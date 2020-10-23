@@ -27,10 +27,6 @@ FSCONFIG_mx8mm = "fsimx8mm_defconfig"
 FSCONFIG_mx8m = "fsimx8m_defconfig"
 FSCONFIG_mx8mn = "fsimx8mn_defconfig"
 
-# Prevent the galcore-module from beeing build, because it is already
-# included in the F&S-Linux-Kernel as a build-in
-RPROVIDES_kernel-image += "kernel-module-imx-gpu-viv"
-
 do_extraunpack () {
 	mv ${WORKDIR}/linux-fus/* ${S}/
 }
