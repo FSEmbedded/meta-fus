@@ -38,6 +38,7 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     mtd-utils-ubifs \
     lmbench \
     fbset \
+    fbida \
     strace \
     ltrace \
     gdb \
