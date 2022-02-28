@@ -64,7 +64,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     matchbox-desktop matchbox-terminal \
     shutdown-desktop \
     libsdl', '', d)} \
-	fs-startscript \
 "
 CORE_IMAGE_EXTRA_INSTALL_remove += " \
 ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'matchbox-keyboard matchbox-keyboard-applet matchbox-keyboard-im matchbox-panel-2 \

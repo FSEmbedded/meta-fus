@@ -70,3 +70,4 @@ echo "" >> $BUILD_DIR/conf/local.conf
 echo "# We remove the optee layer from the build for now because it causes trouble with the machine" >> $BUILD_DIR/conf/local.conf
 echo "# name and we do not support optee on our boards so far." >> $BUILD_DIR/conf/local.conf
 echo "BBMASK += \"meta-fsl-bsp-release/imx/meta-bsp/recipes-security/optee-imx/ \"" >> $BUILD_DIR/conf/local.conf
+echo "CORE_IMAGE_EXTRA_INSTALL += \"fs-startscript \"" >> $BUILD_DIR/conf/local.conf
