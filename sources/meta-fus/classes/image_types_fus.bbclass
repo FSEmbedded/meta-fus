@@ -223,7 +223,11 @@ generate_imx_sdcard () {
                         dd if=${DEPLOY_DIR_IMAGE}/u-boot-${MACHINE}.${UBOOT_SUFFIX_SDCARD} of=${SDCARD} conv=notrunc seek=69 bs=1K
                     fi
 		else
-                    dd if=${DEPLOY_DIR_IMAGE}/u-boot-${MACHINE}.${UBOOT_SUFFIX_SDCARD} of=${SDCARD} conv=notrunc seek=2 bs=512
+                    if [ -n "${UBOOT_SEEK}" ]; then
+                        dd if=${DEPLOY_DIR_IMAGE}/u-boot-${MACHINE}.${UBOOT_SUFFIX_SDCARD} of=${SDCARD} conv=notrunc seek=${UBOOT_SEEK} bs=1K
+                    else
+                        dd if=${DEPLOY_DIR_IMAGE}/u-boot-${MACHINE}.${UBOOT_SUFFIX_SDCARD} of=${SDCARD} conv=notrunc seek=2 bs=512
+                    fi
 		fi
 		;;
 		barebox)
@@ -370,4 +374,42 @@ IMAGE_TYPEDEP_sdcard += "${@d.getVar('SDCARD_ROOTFS', 1).split('.')[-1]}"
 IMAGE_TYPEDEP_sdcard += " \
     ${@bb.utils.contains('IMAGE_FSTYPES', 'uboot.mxsboot-sdcard', 'uboot.mxsboot-sdcard', '', d)} \
     ${@bb.utils.contains('IMAGE_FSTYPES', 'barebox.mxsboot-sdcard', 'barebox.mxsboot-sdcard', '', d)} \
+"
+
+# rename wic image to be confirmed with naming convention
+do_rename_wic_image() {
+	cd ${IMGDEPLOYDIR}
+	cp ${IMAGE_NAME}.rootfs.wic ${IMAGE_NAME}.sysimg
+	ln -sf ${IMAGE_NAME}.sysimg ${IMAGE_BASENAME}-${MACHINE}.sysimg
+	# remove old images
+	rm -f ${IMAGE_NAME}.rootfs.wic
+	rm -f ${IMAGE_BASENAME}-${MACHINE}.wic
+	cd -
+}
+
+do_rename_wic_gz_image() {
+	cd ${IMGDEPLOYDIR}
+	gzip -d ${IMAGE_NAME}.rootfs.wic.gz
+	cp ${IMAGE_NAME}.rootfs.wic ${IMAGE_NAME}.sysimg
+	ln -sf ${IMAGE_NAME}.sysimg ${IMAGE_BASENAME}-${MACHINE}.sysimg
+	# remove old images
+	rm -f ${IMAGE_NAME}.rootfs.wic
+	rm -f ${IMAGE_BASENAME}-${MACHINE}.wic.gz
+	cd -
+}
+
+do_rename_sdcard_image() {
+	cd ${IMGDEPLOYDIR}
+	cp ${IMAGE_NAME}.rootfs.sdcard ${IMAGE_NAME}.sysimg
+	ln -sf ${IMAGE_NAME}.sysimg ${IMAGE_BASENAME}-${MACHINE}.sysimg
+	# remove old images
+	rm -f ${IMAGE_NAME}.rootfs.sdcard
+	rm -f ${IMAGE_BASENAME}-${MACHINE}.sdcard
+	cd -
+}
+
+IMAGE_POSTPROCESS_COMMAND += " \
+    ${@bb.utils.contains('IMAGE_FSTYPES', 'wic', 'do_rename_wic_image;', '', d)} \
+    ${@bb.utils.contains('IMAGE_FSTYPES', 'wic.gz', 'do_rename_wic_gz_image', '', d)} \
+    ${@bb.utils.contains('IMAGE_FSTYPES', 'sdcard', 'do_rename_sdcard_image;', '', d)} \
 "

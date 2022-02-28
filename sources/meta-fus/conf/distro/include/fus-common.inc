@@ -21,6 +21,13 @@ PREFERRED_PROVIDER_virtual/kernel_mx6ul = "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel_mx6sx = "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel_mx7ulp = "linux-fus"
 
+# The FSTYPES need to be set here with "=" instead of "?=",  otherwise they will get
+# overwritten in meta-fsl-bsp-release/imx/meta-sdk/conf/distro/include/fsl-imx-base.inc
+# Priorities should be like this:
+# 1. IMAGE_FSTYPES_mx6ul  = "sdcard" (overwrites 2,3 and 4)
+# 2. IMAGE_FSTYPES_mx6ul ?= "sdcard" (overwrites 3 and 4)
+# 3. IMAGE_FSTYPES        = "sdcard" (overwrites 4) <-- fsl-imx-base.inc
+# 4. IMAGE_FSTYPES       ?= "sdcard"
 IMAGE_FSTYPES = "ubifs sdcard"
 
 MKUBIFS_ARGS = "-m 2048 -e 126976 -c 2048"
