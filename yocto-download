@@ -37,7 +37,7 @@ echo "Downloading all Yocto packages (repo sync)"
 ./repo sync
 
 # Download mono layer
-DOWNLOAD_URL=http://git.yoctoproject.org/cgit/cgit.cgi/meta-mono
+DOWNLOAD_URL=https://git.yoctoproject.org/meta-mono
 BRANCH=rocko
 git clone $DOWNLOAD_URL sources/meta-mono -b $BRANCH
 
