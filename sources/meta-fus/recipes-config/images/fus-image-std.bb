@@ -21,6 +21,10 @@ SOC_TOOLS_GPU_mx6q  = "${SOC_TOOLS_GPU_IMX6QDLSX}"
 SOC_TOOLS_GPU_mx6dl = "${SOC_TOOLS_GPU_IMX6QDLSX}"
 SOC_TOOLS_GPU_mx6sx = "${SOC_TOOLS_GPU_IMX6QDLSX}"
 
+RDEPENDS_${PN} += " \
+	fs-installscript \
+"
+
 CORE_IMAGE_EXTRA_INSTALL += " \
     packagegroup-fsl-gstreamer1.0 \
     packagegroup-fsl-gstreamer1.0-full \
