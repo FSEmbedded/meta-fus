@@ -61,6 +61,7 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     linux-firmware-wl12xx \
     linux-firmware-wl18xx \
     linux-firmware-sd8787 \
+    linux-firmware-sd8997 \
     v4l-utils \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
