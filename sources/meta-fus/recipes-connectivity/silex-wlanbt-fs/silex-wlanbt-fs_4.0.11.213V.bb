@@ -6,7 +6,7 @@ inherit module
 kfirmdir = "/lib/firmware"
 kmoddir = "/lib/modules/${KERNEL_VERSION}"
 SRC_URI = " http://source.codeaurora.org/external/wlan/qcacld-2.0/snapshot/${PV}.tar.gz \
-			file://S02silex \
+			file://silex.service \
 		  	file://0001-qcacld-2.0-Fix-build-error-in-third-party-platform.patch \
 		  	file://0002-qcacld-2.0-Don-t-define-pci-related-api-if-HIF_PCI-i.patch \
 			file://0003-Do-not-allocate-RAM-dump-buffer.patch \
@@ -42,31 +42,26 @@ RDEPENDS_${PN} += "wpa-supplicant hostapd"
 
 do_install() {
     install -d ${D}${kmoddir}/extra
-    install -d ${D}${sysconfdir}/rc1.d
-    install -d ${D}${sysconfdir}/rc2.d
-    install -d ${D}${sysconfdir}/rc3.d
-    install -d ${D}${sysconfdir}/rc4.d
-    install -d ${D}${sysconfdir}/rc5.d
-	install -d ${D}${sysconfdir}/init.d
+    install -d ${D}${systemd_system_unitdir}
+    install -d ${D}${base_libdir}/firmware/wlan
 # install modules
 
     install -m 0644 ${S}/wlan.ko ${D}${kmoddir}/extra
 
 # install startscript
-    install -m 0755 ${WORKDIR}/S02silex ${D}${sysconfdir}/init.d/
-    ln -sf ../init.d/S02silex  ${D}${sysconfdir}/rc1.d/S02silex
-    ln -sf ../init.d/S02silex  ${D}${sysconfdir}/rc2.d/S02silex
-    ln -sf ../init.d/S02silex  ${D}${sysconfdir}/rc3.d/S02silex
-    ln -sf ../init.d/S02silex  ${D}${sysconfdir}/rc4.d/S02silex
-    ln -sf ../init.d/S02silex  ${D}${sysconfdir}/rc5.d/S02silex
+    install -m 0644 ${WORKDIR}/silex.service ${D}${systemd_system_unitdir}/
+    ln -sf ../../../run/Silex-MAC  ${D}${base_libdir}/firmware/wlan/wlan_mac.bin
+}
+
+pkg_postinst_${PN} () {
+    OPTS=""
+    if [ -n "$D" ]; then
+        OPTS="--root=$D"
+    fi
+    systemctl $OPTS enable silex.service
 }
 
 FILES_${PN} += "${kmoddir}/extra-/wlan.ko"
-FILES_${PN} += "${sysconfdir}/init.d/S02silex"
-FILES_${PN} += "${sysconfdir}/rc1.d \
-				${sysconfdir}/rc2.d \
-				${sysconfdir}/rc3.d \
-				${sysconfdir}/rc4.d \
-				${sysconfdir}/rc5.d \
-				${sysconfdir}/init.d \
+FILES_${PN} += "${base_libdir}/firmware/wlan/wlan_mac.bin \
+				${systemd_system_unitdir}/silex.service \
 "

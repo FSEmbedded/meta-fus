@@ -1,5 +1,3 @@
-#!/bin/sh
-#
 # The Silex QCA9377 WLAN driver can use a file /lib/firmware/wlan/wlan_mac.bin
 # to set the current MAC address. F&S U-Boot will dynamically generate an
 # appropriate file that will show up in Linux as /sys/bdinfo/Silex-MAC. So
@@ -11,29 +9,14 @@
 # /run/Silex-MAC and use this script here to copy the file from /sys/bdinfo to
 # /run early in the boot process. /run is a RAM disk (tmpfs), so this will also
 # work on a read-only root filesystem.
-#
-# Remark: This script has to run before udev (via S10udev) loads the Silex WLAN
-# driver and after sysfs is mounted (via inittab). Therefore the name S02silex.
 
-bdinfo_silex_mac=/sys/bdinfo/Silex-MAC
-run_silex_mac=/run/Silex-MAC
+[Unit]
+Description=Silex MAC Address Service
+Before=network.target
 
-case "$1" in
-    start|restart|reload)
-	if [ -e $bdinfo_silex_mac ] ; then
-            echo "Preparing WLAN MAC address"
-	    cp -f $bdinfo_silex_mac $run_silex_mac
-	else
-	    # Create a dummy file to avoid a dangling symbolic link
-            echo "Missing WLAN MAC address ($bdinfo_silex_mac)"
-	    echo "# Missing MAC address, use default" > $run_silex_mac
-	fi
-        ;;
+[Service]
+Type=simple
+ExecStart=/bin/cp -f /sys/bdinfo/Silex-MAC /run/Silex-MAC
 
-    stop)
-        ;;
-
-    *)
-        echo "Usage: $0 {start|stop|restart}"
-        ;;
-esac
+[Install]
+WantedBy=network.target
