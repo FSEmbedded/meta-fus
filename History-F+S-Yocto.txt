@@ -1,6 +1,19 @@
 Version History for Yocto on F&S Boards and Modules
 ===================================================
 
+yocto-2.4-fsimx6ul-Y2020.03.1 (15.03.2022)
+------------------------------------------
+Supported boards: efusA7UL, PicoCoreMX6UL, PicoCoreMX6UL100, PicoMODA7
+
+- Fix download for meta-mono layer
+- Add updated device trees to fsimx6ul.conf
+- Fix core-image-minimal build
+- Add support to build install.scr
+- Add firmware for sd8997
+- Fix passing of ethaddr for Silex WLAN module
+
+
+
 yocto-2.4-fsimx6ul-Y2020.03 (26.03.2020 based on Yocto 2.4 Rocko)
 ------------------------------------------------------------------
 Supported architectures: fsimx6, fsimx6x, fsimx6ul
