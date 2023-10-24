@@ -21,6 +21,9 @@ if test ${update_state} = "uboot" || test ${update_state} = "nboot";
 then
 load ${updatedev} ${loadaddr} ${update_state}-${arch}.fs
 fsimage save || run do_message &&  run do_cleanup && exit 1
+# Reset linux device tree name to default for the new kernel
+env default platform
+env default bootfdt
 saveenv
 reset
 fi
@@ -34,19 +37,28 @@ then
 
 # NANDBOOT
 # Load kernel image and store in partition Kernel
+size ${updatedev} ${bootfile}-${arch}; setenv update_chunk_size $filesize
 load ${updatedev} ${loadaddr} ${bootfile}-${arch}
+run is_error && exit 1
 nand erase.part Kernel
 nand write ${loadaddr} Kernel ${filesize}
+
 # Load device tree blob and store in partition FDT
+size ${updatedev} ${loadaddr} ${bootfdt}; setenv update_chunk_size $filesize
 load ${updatedev} ${loadaddr} ${bootfdt}
+run is_error && exit 1
 nand erase.part FDT
 nand write ${loadaddr} FDT ${filesize}
+
 # Load root filesystem
+size ${updatedev} ${loadaddr} rootfs-${arch}.ubifs; setenv update_chunk_size $filesize
 load ${updatedev} ${loadaddr} rootfs-${arch}.ubifs
+run is_error && exit 1
 # Create UBI with volume rootfs on partition TargetFS
-nand erase.part TargetFS
+# nand erase.part TargetFS is not needed if there is already ann rootfs
+# nand erase.part TargetFS
 ubi part TargetFS
-ubi create rootfs
+#ubi create rootfs
 # Store root filesystem in UBI volume rootfs
 ubi write ${loadaddr} rootfs ${filesize}
 # Set default configuration: kernel and fdt from NAND, rootfs from ubifs
