@@ -1,0 +1,12 @@
+diff --git a/recipes-bsp/u-boot/u-boot-fus.bb b/recipes-bsp/u-boot/u-boot-fus.bb
+index fb18388..9d52ac5 100644
+--- a/recipes-bsp/u-boot/u-boot-fus.bb
++++ b/recipes-bsp/u-boot/u-boot-fus.bb
+@@ -6,7 +6,6 @@ require recipes-bsp/u-boot/u-boot.inc
+ 
+ PROVIDES += "u-boot"
+ DEPENDS:append = " python3 dtc-native bison-native"
+-RDEPENDS:${PN}:append = " fs-installscript"
+ 
+ LICENSE = "GPL-2.0-or-later"
+ LIC_FILES_CHKSUM = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"

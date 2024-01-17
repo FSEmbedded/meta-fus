@@ -1,4 +1,4 @@
-PREFERRED_PROVIDER_virtual/bootloader:imx-nxp-bsp = "u-boot-imx"
+PREFERRED_PROVIDER_virtual/bootloader:imx-nxp-bsp = "u-boot-fus"
 PREFERRED_PROVIDER_virtual/kernel:imx-nxp-bsp = "linux-fus"
 
 PREFERRED_VERSION_gstreamer1.0-plugins-base = "1.20.3.imx"
