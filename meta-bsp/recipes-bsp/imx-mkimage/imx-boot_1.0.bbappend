@@ -4,12 +4,12 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 SRC_URI[md5sum] = "ce864e0f149993d41e9480bf4c2e8510"
 SRC_URI += "file://0001-Add-option-arg-for-nand-device.patch"
-SRC_URI[md5sum] = "b8282a2b78c1f40043f50e9333e07769"
-SRC_URI += "file://0002-Correct-dtbs-env-to-use-different-DTs.patch"
+#SRC_URI[md5sum] = "b8282a2b78c1f40043f50e9333e07769"
+#SRC_URI += "file://0002-Correct-dtbs-env-to-use-different-DTs.patch"
 
 BOOT_CONFIG_MACHINE_FS = "u-boot-${MACHINE}-${UBOOT_CONFIG}.${UBOOT_SUFFIX}"
 
-do_compile() {
+do_compile_mx8m() {
     compile_${SOC_FAMILY}
     # Copy TEE binary to SoC target folder to mkimage
     if ${DEPLOY_OPTEE}; then
@@ -23,7 +23,7 @@ do_compile() {
            make SOC=${SOC_TARGET} DTB=${UBOOT_DTB_NAME} ${REV_OPTION} V2X=NO  flash_linux_m4
         else
            bbnote "building ${SOC_TARGET} - ${REV_OPTION} ${target}"
-           make SOC=${SOC_TARGET} DTB=${UBOOT_DTB_NAME} ${REV_OPTION} ${target}
+           make SOC=${SOC_TARGET} dtbs=${UBOOT_DTB_NAME} ${REV_OPTION} ${target}
         fi
         if [ -e "${BOOT_STAGING}/flash.bin" ]; then
             cp ${BOOT_STAGING}/flash.bin ${S}/${BOOT_CONFIG_MACHINE_FS}
@@ -36,14 +36,14 @@ extract_nb0_fsimx8mp() {
     dd  if=${BOOT_CONFIG_MACHINE_FS} of=uboot-${MACHINE}-${UBOOT_CONFIG}.nb0 bs=1K skip=352
 }
 
-do_install () {
+do_install_mx8m () {
     install -d ${D}/boot
     for target in ${IMXBOOT_TARGETS}; do
         install -m 0644 ${S}/${BOOT_CONFIG_MACHINE_FS} ${D}/boot/
     done
 }
 
-do_deploy() {
+do_deploy_mx8m() {
     deploy_${SOC_FAMILY}
     # copy tee.bin to deploy path
     if "${DEPLOY_OPTEE}"; then

@@ -6,11 +6,11 @@ LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 inherit kernel
 
-SUMMARY = "Linux Kernel for F&S i.MX6/7/8-based boards and modules"
+SUMMARY = "Linux Kernel for F&S i.MX6/7/8/9-based boards and modules"
 
 DEPENDS += "lzop-native bc-native"
 
-COMPATIBLE_MACHINE = "(mx6|mx7|mx8)"
+COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 # SRC_URI and SRCREV are set in the bbappend file
 
@@ -29,6 +29,7 @@ KBUILD_DEFCONFIG:mx7ulp-nxp-bsp = "fsimx7ulp_defconfig"
 KBUILD_DEFCONFIG:mx8mm-nxp-bsp = "fsimx8mm_defconfig"
 KBUILD_DEFCONFIG:mx8mn-nxp-bsp = "fsimx8mn_defconfig"
 KBUILD_DEFCONFIG:mx8mp-nxp-bsp = "fsimx8mp_defconfig"
+KBUILD_DEFCONFIG:mx93-nxp-bsp = "fsimx93_defconfig"
 
 # Prevent the galcore-module from beeing build, because it is already
 # included in the F&S-Linux-Kernel as a build-in

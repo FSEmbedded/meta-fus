@@ -46,7 +46,8 @@ DISTRO=$DISTRO MACHINE=$MACHINE . $FSL_SETUP_RELEASE -b $BUILD_DIR
 
 # Add FuS-Layer
 echo "" >> $BUILD_DIR/conf/bblayers.conf
-echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus \"" >> $BUILD_DIR/conf/bblayers.conf
+echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus/meta-bsp \"" >> $BUILD_DIR/conf/bblayers.conf
+echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus/meta-sdk \"" >> $BUILD_DIR/conf/bblayers.conf
 
 # Determine root file system mode
 if [ "$FS_MODE" == "ro" ]

@@ -9,7 +9,7 @@ DEPENDS:append = " python3 dtc-native bison-native"
 RDEPENDS:${PN}:append = " fs-installscript"
 
 LICENSE = "GPL-2.0-or-later"
-LIC_FILES_CHKSUM = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
+LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
 # SRC_URI and SRCREV are set in the bbappend file
 
@@ -28,7 +28,7 @@ S = "${WORKDIR}/git"
 B = "${WORKDIR}/build"
 
 UBOOT_MAKE_TARGET = "all"
-COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8)"
+COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 
 # Necessary ???
 # FIXME: Allow linking of 'tools' binaries with native libraries

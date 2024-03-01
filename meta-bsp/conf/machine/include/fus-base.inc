@@ -18,6 +18,8 @@ PREFERRED_PROVIDER_virtual/kernel:mx8mm-nxp-bsp ??= "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel:mx8mn-nxp-bsp ??= "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel:mx8mp-nxp-bsp ??= "linux-fus"
 
+PREFERRED_PROVIDER_virtual/kernel:mx93-nxp-bsp ??= "linux-fus"
+
 PREFERRED_PROVIDER_u-boot = "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx6-nxp-bsp    ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx6sx-nxp-bsp  ??= "u-boot-fus"
@@ -27,6 +29,8 @@ PREFERRED_PROVIDER_virtual/bootloader:mx7ulp-nxp-bsp ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx8mm-nxp-bsp  ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx8mn-nxp-bsp  ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx8mp-nxp-bsp  ??= "u-boot-fus"
+
+PREFERRED_PROVIDER_virtual/bootloader:imx93-nxp-bsp  ??= "u-boot-fus"
 
 # Remove Kernel image from the rootfs, because it is located in an own
 # partition.
