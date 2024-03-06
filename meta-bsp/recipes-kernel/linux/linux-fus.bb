@@ -12,7 +12,12 @@ DEPENDS += "lzop-native bc-native"
 
 COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
+FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 # SRC_URI and SRCREV are set in the bbappend file
+SRC_URI:append:mx93-nxp-bsp = " \
+    file://0001-vt-conmakehash-improve-reproducibility.patch \
+    file://0001-lib-build_OID_registry-fix-reproducibility-issues.patch \
+"
 
 S = "${WORKDIR}/git"
 PV = "+git${SRCPV}"
