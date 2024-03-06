@@ -15,6 +15,5 @@
 # We have to use UBOOT_WIC_BINARY instead of UBOOT_BINARY. In UBOOT_WIC_BINARY the FS header is removed.
 part u-boot --source rawcopy --sourceparams="file=${UBOOT_WIC_BINARY}" --ondisk mmcblk --no-table --align ${UBOOT_OFFSET}
 part /boot --source bootimg-partition --ondisk mmcblk --fstype=vfat --label boot --active --align 8192 --fixed-size 88
-part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 8192 --overhead-factor 1.0 --extra-space 0
-
+part / --source rootfs --ondisk mmcblk --fstype=ext4 --label root --align 8192
 bootloader --ptable msdos
