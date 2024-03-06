@@ -38,6 +38,14 @@ if [ -z "$BUILD_DIR" ]; then
    	BUILD_DIR=build-$MACHINE-$DISTRO
 fi
 
+BUILD_DIR_REALPATH="$PWD/$BUILD_DIR"
+
+if [ -z "$OEROOT_DIR" ]; then
+	OEROOT_DIR=$PWD/sources/poky
+	if [ -e $PWD/sources/oe-core ]; then
+    	OEROOT_DIR=$PWD/sources/oe-core
+	fi
+fi
 # Path to fsl-setup-release.sh script
 FSL_SETUP_RELEASE=sources/meta-imx/tools/imx-setup-release.sh
 
@@ -79,4 +87,13 @@ for INIT_SCRIPT in $LIST_OF_INIT_SCRIPTS; do
 		sh ../${INIT_SCRIPT}/scripts/fus_setup.sh $BUILD_DIR ${INIT_SCRIPT}/scripts
 	fi
 done
+
+# make a source_env file
+if [ ! -e source_env ]; then
+    echo "#!/bin/sh" >> source_env
+    echo "cd $OEROOT_DIR" >> source_env
+    echo "set -- $BUILD_DIR_REALPATH" >> source_env
+    echo ". ./oe-init-build-env > /dev/null" >> source_env
+    echo "echo \"Back to build project $(basename $BUILD_DIR_REALPATH).\"" >> source_env
+fi
 ###
