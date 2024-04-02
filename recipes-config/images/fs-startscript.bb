@@ -11,7 +11,9 @@ SRC_URI = " \
            file://fsalias.sh \
            file://systemd-fsgetty-generator \
            file://81-wired-lan.network \
-           file://99-TSC2004-touchscreen.rules "
+           file://99-TSC2004-touchscreen.rules \
+           file://99-SX8654-touchscreen.rules "
+
 
 HAS_X11 = "${@bb.utils.contains("DISTRO_FEATURES", "x11", "yes", "no", d)}"
 
@@ -36,6 +38,7 @@ do_install() {
 	install -m 0644 ${WORKDIR}/81-wired-lan.network ${D}${systemd_unitdir}/network/
 
 	install -m 0644 ${WORKDIR}/99-TSC2004-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
+	install -m 0644 ${WORKDIR}/99-SX8654-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
 
 }
 
@@ -47,4 +50,5 @@ FILES:${PN} = "\
     ${systemd_unitdir}/system-generators/ \
     ${systemd_unitdir}/network/ \
     ${sysconfdir}/udev/rules.d/99-TSC2004-touchscreen.rules\
+    ${sysconfdir}/udev/rules.d/99-SX8654-touchscreen.rules\
 "
