@@ -37,7 +37,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     lmbench \
     libgpiod \
     libgpiod-tools \
-    fbida \
     firmwared \
     strace \
     ltrace \
