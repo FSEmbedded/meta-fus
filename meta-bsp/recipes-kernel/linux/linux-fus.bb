@@ -34,6 +34,7 @@ KBUILD_DEFCONFIG:mx7ulp-nxp-bsp = "fsimx7ulp_defconfig"
 KBUILD_DEFCONFIG:mx8mm-nxp-bsp = "fsimx8mm_defconfig"
 KBUILD_DEFCONFIG:mx8mn-nxp-bsp = "fsimx8mn_defconfig"
 KBUILD_DEFCONFIG:mx8mp-nxp-bsp = "fsimx8mp_defconfig"
+KBUILD_DEFCONFIG:mx8ulp-nxp-bsp = "fsimx8ulp_defconfig"
 KBUILD_DEFCONFIG:mx93-nxp-bsp = "fsimx93_defconfig"
 
 # Prevent the galcore-module from beeing build, because it is already
