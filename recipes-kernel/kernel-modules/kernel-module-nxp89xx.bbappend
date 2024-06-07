@@ -5,7 +5,8 @@ FILES:${PN} = "\
 "
 
 SRC_URI += " file://001-Create-module.aliases-for-the-sdio-devices.patch \
-			 file://mxm-wifiex.conf"
+			 file://mxm-wifiex.conf \
+			 file://0001-Fix-sizeof-sa_data-on-Kernel-5-15-160.patch;striplevel=3"
 
 
 # fsimx6ul does not support PCIE
