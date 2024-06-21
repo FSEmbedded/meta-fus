@@ -14,6 +14,7 @@ MKUBIFS_ARGS ??= "-m 2048 -e 126976 -c 2048"
 # image_types_fsl.bbclass
 IMAGE_CLASSES:remove = "image_types_fsl"
 IMAGE_CLASSES += "image_types_fus"
+IMAGE_NAME_SUFFIX ?= ""
 
 # need hosttools crc32 for U-Boot addfsheader.sh
 HOSTTOOLS_NONFATAL:append:mx8 = " crc32"
