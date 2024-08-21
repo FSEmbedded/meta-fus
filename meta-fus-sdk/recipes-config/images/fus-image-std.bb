@@ -66,3 +66,11 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init weston-examples', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
 "
+
+# remove getty tty1 service because of using runtime generated
+# 'fsserial-getty@.service' service
+ROOTFS_POSTPROCESS_COMMAND = "remove_default_getty_service; "
+remove_default_getty_service () {
+    rm -f ${IMAGE_ROOTFS}/lib/systemd/system/getty@.service
+    rm -f ${IMAGE_ROOTFS}/etc/systemd/system/getty.target.wants/getty@tty1.service
+}
