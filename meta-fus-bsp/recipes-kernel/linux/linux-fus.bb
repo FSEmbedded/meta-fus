@@ -16,7 +16,6 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 # SRC_URI and SRCREV are set in the bbappend file
 SRC_URI:append:mx93-nxp-bsp = " \
     file://0001-vt-conmakehash-improve-reproducibility.patch \
-    file://0001-lib-build_OID_registry-fix-reproducibility-issues.patch \
 "
 
 S = "${WORKDIR}/git"
@@ -46,7 +45,6 @@ RCONFLICTS:${KERNEL_PACKAGE_NAME}-base += "kernel-module-imx-gpu-viv"
 do_extraunpack () {
 	mv ${WORKDIR}/linux-fus/* ${S}/
 }
-
 
 kernel_do_configure:prepend() {
 	install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
