@@ -10,3 +10,5 @@ CONFLICT_DISTRO_FEATURES = "directfb"
 IMAGE_INSTALL += " \
     packagegroup-qt6-fsimx \
 "
+
+IMAGE_NAME_SUFFIX = "-qt"
