@@ -41,14 +41,16 @@ COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 do_compile:prepend() {
 	if [ "${SCMVERSION}" = "y" ]; then
 		# Add GIT revision to the local version
-		head=`cd ${S} ; git tag --points-at HEAD 2> /dev/null`
+		# get annotated tag name only
+		head=`cd ${S} ; git tag --contains HEAD --format='%(objecttype) %(refname:strip=2)' | \
+				grep '^tag ' | awk '{print $2}' 2> /dev/null`
 		sep="-"
 		if [ -z "${head}" ]; then
 			head=`cd ${S} ; git rev-parse --verify --short HEAD 2> /dev/null`
 			sep="+g"
 		fi
-			printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${S}/.scmversion
-			printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${B}/.scmversion
+		printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${S}/.scmversion
+		printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${B}/.scmversion
 	else
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${S}/.scmversion
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${B}/.scmversion
