@@ -1,20 +1,22 @@
 # Copyright (C) 2020 F&S Elektronik Systeme GmbH
 # Released under the MIT license (see COPYING.MIT for the terms)
 
-DESCRIPTION = "bootloader for F&S boards and modules"
+DESCRIPTION = "u-boot bootloader for F&S boards and modules"
 require recipes-bsp/u-boot/u-boot.inc
 
 PROVIDES += "u-boot"
-DEPENDS:append = " python3 dtc-native bison-native"
+DEPENDS:append = " python3 dtc-native bison-native libarchive-native xxd-native"
+DEPENDS:append = " \
+	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf', '', d)} \
+	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-fus', '', d)} \
+"
+
 RDEPENDS:${PN}:append = " fs-installscript"
 
 LICENSE = "GPL-2.0-or-later"
 LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
 # SRC_URI and SRCREV are set in the bbappend file
-
-S = "${WORKDIR}/git"
-PV = "+git${SRCPV}"
 
 SCMVERSION ??= "y"
 LOCALVERSION ??= "-F+S"
@@ -26,8 +28,9 @@ SRC_URI += '${@bb.utils.contains("IMAGE_FEATURES", "read-only-rootfs", "", "file
 
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build"
+PV = "+git${SRCPV}"
 
-UBOOT_MAKE_TARGET = "all"
+UBOOT_MAKE_TARGET ??= "all"
 COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 
 # Necessary ???
@@ -37,6 +40,12 @@ COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 #EXTRA_OEMAKE += 'HOSTCC="${BUILD_CC} ${BUILD_CPPFLAGS}" \
 #                 HOSTLDFLAGS="${BUILD_LDFLAGS}" \
 #                 HOSTSTRIP=true'
+
+NEED_OPTEE = "${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'true', 'false', d)}"
+NEED_ATF = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'true', 'false', d)}"
+UBOOT_FILE = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'uboot-info.fs', 'uboot.fs', d)}"
+
+inherit deploy
 
 do_compile:prepend() {
 	if [ "${SCMVERSION}" = "y" ]; then
@@ -55,6 +64,26 @@ do_compile:prepend() {
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${S}/.scmversion
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${B}/.scmversion
 	fi
+
+	#Copy Firmware files into NXP-Firmware
+	if ${NEED_ATF}; then
+		cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/board/F+S/NXP-Firmware/bl31.bin
+	fi
+
+	if ${NEED_OPTEE}; then
+		cp ${DEPLOY_DIR_IMAGE}/bl32.bin ${S}/board/F+S/NXP-Firmware/bl32.bin
+	fi
+}
+
+do_deploy:append() {
+	install -d ${DEPLOY_DIR_IMAGE}/Firmware/
+	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
+
+	for config in ${UBOOT_MACHINE}; do
+		install -m 0644 ${B}/${config}/board/F+S/NXP-Firmware/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
+		install -m 0644 ${B}/${config}/${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}_${PV}.fs
+		ln -sf ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}_${PV}.fs ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}.fs
+	done
 }
 
 PACKAGE_ARCH = "${MACHINE_ARCH}"
