@@ -16,9 +16,6 @@ IMAGE_CLASSES:remove = "image_types_fsl"
 IMAGE_CLASSES += "image_types_fus"
 IMAGE_NAME_SUFFIX ?= ""
 
-# need hosttools crc32 for U-Boot addfsheader.sh
-HOSTTOOLS_NONFATAL:append:mx8 = " crc32"
-
 CORE_IMAGE_EXTRA_INSTALL:append = " fs-startscript "
 
 # Remove Kernel Image from rootfs

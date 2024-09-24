@@ -8,7 +8,7 @@ PROVIDES += "u-boot"
 DEPENDS:append = " python3 dtc-native bison-native libarchive-native xxd-native"
 DEPENDS:append = " \
 	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf', '', d)} \
-	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-fus', '', d)} \
+	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os', '', d)} \
 "
 
 RDEPENDS:${PN}:append = " fs-installscript"
@@ -71,10 +71,13 @@ do_compile:prepend() {
 	#Copy Firmware files into NXP-Firmware
 	if ${NEED_ATF}; then
 		cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/board/F+S/NXP-Firmware/bl31.bin
+		if ${NEED_OPTEE}; then
+			cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin-optee ${S}/board/F+S/NXP-Firmware/bl31-optee.bin
+		fi
 	fi
 
 	if ${NEED_OPTEE}; then
-		cp ${DEPLOY_DIR_IMAGE}/bl32.bin ${S}/board/F+S/NXP-Firmware/bl32.bin
+		cp ${DEPLOY_DIR_IMAGE}/tee.bin ${S}/board/F+S/NXP-Firmware/bl32.bin
 	fi
 }
 
@@ -82,10 +85,11 @@ do_deploy:append() {
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
 
-	for config in ${UBOOT_MACHINE}; do
-		install -m 0644 ${B}/${config}/board/F+S/NXP-Firmware/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
-		install -m 0644 ${B}/${config}/${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}_${PV}.fs
-		ln -sf ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}_${PV}.fs ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}.fs
+	for config in ${UBOOT_CONFIG}; do
+		install -m 0644 ${B}/${config}_defconfig/board/F+S/NXP-Firmware/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
+		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
+		cd ${DEPLOY_DIR_IMAGE}/ && ln -sf Firmware/uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
+		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 	done
 }
 

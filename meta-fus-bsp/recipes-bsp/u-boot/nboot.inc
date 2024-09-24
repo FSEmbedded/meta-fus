@@ -49,10 +49,9 @@ do_deploy() {
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
 
 	install -m 0644 ${B}/board/F+S/NXP-Firmware/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
-	install -m 0644 ${B}/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/nboot_${UBOOT_CONFIG_BASENAME}_${PV}.fs
-	ln -sf ${DEPLOY_DIR_IMAGE}/Firmware/nboot_${UBOOT_CONFIG_BASENAME}_${PV}.fs ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs
-
-	for config in ${UBOOT_MACHINE}; do 
+	install -m 0644 ${B}/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/nboot-${UBOOT_CONFIG_BASENAME}-${PV}.fs
+	cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf nboot-${UBOOT_CONFIG_BASENAME}-${PV}.fs ./nboot.fs; cd -
+	for config in ${UBOOT_CONFIG}; do
 		cat ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}.fs > ${DEPLOY_DIR_IMAGE}/Firmware/flash_${config}.fs
 	done
 }
