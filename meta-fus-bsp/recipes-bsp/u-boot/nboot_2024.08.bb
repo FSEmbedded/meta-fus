@@ -10,7 +10,9 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
 include nboot.inc
 
-SRC_URI = "git://${DL_DIR}/u-boot-fus;branch=fsimx93;protocol=file"
+# Use this to build from local source
+#SRC_URI = "git://${DL_DIR}/u-boot-fus;branch=fsimx93;protocol=file"
+SRC_URI = "git://github.com/FSEmbedded/u-boot-fus;branch=fsimx93;protocol=https"
 SRCREV = "7ba0ebb30f6007c9cf060c7d2c1935e37ad7ffc7"
 
 S = "${WORKDIR}/git"

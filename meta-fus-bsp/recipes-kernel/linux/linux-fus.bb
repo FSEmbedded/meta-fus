@@ -13,7 +13,12 @@ DEPENDS += "lzop-native bc-native"
 COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
-# SRC_URI and SRCREV are set in the bbappend file
+
+# Use this to build from local source
+#SRC_URI = "git://${DL_DIR}/linux-fus;branch=fsimx93;protocol=file"
+SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=fsimx93;protocol=https"
+SRCREV = "914d17cb21ca3008d4b2e28475b1cc69bdd3f64a"
+
 SRC_URI:append:mx93-nxp-bsp = " \
     file://0001-vt-conmakehash-improve-reproducibility.patch \
 "

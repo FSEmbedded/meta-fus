@@ -16,7 +16,10 @@ RDEPENDS:${PN}:append = " fs-installscript"
 LICENSE = "GPL-2.0-or-later"
 LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
-# SRC_URI and SRCREV are set in the bbappend file
+# Use this to build from local source
+#SRC_URI = "git://${DL_DIR}/u-boot-fus;branch=fsimx93;protocol=file"
+SRC_URI = "git://github.com/FSEmbedded/u-boot-fus;branch=fsimx93;protocol=https"
+SRCREV = "ca14a8d4d4b486bd3f4ed5e83fefc9b79c8442b8"
 
 SCMVERSION ??= "y"
 LOCALVERSION ??= "-F+S"
