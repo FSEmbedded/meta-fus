@@ -1,5 +1,7 @@
 # Common settings for all F&S boards
 
+DISTRO_NAME = "FUS i.MX Release Distro"
+
 MKUBIFS_ARGS ??= "-m 2048 -e 126976 -c 2048"
 
 # Remove image_types_fsl because there is a awk command which search after a
