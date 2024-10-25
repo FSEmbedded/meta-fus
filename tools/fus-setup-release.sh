@@ -60,22 +60,3 @@ else
 	echo
 	echo "Building read/write root file system"
 fi
-
-##
-# Run layer dependend init
-##
-
-OLD_PWD=$PWD
-cd ..
-LIST_OF_INIT_SCRIPTS=$(ls -d sources/*)
-cd $OLD_PWD
-
-for INIT_SCRIPT in $LIST_OF_INIT_SCRIPTS; do
-
-	if [[ -e ../${INIT_SCRIPT}/scripts/fus_setup.sh ]]; then
-		echo "Following extra layer init run": "../${INIT_SCRIPT}/scripts/fus_setup.sh"
-		export BUILD_DIR=$BUILD_DIR
-		sh ../${INIT_SCRIPT}/scripts/fus_setup.sh $BUILD_DIR ${INIT_SCRIPT}/scripts
-	fi
-done
-###
