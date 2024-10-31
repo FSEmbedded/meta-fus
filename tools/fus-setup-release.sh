@@ -47,6 +47,12 @@ DISTRO=$DISTRO MACHINE=$MACHINE . $FSL_SETUP_RELEASE -b $BUILD_DIR
 # Add FuS-Layer
 echo "" >> $BUILD_DIR/conf/bblayers.conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus \"" >> $BUILD_DIR/conf/bblayers.conf
+# Add rauc layer to bblayers.conf
+echo "BBLAYERS += \" \${BSPDIR}/sources/meta-rauc \"" >> $BUILD_DIR/conf/bblayers.conf
+# Add fus-updater layer to bblayers.conf
+echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater \"" >> $BUILD_DIR/conf/bblayers.conf
+# Add fus-updater-azure layer to bblayers.conf
+echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater-azure \"" >> $BUILD_DIR/conf/bblayers.conf
 
 # Determine root file system mode
 if [ "$FS_MODE" == "ro" ]
