@@ -5,7 +5,7 @@ DESCRIPTION = "u-boot bootloader for F&S boards and modules"
 require recipes-bsp/u-boot/u-boot.inc
 
 PROVIDES += "u-boot"
-DEPENDS:append = " python3 dtc-native bison-native libarchive-native xxd-native"
+DEPENDS:append = " python3 dtc-native bison-native libarchive-native xxd-native "
 DEPENDS:append = " \
 	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf', '', d)} \
 	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os', '', d)} \
@@ -19,15 +19,12 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/u-boot-fus;branch=fsimx93;protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/u-boot-fus;branch=fsimx93;protocol=https"
-SRCREV = "ca14a8d4d4b486bd3f4ed5e83fefc9b79c8442b8"
+SRCREV = "4f846f5a7b29e2d934f86918875b3296ee185cb0"
 
 SCMVERSION ??= "y"
 LOCALVERSION ??= "-F+S"
 
 UBOOT_LOCALVERSION = "${LOCALVERSION}"
-
-# Set the u-boot environment variable "mode" to rw if it is not a read-only-rootfs
-SRC_URI += '${@bb.utils.contains("IMAGE_FEATURES", "read-only-rootfs", "", "file://0001-Set-file-system-RW.patch",d)}'
 
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build"
