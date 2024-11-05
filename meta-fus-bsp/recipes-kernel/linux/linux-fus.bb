@@ -14,14 +14,13 @@ COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Use this to build from local source
-#SRC_URI = "git://${DL_DIR}/linux-fus;branch=fsimx93;protocol=file"
-SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=fsimx93;protocol=https"
-SRCREV = "914d17cb21ca3008d4b2e28475b1cc69bdd3f64a"
+# Based on Version fslc-6.6.54-2.1.0-fs1.0
+SRCBRANCH="linux-fus-6.6.x"
+SRCREV = "c3923b13da4eb13939d16d3967cbb5362097e4af"
 
-SRC_URI:append:mx93-nxp-bsp = " \
-    file://0001-vt-conmakehash-improve-reproducibility.patch \
-"
+# Use this to build from local source
+#SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
+SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=${SRCBRANCH};protocol=https"
 
 S = "${WORKDIR}/git"
 PV = "+git${SRCPV}"
