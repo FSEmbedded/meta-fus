@@ -21,20 +21,27 @@ IMAGE_FEATURES += " \
 CORE_IMAGE_EXTRA_INSTALL += " \
     packagegroup-fsl-gstreamer1.0 \
     packagegroup-fsl-gstreamer1.0-full \
+    v4l-utils \
     alsa-utils \
     alsa-tools \
     dosfstools \
-    evtest \
     e2fsprogs-mke2fs \
+    mtd-utils \
+    mtd-utils-ubifs \
+    mmc-utils \
+    evtest \
     fbset \
     i2c-tools \
     spitools \
+    pciutils \
+    can-utils \
+    linux-serial-test \
     iproute2 \
-    memtester \
     ethtool \
-    mtd-utils \
-    mtd-utils-ubifs \
+    iperf3 \
     lmbench \
+    glmark2 \
+    stress-ng \
     libgpiod \
     libgpiod-tools \
     fbida \
@@ -43,17 +50,16 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     ltrace \
     gdb \
     kbd \
-    pciutils \
     libsndfile1 \
     libusb1 \
     libxml2 \
     bluez5 \
-    can-utils \
     iw \
     openssh \
+    libubootenv \
     wpa-supplicant \
     hostapd \
-	psplash \
+    psplash \
     liberation-fonts \
     linux-firmware-wl12xx \
     linux-firmware-wl18xx \
@@ -62,9 +68,9 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     linux-firmware-pcie8997 \
     linux-firmware-atmel-mxt \
     nxp-wlan-sdk \
-    v4l-utils \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init weston-examples', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
+    ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-test', '', d)} \
 "
 
 # remove getty tty1 service because of using runtime generated
