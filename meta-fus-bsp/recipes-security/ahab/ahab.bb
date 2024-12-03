@@ -8,6 +8,7 @@ PROVIDES += "ahab"
 LICENSE = "CLOSED"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:${DL_DIR}:"
+SRC_URI += " file://fsimage.sh "
 
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build"
@@ -15,6 +16,7 @@ B = "${WORKDIR}/build"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 COMPATIBLE_MACHINE = "(mx8|mx93)"
 
+DEPENDS:append = " imx-cst-native "
 inherit deploy
 
 do_configure() {
