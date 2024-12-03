@@ -6,6 +6,8 @@
 
 source ./yocto-f+s-utilities
 
+WORKDIR="$PWD"
+
 # Get the command line parameters
 while getopts "b:m:h" setup_flag
 do
@@ -47,12 +49,21 @@ DISTRO=$DISTRO MACHINE=$MACHINE . $FSL_SETUP_RELEASE -b $BUILD_DIR
 # Add FuS-Layer
 echo "" >> $BUILD_DIR/conf/bblayers.conf
 echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus \"" >> $BUILD_DIR/conf/bblayers.conf
-# Add rauc layer to bblayers.conf
-echo "BBLAYERS += \" \${BSPDIR}/sources/meta-rauc \"" >> $BUILD_DIR/conf/bblayers.conf
-# Add fus-updater layer to bblayers.conf
-echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater \"" >> $BUILD_DIR/conf/bblayers.conf
-# Add fus-updater-azure layer to bblayers.conf
-echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater-azure \"" >> $BUILD_DIR/conf/bblayers.conf
+
+if [ -d "$WORKDIR/sources/meta-rauc" ]; then
+	# Add rauc layer to bblayers.conf
+	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-rauc \"" >> $BUILD_DIR/conf/bblayers.conf
+	echo "DISTRO_FEATURES:append =  \" rauc\"" >> $BUILD_DIR/conf/local.conf
+fi
+if [ -d "$WORKDIR/sources/meta-fus-updater" ]; then
+	# Add fus-updater layer to bblayers.conf
+	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater \"" >> $BUILD_DIR/conf/bblayers.conf
+fi
+if [ -d "$WORKDIR/sources/meta-fus-updater-azure" ]; then
+	# Add fus-updater-azure layer to bblayers.conf
+	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater-azure \"" >> $BUILD_DIR/conf/bblayers.conf
+fi
+
 
 # Determine root file system mode
 if [ "$FS_MODE" == "ro" ]
