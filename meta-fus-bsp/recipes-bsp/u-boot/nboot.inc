@@ -5,6 +5,7 @@ DEPENDS:append = " python3 dtc-native bison-native lzop-native xxd-native"
 DEPENDS:append = " \
 	${IMX_EXTRA_FIRMWARE} \
 	u-boot-fus \
+	${@bb.utils.contains('MACHINE_ESSENTIAL_EXTRA_RRECOMMENDS', 'm33-image', 'm33-image', '', d)} \
 "
 
 EXTRA_OEMAKE:append = " -C ${S} O=${B}"
@@ -17,6 +18,9 @@ EXTRA_OEMAKE:append  = ' CROSS_COMPILE=${TARGET_PREFIX} V=1'
 EXTRA_OEMAKE:append  = ' CC="${TARGET_PREFIX}gcc ${TOOLCHAIN_OPTIONS} ${@bb.utils.contains('DISTRO_FEATURES', 'ld-is-gold', ' -fuse-ld=bfd ', '', d)} ${DEBUG_PREFIX_MAP}"'
 EXTRA_OEMAKE:append = ' HOSTCC="${BUILD_CC} ${BUILD_CFLAGS} ${BUILD_LDFLAGS}"'
 EXTRA_OEMAKE:append = ' STAGING_INCDIR=${STAGING_INCDIR_NATIVE} STAGING_LIBDIR=${STAGING_LIBDIR_NATIVE}'
+
+NEED_M33_IMAGE = "${@bb.utils.contains('MACHINE_ESSENTIAL_EXTRA_RRECOMMENDS', 'm33-image', 'true', 'false', d)}"
+NEED_UPOWER = "${@bb.utils.contains('IMX_EXTRA_FIRMWARE', 'firmware-upower', 'true', 'false', d)}"
 
 do_configure() {
 	oe_runmake ${UBOOT_CONFIG_BASENAME}_defconfig
@@ -35,6 +39,14 @@ do_compile:prepend() {
 	if [ -n "${SECO_FIRMWARE_NAME}" ]; then
 		cp "${DEPLOY_DIR_IMAGE}/${SECO_FIRMWARE_NAME}" "${S}/board/F+S/NXP-Firmware/${SECO_FIRMWARE_NAME}"
 	fi
+
+	if ${NEED_M33_IMAGE}; then
+		cp "${DEPLOY_DIR_IMAGE}/m33_image.bin" "${S}/board/F+S/NXP-Firmware/m33_image.bin"
+	fi
+
+	if ${NEED_UPOWER}; then
+		cp "${DEPLOY_DIR_IMAGE}/imx-boot-tools/upower.bin" "${S}/board/F+S/NXP-Firmware/upower.bin"
+	fi
 }
 
 do_compile() {
@@ -52,6 +64,6 @@ do_deploy() {
 	install -m 0644 ${B}/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/nboot-${UBOOT_CONFIG_BASENAME}-${PV}.fs
 	cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf nboot-${UBOOT_CONFIG_BASENAME}-${PV}.fs ./nboot.fs; cd -
 	for config in ${UBOOT_CONFIG}; do
-		cat ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/uboot_${config}.fs > ${DEPLOY_DIR_IMAGE}/Firmware/flash_${config}.fs
+		cat ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}.fs > ${DEPLOY_DIR_IMAGE}/Firmware/flash_${config}.fs
 	done
 }
