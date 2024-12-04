@@ -64,6 +64,11 @@ if [ -d "$WORKDIR/sources/meta-fus-updater-azure" ]; then
 	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus-updater-azure \"" >> $BUILD_DIR/conf/bblayers.conf
 fi
 
+if [ -d "$WORKDIR/sources/meta-silex-fus" ]; then
+	# Add silex-fus layer to bblayers.conf
+	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-silex-fus \"" >> $BUILD_DIR/conf/bblayers.conf
+fi
+
 
 # Determine root file system mode
 if [ "$FS_MODE" == "ro" ]
