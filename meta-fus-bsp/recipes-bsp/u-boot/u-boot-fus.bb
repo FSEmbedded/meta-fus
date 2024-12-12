@@ -6,10 +6,6 @@ require recipes-bsp/u-boot/u-boot.inc
 
 PROVIDES += "u-boot"
 DEPENDS:append = " python3 dtc-native bison-native libarchive-native xxd-native "
-DEPENDS:append = " \
-	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf', '', d)} \
-	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os', '', d)} \
-"
 
 RDEPENDS:${PN}:append = " fs-installscript"
 
@@ -46,6 +42,11 @@ NEED_ATF = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'true', '
 UBOOT_FILE = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'uboot-info.fs', 'uboot.fs', d)}"
 
 inherit deploy
+
+do_compile[depends] += " \
+	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf:do_deploy', '', d)} \
+	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os:do_deploy', '', d)} \
+"
 
 do_compile:prepend() {
 	if [ "${SCMVERSION}" = "y" ]; then
