@@ -2,11 +2,6 @@
 # Released under the MIT license (see COPYING.MIT for the terms)
 
 DEPENDS:append = " python3 dtc-native bison-native lzop-native xxd-native"
-DEPENDS:append = " \
-	${IMX_EXTRA_FIRMWARE} \
-	u-boot-fus \
-	${@bb.utils.contains('MACHINE_ESSENTIAL_EXTRA_RRECOMMENDS', 'm33-image', 'm33-image', '', d)} \
-"
 
 EXTRA_OEMAKE:append = " -C ${S} O=${B}"
 NBOOT_MAKE_TARGET ??= "nboot"
@@ -29,6 +24,7 @@ do_configure() {
 do_compile[depends] += " \
     ${@' '.join('%s:do_deploy' % r for r in '${IMX_EXTRA_FIRMWARE}'.split() )} \
     imx-atf:do_deploy \
+    ${@bb.utils.contains('MACHINE_ESSENTIAL_EXTRA_RRECOMMENDS', 'm33-image', 'm33-image:do_deploy', '', d)} \
 "
 
 do_compile:prepend() {
@@ -56,6 +52,8 @@ do_compile() {
 do_install[noexec] = "1"
 
 addtask deploy after do_compile
+
+do_deploy[depends] += " u-boot-fus:do_deploy"
 do_deploy() {
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
