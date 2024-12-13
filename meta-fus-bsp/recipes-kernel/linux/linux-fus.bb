@@ -14,9 +14,9 @@ COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Based on Version fslc-6.6.54-2.1.0-fs1.0
-SRCBRANCH="fsimx93"
-SRCREV = "a212e3035f802172acc1481af4bd427dea59cc6b"
+# Based on Version fslc-6.6.69-2.2.0-fs1.0
+SRCBRANCH="linux-fus-6.6.x"
+SRCREV = "9ee1e5e80d7546b7f33502850a89c1c7aa2f24fb"
 
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
