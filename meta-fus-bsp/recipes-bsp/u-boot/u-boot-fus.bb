@@ -15,7 +15,7 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/u-boot-fus;branch=fsimx93;protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/u-boot-fus;branch=fsimx93;protocol=https"
-SRCREV = "162ea955ae5a3347dee8a45b6c80afb0dfbe55c6"
+SRCREV = "0b2e758606819854530be398dcfa1adbc79aa02b"
 
 SCMVERSION ??= "y"
 LOCALVERSION ??= "-F+S"
