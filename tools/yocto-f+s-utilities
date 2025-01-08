@@ -40,7 +40,7 @@ cat pn-depends.dot | grep -v -e '-native' | grep -v digraph | grep -v -e '-image
 print_usage()
 {
 	# List of possible board names that will be shown later
-	ARCHS="fsimx6 fsimx6sx fsimx6ul fsimx7ulp fsimx8mm fsimx8mn fsimx8mp"
+	ARCHS="fsimx6 fsimx6sx fsimx6ul fsimx7ulp fsimx8mm fsimx8mn fsimx8mp fsimx93"
 	DISTROS="fus-imx-wayland fus-imx-xwayland "
 	echo
 	echo "DISTRO=<distro> MACHINE=<arch> . fus-setup-release.sh [OPTIONS]"
@@ -52,12 +52,13 @@ print_usage()
 	echo "<arch>   can be one of:   $ARCHS"
 	echo
 	echo "OPTIONS"
+	echo "  -e          automatically accept all EULAs"
 	echo "  -b          set name of the build directory"
 	echo "              default is \"build-$MACHINE-$DISTRO\""
-	echo "  -m [rw/ro]  create  read-write/read-only root file system"
-	echo "              default is read-write"
-	echo "              can be changed later by removing or adding the"
-	echo "              EXTRA_IMAGE_FEATURES=\"read-only-rootfs\" from your local.conf"
+	echo "  -c [cmd]    execute [cmd] after setup"
+	echo "  -f          force execution of imx-setup-release although the build"
+	echo "              directory already exists else setup-environment"
+	echo "              will be executed instead."
 	echo "  -h          shows this help"
 	echo
 	echo "If you want to build yocto in a different shell you have to call"
