@@ -16,7 +16,7 @@ B = "${WORKDIR}/build"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 COMPATIBLE_MACHINE = "(mx8|mx93)"
 
-DEPENDS:append = " imx-cst-native nboot u-boot-fus xxd-native u-boot-tools-native linux-fus "
+DEPENDS:append = " imx-cst-native nboot u-boot-fus xxd-native u-boot-tools-native linux-fus optee-os imx-atf"
 inherit deploy
 
 do_configure[depends] += " linux-fus:do_deploy "
