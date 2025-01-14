@@ -90,4 +90,9 @@ do_install[noexec] = "1"
 addtask deploy after do_compile
 
 do_deploy() {
+	install -d ${DEPLOY_DIR_IMAGE}/Secure
+	install -m 0644 ${B}/uboot-fsimx93_secure_boot_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
+	install -m 0644 ${B}/nboot_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
+	install -m 0644 ${B}/flash_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
+	install -m 0644 ${B}/os_cntr_signed.cntr ${DEPLOY_DIR_IMAGE}/Secure
 }
