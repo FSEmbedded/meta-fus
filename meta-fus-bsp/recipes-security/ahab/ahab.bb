@@ -8,7 +8,7 @@ PROVIDES += "ahab"
 LICENSE = "CLOSED"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:${DL_DIR}:"
-SRC_URI += " file://fsimage.sh file://input.csf "
+SRC_URI += " file://fsimage.sh file://input.csf file://os_cntr.cfg  "
 
 S = "${WORKDIR}/git"
 B = "${WORKDIR}/build"
@@ -16,9 +16,10 @@ B = "${WORKDIR}/build"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 COMPATIBLE_MACHINE = "(mx8|mx93)"
 
-DEPENDS:append = " imx-cst-native nboot u-boot-fus xxd-native "
+DEPENDS:append = " imx-cst-native nboot u-boot-fus xxd-native u-boot-tools-native linux-fus "
 inherit deploy
 
+do_configure[depends] += " linux-fus:do_deploy "
 do_configure() {
 	if [ ! -f ${DL_DIR}/crts.tar.gz ]; then
 		bbfatal "crts.tar.gz not found, exiting!"
@@ -43,6 +44,9 @@ do_configure() {
 
 	cp ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs ${B}/nboot_signed.fs
 	cp ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${MACHINE_ARCH}_secure_boot.fs ${B}/uboot-fsimx93_secure_boot_signed.fs
+
+	cp ${WORKDIR}/os_cntr.cfg ${B}/os_cntr_edited.cfg
+	cp ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/
 }
 
 do_compile() {
@@ -61,6 +65,24 @@ do_compile() {
 		done
 	done
 	cat ${B}/nboot_signed.fs ${B}/uboot-fsimx93_secure_boot_signed.fs > flash_signed.fs
+
+	sed -i "s/###fitimage###/fitImage-${MACHINE_ARCH}.bin/g" ${B}/os_cntr_edited.cfg
+	mkimage -n ${B}/os_cntr_edited.cfg -T imx8image -d ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/os_cntr.cntr > os_cntr.log
+	cp ${B}/input_edited.csf ${B}/input_edited2.csf
+	grep "CST" os_cntr.log | while read line
+	do
+		if [[ $line == *"Signature"* ]]
+		then
+			signature=0x$(echo $line | sed "s/.*0x//")
+			sed -i "s/###signature###/${signature}/g" ${B}/input_edited2.csf
+		else
+			container=0x$(echo $line | sed "s/.*0x//")
+			sed -i "s/###header###/${container}/g" ${B}/input_edited2.csf
+		fi
+	done
+	sed -i "s/###filename###/os_cntr.cntr/g" ${B}/input_edited2.csf
+	cst -i ${B}/input_edited2.csf -o ${B}/os_cntr_signed.cntr
+
 }
 
 do_install[noexec] = "1"
