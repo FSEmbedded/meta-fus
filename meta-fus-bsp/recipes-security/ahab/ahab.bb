@@ -47,14 +47,14 @@ do_configure() {
 	sed -i "s/###revoke###/${SRK_revoke}/g" ${B}/input_edited.csf
 
 	cp ${DEPLOY_DIR_IMAGE}/Firmware/nboot.fs ${B}/nboot_signed.fs
-	cp ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${MACHINE_ARCH}_secure_boot.fs ${B}/uboot-fsimx93_secure_boot_signed.fs
+	cp ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${MACHINE_ARCH}_secure_boot.fs ${B}/uboot-${MACHINE_ARCH}_secure_boot_signed.fs
 
 	cp ${WORKDIR}/os_cntr.cfg ${B}/os_cntr_edited.cfg
 	cp ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/
 }
 
 do_compile() {
-	for file in nboot uboot-fsimx93_secure_boot
+	for file in nboot uboot-${MACHINE_ARCH}_secure_boot
 	do
 		cat ${DEPLOY_DIR_IMAGE}/Firmware/${file}.fs | ${WORKDIR}/fsimage.sh | grep "i.MX Container: type: OEM" | while read line
 		do
@@ -68,7 +68,7 @@ do_compile() {
 			echo ${file}_signed.fs is signed
 		done
 	done
-	cat ${B}/nboot_signed.fs ${B}/uboot-fsimx93_secure_boot_signed.fs > flash_signed.fs
+	cat ${B}/nboot_signed.fs ${B}/uboot-${MACHINE_ARCH}_secure_boot_signed.fs > flash_signed.fs
 
 	sed -i "s/###fitimage###/fitImage-${MACHINE_ARCH}.bin/g" ${B}/os_cntr_edited.cfg
 	mkimage -n ${B}/os_cntr_edited.cfg -T imx8image -d ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/os_cntr.cntr > os_cntr.log
@@ -95,7 +95,7 @@ addtask deploy after do_compile
 
 do_deploy() {
 	install -d ${DEPLOY_DIR_IMAGE}/Secure
-	install -m 0644 ${B}/uboot-fsimx93_secure_boot_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
+	install -m 0644 ${B}/uboot-${MACHINE_ARCH}_secure_boot_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
 	install -m 0644 ${B}/nboot_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
 	install -m 0644 ${B}/flash_signed.fs ${DEPLOY_DIR_IMAGE}/Secure
 	install -m 0644 ${B}/os_cntr_signed.cntr ${DEPLOY_DIR_IMAGE}/Secure
