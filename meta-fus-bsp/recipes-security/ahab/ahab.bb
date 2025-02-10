@@ -16,6 +16,10 @@ B = "${WORKDIR}/build"
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 COMPATIBLE_MACHINE = "(mx8|mx93)"
 
+SRK_index ?= "0"
+SRK_filename ?= "SRK1_sha384_secp384r1_v3_usr_crt.pem"
+SRK_revoke ?= "0x0"
+
 DEPENDS:append = " imx-cst-native nboot u-boot-fus xxd-native u-boot-tools-native linux-fus optee-os imx-atf"
 inherit deploy
 
