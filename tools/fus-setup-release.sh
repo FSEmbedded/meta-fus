@@ -6,6 +6,16 @@
 set -e
 . ./yocto-f+s-utilities
 
+WORKDIR="$PWD"
+
+add_layer() {
+	local layer="$1"
+	if [ -d "$WORKDIR/sources/$layer" ]; then
+		# Add rauc layer to bblayers.conf
+		echo "BBLAYERS += \" \${BSPDIR}/sources/$layer \"" >> $BUILD_DIR/conf/bblayers.conf
+	fi
+}
+
 # Get the command line parameters
 while getopts "b:c:efh" setup_flag
 do
@@ -54,18 +64,57 @@ if [ -z "$OEROOT_DIR" ]; then
 	fi
 fi
 # Path to fsl-setup-release.sh script
-FSL_SETUP_RELEASE=sources/meta-imx/tools/imx-setup-release.sh
+FSL_SETUP_RELEASE=setup-environment
 
 if [ -d "$BUILD_DIR" ] && [ "$FORCE" != "1" ]; then
 	. setup-environment "$BUILD_DIR"
 else
-	# Call NXPs fsl_setup_release script
-	DISTRO="$DISTRO" MACHINE="$MACHINE" . $FSL_SETUP_RELEASE -b "$BUILD_DIR"
+
+	DISTRO="$DISTRO" MACHINE="$MACHINE" . ./$FSL_SETUP_RELEASE  "$BUILD_DIR"
+
+	# Point to the current directory since the last command changed the directory to $BUILD_DIR
+	BUILD_DIR=.
+
+	if [ ! -e $BUILD_DIR/conf/local.conf ]; then
+		echo -e "\n ERROR - No build directory is set yet. Run the 'setup-environment' script before running this script to create " $BUILD_DIR
+		echo -e "\n"
+		return 1
+	fi
+
+	# On the first script run, backup the local.conf file
+	# Consecutive runs, it restores the backup and changes are appended on this one.
+	if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
+		cp $BUILD_DIR/conf/local.conf $BUILD_DIR/conf/local.conf.org
+	else
+		cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
+	fi
+
+	echo >> conf/local.conf
+	echo "# Switch to Debian packaging and include package-management in the image" >> conf/local.conf
+	echo "PACKAGE_CLASSES = \"package_deb\"" >> conf/local.conf
+	echo "EXTRA_IMAGE_FEATURES += \"package-management\"" >> conf/local.conf
+
+	if [ ! -e $BUILD_DIR/conf/bblayers.conf.org ]; then
+		cp $BUILD_DIR/conf/bblayers.conf $BUILD_DIR/conf/bblayers.conf.org
+	else
+		cp $BUILD_DIR/conf/bblayers.conf.org $BUILD_DIR/conf/bblayers.conf
+	fi
 
 	# Add FuS-Layer
 	echo "" >> "$BUILD_DIR/conf/bblayers.conf"
-	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus/meta-fus-bsp \"" >> "$BUILD_DIR/conf/bblayers.conf"
-	echo "BBLAYERS += \" \${BSPDIR}/sources/meta-fus/meta-fus-sdk \"" >> "$BUILD_DIR/conf/bblayers.conf"
+	add_layer "meta-fus/meta-fus-bsp"
+	add_layer "meta-fus/meta-fus-sdk"
+	add_layer "meta-fus-nboot"
+
+	# Add other layers
+	echo "" >> "$BUILD_DIR/conf/bblayers.conf"
+	add_layer "meta-arm/meta-arm"
+	add_layer "meta-arm/meta-arm-toolchain"
+	add_layer "meta-clang"
+	add_layer "meta-openembedded/meta-gnome"
+	add_layer "meta-openembedded/meta-networking"
+	add_layer "meta-openembedded/meta-filesystems"
+	add_layer "meta-qt6"
 
 	##
 	# Run layer dependend init

@@ -1,0 +1,5 @@
+# i.MX93 PXP udev rules
+SUBSYSTEM=="video", MODE="0660"
+KERNEL=="pxp_device",  MODE="0660", GROUP="video"
+KERNEL=="linux,cma",  MODE="0660", GROUP="video"
+KERNEL=="linux,cma-uncached",  MODE="0660", GROUP="video"
