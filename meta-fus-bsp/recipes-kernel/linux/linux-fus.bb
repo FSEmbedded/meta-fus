@@ -16,7 +16,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
 # Based on Version fslc-6.6.69-2.2.0-fs1.0
 SRCBRANCH="linux-fus-6.6.x"
-SRCREV = "9ee1e5e80d7546b7f33502850a89c1c7aa2f24fb"
+SRCREV = "e543087d54458ed7bfcd92fd5f3433490383dfb3"
 
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
