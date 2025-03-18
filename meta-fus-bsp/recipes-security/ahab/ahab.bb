@@ -19,6 +19,9 @@ COMPATIBLE_MACHINE = "(mx8|mx93)"
 SRK_index ?= "0"
 SRK_filename ?= "SRK1_sha384_secp384r1_v3_usr_crt.pem"
 SRK_revoke ?= "0x0"
+### skript datei
+Update_Files ?= ""
+Update_Scripts ?= ""
 
 SIGN_LINUX = "${@bb.utils.contains('KERNEL_CLASSES', 'kernel-fitimage', 'true', 'false', d)}"
 
@@ -55,6 +58,14 @@ do_configure() {
 		cp ${WORKDIR}/os_cntr.cfg ${B}/os_cntr_edited.cfg
 		cp ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/
 	fi
+
+	### skript kopieren
+	for i in ${Update_Files}; do
+		cp ${DL_DIR}/${i} ${WORKDIR}
+	done
+	for i in ${Update_Scripts}; do
+		cp ${DL_DIR}/${i} ${WORKDIR}
+	done
 }
 
 do_compile() {
@@ -94,6 +105,29 @@ do_compile() {
 	fi
 
 	### jetzt noch das update script
+	for i in ${Update_Files}; do
+		cp ${WORKDIR}/os_cntr.cfg ${B}/script.cfg #alles von W zu B
+		sed -i "s/###fitimage###/${i}.scr/g" ${B}/script.cfg
+		mkimage -T script -n "Bootscript" -C none -d ${WORKDIR}/${i} ${B}/${i}.scr
+		mkimage -n script.cfg -T imx8image -d ${B}/${i}.scr ${B}/${i}.cntr >> ${WORKDIR}/scripts.log
+		
+		cp ${B}/input_edited.csf ${B}/input_edited3.csf
+		sed -i "s/###signature###/0x90/g" ${B}/input_edited3.csf
+		sed -i "s/###header###/0x0/g" ${B}/input_edited3.csf
+		sed -i "s/###filename###/${i}.scr.cntr/g" ${B}/input_edited3.csf
+
+		cst -i ${B}/input_edited3.csf -o ${B}/${i}.scr.cntr.signed
+	done
+	for i in ${Update_Scripts}; do
+		mkimage -n script.cfg -T imx8image -d ${WORKDIR}/${i}.scr ${B}/${i}.cntr >> ${WORKDIR}/scripts.log
+
+		cp ${B}/input_edited.csf ${B}/input_edited3.csf
+		sed -i "s/###signature###/0x90/g" ${B}/input_edited3.csf
+		sed -i "s/###header###/0x0/g" ${B}/input_edited3.csf
+		sed -i "s/###filename###/${i}.scr.cntr/g" ${B}/input_edited3.csf
+
+		cst -i ${B}/input_edited3.csf -o ${B}/${i}.cntr.signed
+	done
 }
 
 do_install[noexec] = "1"
@@ -108,4 +142,14 @@ do_deploy() {
 	if ${SIGN_LINUX}; then
 		install -m 0644 ${B}/os_cntr_signed.cntr ${DEPLOY_DIR_IMAGE}/Secure
 	fi
+
+	### update skript
+	for i in ${Update_Files}; do
+		name=$(echo ${i} | sed "s/\..*//g")_signed.scr
+		cp ${B}/${i}.scr.cntr.signed ${DEPLOY_DIR_IMAGE}/Secure/${name}
+	done
+	for i in ${Update_Scripts}; do
+		name=$(echo ${i} | sed "s/\..*//g")_signed.scr
+		cp ${B}/${i}.cntr.signed ${DEPLOY_DIR_IMAGE}/Secure/${name}
+	done
 }
