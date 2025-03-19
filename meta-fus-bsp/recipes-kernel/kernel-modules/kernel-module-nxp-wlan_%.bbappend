@@ -13,6 +13,7 @@ SRC_URI += " file://001-Create-module.aliases-for-the-sdio-devices.patch \
 SOC_FAMILY                    = "INVALID"
 SOC_FAMILY:mx93-generic-bsp   = "mx93"
 SOC_FAMILY:mx8ulp-generic-bsp   = "mx93"
+SOC_FAMILY:mx8-generic-bsp   = "mx8"
 
 do_install:append () {
     # install mxm-wifiex to install, blacklist supported driver
@@ -32,5 +33,9 @@ do_install_mx93 () {
     sed -i '3,5 s/^/#/' ${D}${sysconfdir}/modprobe.d/mxm-wifiex.conf
     # uncomment options to use wifi_mod_para.conf for moal driver
     sed -i '16 s/^#//' ${D}${sysconfdir}/modprobe.d/mxm-wifiex.conf
+}
+
+do_install_mx8 () {
+	echo
 }
 
