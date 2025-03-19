@@ -14,31 +14,17 @@ COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
-# Based on Version fslc-6.6.69-2.2.0-fs1.0
-SRCBRANCH="linux-fus-6.6.x"
-SRCREV = "9ee1e5e80d7546b7f33502850a89c1c7aa2f24fb"
-
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=${SRCBRANCH};protocol=https"
 
+PV = "${LINUX_VERSION}"
+
 S = "${WORKDIR}/git"
-PV = "+git${SRCPV}"
 
 # We need to pass it as param since kernel might support more then one
 # machine, with different entry points
 KERNEL_EXTRA_ARGS += "LOADADDR=${UBOOT_ENTRYPOINT}"
-
-KBUILD_DEFCONFIG:mx6-nxp-bsp = "fsimx6_defconfig"
-KBUILD_DEFCONFIG:mx6sx-nxp-bsp = "fsimx6sx_defconfig"
-KBUILD_DEFCONFIG:mx6ul-nxp-bsp = "fsimx6ul_defconfig"
-KBUILD_DEFCONFIG:mx7ulp-nxp-bsp = "fsimx7ulp_defconfig"
-
-KBUILD_DEFCONFIG:mx8mm-nxp-bsp = "fsimx8mm_defconfig"
-KBUILD_DEFCONFIG:mx8mn-nxp-bsp = "fsimx8mn_defconfig"
-KBUILD_DEFCONFIG:mx8mp-nxp-bsp = "fsimx8mp_defconfig"
-KBUILD_DEFCONFIG:mx8ulp-nxp-bsp = "fsimx8ulp_defconfig"
-KBUILD_DEFCONFIG:mx93-nxp-bsp = "fsimx93_defconfig"
 
 # Prevent the galcore-module from beeing build, because it is already
 # included in the F&S-Linux-Kernel as a build-in
