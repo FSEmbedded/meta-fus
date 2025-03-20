@@ -50,7 +50,7 @@ do_compile:prepend() {
 	if [ "${SCMVERSION}" = "y" ]; then
 		# Add GIT revision to the local version
 		# get annotated tag name only
-		head=`cd ${S} ; git tag --contains HEAD --format='%(objecttype) %(refname:strip=2)' | \
+		head=`cd ${S} ; git tag --points-at HEAD --format='%(objecttype) %(refname:strip=2)' | \
 				grep '^tag ' | awk '{print $2}' 2> /dev/null`
 		sep="-"
 		if [ -z "${head}" ]; then
