@@ -44,7 +44,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     stress-ng \
     libgpiod \
     libgpiod-tools \
-    fbida \
     firmwared \
     strace \
     ltrace \

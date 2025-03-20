@@ -7,12 +7,17 @@
 
 list_fsl_target_boards()
 {
-[ -f conf/local.conf ] && ls -1 ../sources/meta-fsl-arm/conf/machine/*.conf
+[ -f conf/local.conf ] && ls -1 ../sources/meta-freescale/conf/machine/*.conf
 }
 
 list_non_fsl_target_boards()
 {
-[ -f conf/local.conf ] && ls -1 ../sources/meta-fsl-arm-extra/conf/machine/*.conf
+[ -f conf/local.conf ] && ls -1 ../sources/meta-freescale-3rdparty/conf/machine/*.conf
+}
+
+list_imx_target_boards()
+{
+[ -f conf/local.conf ] && ls -1 ../sources/meta-imx/meta-bsp/conf/machine/*.conf
 }
 
 list_fus_target_boards()

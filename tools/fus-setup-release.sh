@@ -15,7 +15,6 @@ add_layer() {
 		echo "BBLAYERS += \" \${BSPDIR}/sources/$layer \"" >> $BUILD_DIR/conf/bblayers.conf
 	fi
 }
-
 # Get the command line parameters
 while getopts "b:c:efh" setup_flag
 do
@@ -28,10 +27,9 @@ do
 		;;
         f) FORCE="1";
 		;;
-        h) SHOW_HELP="1";
+		h) SHOW_HELP="1";
 		;;
 		*) SHOW_HELP="1";
-
     esac
 done
 
@@ -72,6 +70,7 @@ else
 
 	DISTRO="$DISTRO" MACHINE="$MACHINE" . ./$FSL_SETUP_RELEASE  "$BUILD_DIR"
 
+
 	# Point to the current directory since the last command changed the directory to $BUILD_DIR
 	BUILD_DIR=.
 
@@ -85,9 +84,9 @@ else
 	# Consecutive runs, it restores the backup and changes are appended on this one.
 	if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
 		cp $BUILD_DIR/conf/local.conf $BUILD_DIR/conf/local.conf.org
-	else
+else
 		cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
-	fi
+fi
 
 	echo >> conf/local.conf
 	echo "# Switch to Debian packaging and include package-management in the image" >> conf/local.conf
@@ -105,6 +104,14 @@ else
 	add_layer "meta-fus/meta-fus-bsp"
 	add_layer "meta-fus/meta-fus-sdk"
 	add_layer "meta-fus-nboot"
+	add_layer "meta-rauc"
+	echo "DISTRO_FEATURES:append =  \" rauc\"" >> $BUILD_DIR/conf/local.conf
+	add_layer "meta-rauc"
+	add_layer "meta-fus-updater"
+	add_layer "meta-fus-updater-azure"
+	add_layer "meta-silex-fus"
+
+
 
 	# Add other layers
 	echo "" >> "$BUILD_DIR/conf/bblayers.conf"
@@ -149,5 +156,4 @@ if [ -n "$COMMAND" ]; then
 	echo "Running: $COMMAND"
 	$COMMAND
 fi
-
 
