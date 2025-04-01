@@ -14,17 +14,18 @@ COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=${SRCBRANCH};protocol=https"
 
 PV = "${LINUX_VERSION}"
-
 S = "${WORKDIR}/git"
 
 # We need to pass it as param since kernel might support more then one
 # machine, with different entry points
 KERNEL_EXTRA_ARGS += "LOADADDR=${UBOOT_ENTRYPOINT}"
+
 
 # Prevent the galcore-module from beeing build, because it is already
 # included in the F&S-Linux-Kernel as a build-in

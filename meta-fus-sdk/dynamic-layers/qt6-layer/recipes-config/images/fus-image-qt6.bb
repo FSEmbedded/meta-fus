@@ -3,7 +3,7 @@ LICENSE = "MIT"
 
 require recipes-config/images/fus-image-std.bb
 
-inherit populate_sdk_qt6_base
+inherit populate_sdk_qt6
 
 CONFLICT_DISTRO_FEATURES = "directfb"
 
