@@ -36,17 +36,17 @@ done
 if [ -n "$SHOW_HELP" ]; then
 	print_usage
 	SHOW_HELP=""
-	exit 1
+	return 0
 fi
 
 if [ -z "$DISTRO" ]; then
    	print_usage
-	exit 1
+	return 0
 fi
 
 if [ -z "$MACHINE" ]; then
    	print_usage
-	exit 1
+	return 0
 fi
 
 if [ -z "$BUILD_DIR" ]; then
@@ -157,3 +157,4 @@ if [ -n "$COMMAND" ]; then
 	$COMMAND
 fi
 
+set +e
