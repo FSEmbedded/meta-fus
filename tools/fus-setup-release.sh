@@ -3,7 +3,7 @@
 # This is a wrapper script for NXPs fsl_setup_release.sh.
 # It calls the fsl_setup_release script with the given parameters
 # and adds some F&S specific configurations to the build
-
+set -e
 source ./yocto-f+s-utilities
 
 WORKDIR="$PWD"
@@ -23,17 +23,17 @@ done
 if [ -n "$SHOW_HELP" ]; then
 	print_usage
 	SHOW_HELP=""
-	return 1
+	return 0
 fi
 
 if [ -z "$DISTRO" ]; then
    	print_usage
-	return 1
+	return 0
 fi
 
 if [ -z "$MACHINE" ]; then
    	print_usage
-	return 1
+	return 0
 fi
 
 if [ -z "$BUILD_DIR" ]; then
@@ -82,3 +82,5 @@ else
 	echo
 	echo "Building read/write root file system"
 fi
+
+set +e
