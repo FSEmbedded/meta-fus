@@ -49,8 +49,8 @@ do_compile:prepend() {
 			head=`cd ${S} ; git rev-parse --verify --short HEAD 2> /dev/null`
 			sep="+g"
 		fi
-		printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${S}/.scmversion
-		printf "%s%s%s" "${UBOOT_LOCALVERSION}" $sep $head > ${B}/.scmversion
+		printf "%s%s" $sep $head > ${S}/.scmversion
+		printf "%s%s" $sep $head > ${B}/.scmversion
 	else
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${S}/.scmversion
 		printf "%s" "${UBOOT_LOCALVERSION}" > ${B}/.scmversion
