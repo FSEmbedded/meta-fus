@@ -1,12 +1,12 @@
 require linux-fus.inc
 
-# Based on Version fslc-6.6.69-2.2.0
-SRCBRANCH="linux-fus-6.6.x"
-SRCREV = "ec50a0e7655e817c3f08f17eaf7b8111109beecf"
+# Based on Version fslc-6.6.101-2.2.1
+SRCBRANCH="master"
+SRCREV = "a4271fdfe8ea01be4bf6f67744325f5f00c18bc1"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
-LINUX_VERSION = "6.6.69"
+LINUX_VERSION = "6.6.101"
 
 KBUILD_DEFCONFIG:mx6-nxp-bsp = "fsimx6_defconfig"
 KBUILD_DEFCONFIG:mx6sx-nxp-bsp = "fsimx6sx_defconfig"
