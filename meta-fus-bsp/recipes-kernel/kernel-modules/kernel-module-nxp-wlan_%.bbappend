@@ -5,7 +5,7 @@ FILES:${PN} = "\
     ${sysconfdir}/modules-load.d/mxm-wifiex-filters.conf \
 "
 
-SRC_URI += " file://001-Create-module.aliases-for-the-sdio-devices.patch \
+SRC_URI += " \
     file://mxm-wifiex.conf \
     file://mxm-wifiex-filters.conf \
 "
