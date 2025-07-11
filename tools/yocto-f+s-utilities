@@ -65,6 +65,10 @@ print_usage()
 	echo "              directory already exists else setup-environment"
 	echo "              will be executed instead."
 	echo "  -h          shows this help"
+	echo "  -add-chromium      adds chromium to the image"
+	echo "  -add-spdx [org]    adds SPDX license information to the image"
+	echo "                     [org] is the name of the organization that"
+	echo "                     is responsible for the image, e.g. F&S Elektronik"
 	echo
 	echo "If you want to build yocto in a different shell you have to call"
 	echo "  source setup-environment  <build-dir>"
