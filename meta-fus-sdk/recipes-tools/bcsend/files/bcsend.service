@@ -1,0 +1,11 @@
+[Unit]
+Description=Broadcast board information
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/bcsend
+
+[Install]
+WantedBy=multi-user.target
+
