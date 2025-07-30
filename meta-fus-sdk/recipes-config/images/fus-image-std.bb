@@ -68,6 +68,8 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     linux-firmware-atmel-mxt \
     kernel-module-nxp-wlan \
     bcsend \
+    freerdp \
+    fs-remote\
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init weston-examples', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
     ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-test', '', d)} \
