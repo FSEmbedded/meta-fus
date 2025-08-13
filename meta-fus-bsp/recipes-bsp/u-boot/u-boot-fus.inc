@@ -36,13 +36,15 @@ COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 #                 HOSTSTRIP=true'
 
 NEED_OPTEE = "${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'true', 'false', d)}"
-NEED_ATF = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'true', 'false', d)}"
-UBOOT_FILE = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'uboot-info.fs', 'uboot.fs', d)}"
+NEED_ATF = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'true', 'false', d)}"
+UBOOT_FILE = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'uboot.fs', 'uboot.fs', d)}"
+
+FIRMWARE_DIR = "board/F+S/NXP-Firmware/${MACHINE}"
 
 inherit deploy
 
 do_compile[depends] += " \
-	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot-info.fs', 'imx-atf:do_deploy', '', d)} \
+	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'imx-atf:do_deploy', '', d)} \
 	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os:do_deploy', '', d)} \
 "
 
@@ -66,23 +68,26 @@ do_compile:prepend() {
 
 	#Copy Firmware files into NXP-Firmware
 	if ${NEED_ATF}; then
-		cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/board/F+S/NXP-Firmware/bl31.bin
+		mkdir -p ${S}/${FIRMWARE_DIR}
+		cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/${FIRMWARE_DIR}/bl31.bin
 		if ${NEED_OPTEE}; then
-			cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin-optee ${S}/board/F+S/NXP-Firmware/bl31-optee.bin
+			cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin-optee ${S}/${FIRMWARE_DIR}/bl31-optee.bin
 		fi
 	fi
 
 	if ${NEED_OPTEE}; then
-		cp ${DEPLOY_DIR_IMAGE}/tee.bin ${S}/board/F+S/NXP-Firmware/bl32.bin
+		mkdir -p ${S}/${FIRMWARE_DIR}
+		cp ${DEPLOY_DIR_IMAGE}/tee.bin ${S}/${FIRMWARE_DIR}/bl32.bin
 	fi
 }
 
 do_deploy:append() {
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/
-	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
+	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/
+	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
 
 	for config in ${UBOOT_CONFIG}; do
-		install -m 0644 ${B}/${config}_defconfig/board/F+S/NXP-Firmware/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware
+		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
 		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
 		cd ${DEPLOY_DIR_IMAGE}/ && ln -sf Firmware/uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
