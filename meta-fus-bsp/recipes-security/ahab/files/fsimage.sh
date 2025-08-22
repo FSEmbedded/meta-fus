@@ -154,38 +154,9 @@ get_string()
     echo "$string"
 }
 
-# Extract all header entries, but do not read more than $1 bytes. Returns 1 if
-# no valid F&S header. When returning, variable $headersize contains the number
-# of bytes that were actually read from the stream, even in case of error.
-get_header_info()
+# Get F&S Header, do not read more than $1 bytes
+get_fsh()
 {
-    size=$1
-    padsize=0
-    crc32="[unknown]"
-    os="[unknown]"
-    version="[unknown]"
-    type="[unknown]"
-    typedescr="[padding/unknown data]"
-    descr="[empty]"
-    flags=0
-    extra=0
-
-    # Read the first 4 bytes (or less) of the header and use as magic number
-    if [ $1 -lt 4 ]; then
-	head=$(head -c $1 | xxd -l $1 -c $1 -p)
-	globaloffs=$((globaloffs + $1))
-    else
-	head=$(head -c 4 | xxd -l 4 -c 4 -p)
-	globaloffs=$((globaloffs + 4))
-    fi
-    headersize=$((${#head} / 2))
-    magic="$(get_string $head)...."
-    magic=${magic:0:$headersize}
-    if [ "${magic:0:2}" != "FS" ]; then
-#	echo "No FS magic: ${head:0:4}" >&2
-	return 1;
-    fi
-
     # Return error if remaining size is less then V0.0 header size
     if [ $1 -lt 16 ]; then
 #	echo "Size < 16" >&2
@@ -197,7 +168,7 @@ get_header_info()
     globaloffs=$((globaloffs + 12))
     headersize=$((${#head} / 2))
     if [ $headersize -lt 16 ]; then
-#	echo "Size $headersize instead of 16" >&2
+#	echo "FSH size $headersize instead of 16+" >&2
 	return 1;
     fi
 
@@ -229,6 +200,8 @@ get_header_info()
 
 #    echo $head >&2
 
+    headertype="FSH"
+
     # Parse V1.0 data
     padsize=$((0x${head:28:2}))
     type=$(get_string ${head:32:32})
@@ -253,6 +226,111 @@ get_header_info()
     fi
 
     return 0
+}
+
+# Get i.MX Container Header
+get_imx_header()
+{
+    # Return error if remaining size is less then 16 bytes
+    if [ $1 -lt 16 ]; then
+#	echo "Size < 16" >&2
+	return 1
+    fi
+
+    # Get container size
+    size=$(("0x${head:4:2}${head:2:2}"))
+
+    # Add padding to size if not aligned to 1KB
+    align=$((size & 0x3ff))
+    if [[ align -ne 0 ]]; then
+	size=$((size - align + 0x400))
+    fi
+
+    head=$head$(head -c 12 | xxd -l 12 -c 12 -p)
+
+    globaloffs=$((globaloffs + 12))
+    headersize=$((${#head} / 2))
+    if [ $headersize -lt 16 ]; then
+#	echo "IMX container size $headersize instead of 16+" >&2
+	return 1;
+    fi
+
+    headertype="IMX"
+
+    image_count=$((0x${head:22:2}))
+    if [ $image_count -eq 1 ]; then
+	image_count_string="1 image"
+    else
+	image_count_string="$image_count images"
+    fi
+
+    signature_offset=$((0x$(reverse ${head:24:4}) + globaloffs - 16))
+    signature_offset=$(printf "0x%x" $signature_offset)
+    container_flags=$((0x${head:8:2} & 0x3))
+    if [[ container_flags -eq 1 ]]; then
+	auth="NXP signed @ $signature_offset"
+    elif [[ container_flags -eq 2 ]]; then
+	auth="OEM signed @ $signature_offset"
+    else
+	auth="unsigned"
+    fi
+
+    typedescr="IMX Container Header ($image_count_string, $auth)"
+    flags=0
+
+#    # Show image entries of the header for debugging purposes
+#    container_start=$((globaloffs - 16))
+#    while [[ $image_count -gt 0 ]]; do
+#	image_entry=$(head -c 128 | xxd -l 128 -c 128 -p)
+#	image_offs=$((0x$(reverse ${image_entry:0:8}) + container_start))
+#	image_size=$((0x$(reverse ${image_entry:8:8})))
+#	printf "Image %d %08x %08x\n" $image_count $image_offs $image_size
+#	image_count=$((image_count - 1))
+#	headersize=$((headersize + 128))
+#	globaloffs=$((globaloffs + 128))
+#    done
+
+    return 0
+}
+
+# Extract all header entries, but do not read more than $1 bytes. Returns 1 if
+# no valid F&S header. When returning, variable $headersize contains the number
+# of bytes that were actually read from the stream, even in case of error.
+get_header_info()
+{
+    size=$1
+    padsize=0
+    crc32="[unknown]"
+    os="[unknown]"
+    version="[unknown]"
+    type="[unknown]"
+    typedescr="[padding/unknown data]"
+    descr="[empty]"
+    flags=0
+    extra=0
+    headertype=
+
+    # Read the first 4 bytes (or less) of the header and use as magic number
+    if [ $1 -lt 4 ]; then
+	head=$(head -c $1 | xxd -l $1 -c $1 -p)
+	globaloffs=$((globaloffs + $1))
+    else
+	head=$(head -c 4 | xxd -l 4 -c 4 -p)
+	globaloffs=$((globaloffs + 4))
+    fi
+    headersize=$((${#head} / 2))
+    magic="$(get_string $head)...."
+    magic=${magic:0:$headersize}
+    if [ "${magic:0:2}" == "FS" ]; then
+	get_fsh $1
+	return $?
+    elif [[ "${head:6:2}" == "87" ]]; then
+	get_imx_header $1
+	return $?
+    fi
+
+#	echo "No magic: ${head:0:8}" >&2
+    return 1;
 }
 
 # Compute CRC32 and compare with stored value; return 1 on mismatch
@@ -434,9 +512,9 @@ handle_command()
 parse_image()
 {
     local remaining=$1
-    local savedextra savedoffs found imgoffs
+    local savedextra savedoffs found imgoffs offs
 
-#    echo "in: offs=$offs remaining=$remaining" >&2
+#    echo "in: globaloffs=$globaloffs remaining=$remaining" >&2
 
     handle_command $((globaloffs - headersize)) $2
 
@@ -467,25 +545,23 @@ parse_image()
     else
 	if [ $extra -gt 0 ]; then
 	    savedextra=$extra
-	    get_header_info $savedextra
-	    remaining=$((remaining - headersize))
-	    savedextra=$((savedextra - headersize))
-
-        while [[ "${head:6:2}" == "87" ]]; do      
-        container
-        done
-
-	    typedescr="[header/extra data]"
-	    handle_command $((globaloffs - headersize)) $(($2 + 1))
-	    head -c $savedextra > /dev/null
-	    globaloffs=$((globaloffs + savedextra))
-	    remaining=$((remaining - savedextra))
+	    while [ $savedextra -gt 0 ]; do
+		if ! get_header_info $savedextra; then
+		    typedescr="[extra data]"
+		fi
+		remaining=$((remaining - size))
+		savedextra=$((savedextra - size))
+		handle_command $((globaloffs - headersize)) $(($2 + 1))
+		size=$((size - headersize))
+		head -c $size > /dev/null
+		globaloffs=$((globaloffs + size))
+	    done
 	fi
 	while [ $remaining -gt 0 ]; do
 	    if get_header_info $remaining; then
 		remaining=$((remaining - headersize))
 #		if [ $found -eq 0 ]; then
-#		    printf "    $wx ----  Starting sub-image list\n" $offs
+#		    printf "    $wx ----  Starting sub-image list\n" $globaloffs
 #		    savedoffs=$globaloffs
 #		fi
 		found=1
@@ -512,40 +588,10 @@ parse_image()
 
 container()
 {
-        # wir sind bereits 0x4 über den header da die aufrufende Funktion diese Bytes einließt, jede +/- 0x4 kommen daher zustande
-        printf "i.MX Container: "
+    # We are already 0x4 behind the header (read by the calling function); this
+    # explains any +/-4 here.
+    printf "i.MX Container: "
 
-        # get container size
-        container_padded=$(($(($(("0x${head:4:2}${head:2:2}" / 0x400)) + 1)) * 0x400))
-
-        # get container type
-        container_flags=$(head -c $headersize | xxd -l $headersize -c $headersize -p)
-        if [[ ${container_flags:0:2} -eq 01 ]]; then
-            printf "type: NXP, "
-        else
-            printf "type: OEM, "
-        fi
-
-        # skip unnecessary data
-        head -c 4 > /dev/null
-
-        #get other relevant info
-        container_signatureblock=$(head -c $headersize | xxd -l $headersize -c $headersize -p)
-        signature_offset=0x${container_signatureblock:2:2}${container_signatureblock:0:2}
-        
-        # print relevant info
-        printf "Container offset: %x, Signature block offset: %x\n" $(($globaloffs - 0x4)) $(($globaloffs + $signature_offset - 0x4)) #0x4 abzug weil die ersten vier bytes zuvor bereits abgezogen waren
-
-        # skip container to search for another
-        remaining=$((remaining - $container_padded + 0x4))   
-        savedextra=$((savedextra - $container_padded + 0x4)) 
-        head -c $(($container_padded - 0xC - 0x4)) > /dev/null # 0xC wegen den 0xC eingelesenen Bytes seid aufruf
-
-        # get next head to either try again or resume with normal operation
-        head=$(head -c $headersize | xxd -l $headersize -c $headersize -p)
-        remaining=$((remaining - $headersize))   
-        savedextra=$((savedextra - $headersize))
-        globaloffs=$((globaloffs + container_padded))
 }
 
 # Main part of the script
