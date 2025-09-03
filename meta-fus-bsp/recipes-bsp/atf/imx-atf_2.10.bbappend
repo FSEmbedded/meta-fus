@@ -1,4 +1,4 @@
 ATF_SRC = "git://github.com/FSEmbedded/atf-fus;protocol=https"
 SRC_URI = "${ATF_SRC};branch=${SRCBRANCH}"
 SRCBRANCH = "fsimx93"
-SRCREV = "3c117e7b908d340dc17dee632edaeaebcff41d96"
+SRCREV = "1e06f7f9ad2efb81d093f2bff1384e7abdcb898e"
