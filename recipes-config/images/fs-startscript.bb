@@ -12,6 +12,7 @@ SRC_URI = " \
            file://systemd-fsgetty-generator \
            file://81-wired-lan.network \
            file://99-TSC2004-touchscreen.rules \
+           file://99-iMX6UL-touchscreen.rules \
            file://99-SX8654-touchscreen.rules "
 
 
@@ -38,8 +39,8 @@ do_install() {
 	install -m 0644 ${WORKDIR}/81-wired-lan.network ${D}${systemd_unitdir}/network/
 
 	install -m 0644 ${WORKDIR}/99-TSC2004-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
+	install -m 0644 ${WORKDIR}/99-iMX6UL-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
 	install -m 0644 ${WORKDIR}/99-SX8654-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
-
 }
 
 FILES:${PN} = "\
@@ -50,5 +51,6 @@ FILES:${PN} = "\
     ${systemd_unitdir}/system-generators/ \
     ${systemd_unitdir}/network/ \
     ${sysconfdir}/udev/rules.d/99-TSC2004-touchscreen.rules\
+    ${sysconfdir}/udev/rules.d/99-iMX6UL-touchscreen.rules\
     ${sysconfdir}/udev/rules.d/99-SX8654-touchscreen.rules\
 "
