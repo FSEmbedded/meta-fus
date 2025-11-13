@@ -42,6 +42,7 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     lmbench \
     glmark2 \
     stress-ng \
+    dhrystone \
     libgpiod \
     libgpiod-tools \
     firmwared \
