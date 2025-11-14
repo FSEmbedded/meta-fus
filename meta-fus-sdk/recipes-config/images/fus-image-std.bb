@@ -19,58 +19,33 @@ IMAGE_FEATURES += " \
 "
 
 CORE_IMAGE_EXTRA_INSTALL += " \
-    packagegroup-fsl-gstreamer1.0 \
-    packagegroup-fsl-gstreamer1.0-full \
-    v4l-utils \
-    alsa-utils \
-    alsa-tools \
-    dosfstools \
-    e2fsprogs-mke2fs \
-    mtd-utils \
-    mtd-utils-ubifs \
-    mmc-utils \
-    evtest \
-    fbset \
-    i2c-tools \
-    spitools \
-    pciutils \
-    can-utils \
-    linux-serial-test \
-    iproute2 \
-    ethtool \
-    iperf3 \
-    lmbench \
-    glmark2 \
-    stress-ng \
-    dhrystone \
-    libgpiod \
-    libgpiod-tools \
-    firmwared \
-    strace \
-    ltrace \
-    gdb \
-    kbd \
-    libsndfile1 \
-    libusb1 \
-    libxml2 \
-    bluez5 \
-    iw \
-    openssh \
-    libubootenv \
-    wpa-supplicant \
-    hostapd \
-    psplash \
-    liberation-fonts \
-    linux-firmware-wl12xx \
-    linux-firmware-wl18xx \
-    linux-firmware-sd8787 \
-    linux-firmware-sd8997 \
-    linux-firmware-pcie8997 \
-    linux-firmware-atmel-mxt \
-    kernel-module-nxp-wlan \
     bcsend \
+    fbset \
+    firmwared \
     freerdp \
     fs-remote\
+    hostapd \
+    kernel-module-nxp-wlan \
+    liberation-fonts \
+    libsndfile1 \
+    libubootenv \
+    libusb1 \
+    libxml2 \
+    libgpiod \
+    linux-firmware-atmel-mxt \
+    linux-firmware-pcie8997 \
+    linux-firmware-sd8787 \
+    linux-firmware-sd8997 \
+    linux-firmware-wl12xx \
+    linux-firmware-wl18xx \
+    linux-serial-test \
+    openssh \
+    packagegroup-fs-benchmark \
+    packagegroup-fs-monitor \
+    packagegroup-fs-util \
+    packagegroup-fsl-gstreamer1.0 \
+    packagegroup-fsl-gstreamer1.0-full \
+    psplash \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init weston-examples', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
     ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-test', '', d)} \
