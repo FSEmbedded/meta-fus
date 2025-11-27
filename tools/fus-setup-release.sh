@@ -45,48 +45,58 @@ add_spdx() {
 	fi
 }
 
+build_mainline() {
+	if [ "$MAINLINE" == "1" ]; then
+		add_config "IMX_DEFAULT_BSP:forcevariable = \"mainline\""
+	fi
+}
+
 
 parse_arguments() {
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -h|--help)
-                print_usage
-				exit 0
-		;;
-            -b)
-                BUILD_DIR="$2"
-                shift # past argument
-                shift # past value
-        ;;
-            -c)
-                COMMAND="$2"
-                shift # past argument
-                shift # past value
-		;;
-            -e)
-                EULA=1
-                shift # past argument
-		;;
-            -f)
-                FORCE="1"
-                shift # past argument
-		;;
-            --add-chromium)
-                CHROMIUM="1"
-                shift # past argument
-            ;;
-            --add-spdx)
-                SPDX="1"
-		SPDX_ORG="$2"
-                shift # past argument
-                shift # past value
-            ;;
-            *)    # unknown option
-                echo "Unknown option: $1"
-                print_usage
-		exit 0
-            ;;
-    esac
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-h|--help)
+			print_usage
+			exit 0
+			;;
+		-b)
+			BUILD_DIR="$2"
+			shift # past argument
+			shift # past value
+			;;
+		-c)
+			COMMAND="$2"
+			shift # past argument
+			shift # past value
+			;;
+		-e)
+			EULA=1
+			shift # past argument
+			;;
+		-f)
+			FORCE="1"
+			shift # past argument
+			;;
+		--build-mainline)
+			MAINLINE="1"
+			shift # past argument
+			;;
+		--add-chromium)
+			CHROMIUM="1"
+			shift # past argument
+			;;
+		--add-spdx)
+			SPDX="1"
+			SPDX_ORG="$2"
+			shift # past argument
+			shift # past value
+			;;
+		*)    # unknown option
+			echo "Unknown option: $1"
+			print_usage
+			exit 0
+			;;
+	esac
 done
 }
 
@@ -202,6 +212,7 @@ fi
 
 # Add configs, given by parameter
 add_chromium
+build_mainline
 add_spdx
 
 set +e

@@ -1,0 +1,72 @@
+From b7ccf8d4c6fe7db9d9735d5dc079e69f61c3c8f6 Mon Sep 17 00:00:00 2001
+Message-Id: <b7ccf8d4c6fe7db9d9735d5dc079e69f61c3c8f6.1764249235.git.gerbach@fs-net.de>
+In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Thu, 27 Nov 2025 14:00:59 +0100
+Subject: [PATCH 11/11] Hoftfix for tc35877 MIPI2LVDS bridge
+
+The tc35877 seems to have 2 issues
+1. I2C communication is only possible if DSI clock is running but
+   DSI clock must not ne enabled when the chip is reset or the chip
+   hangs.
+2. There must not be any DSI image data before the tc35877 is fully
+   initialized or the pictures gets shifted sometimes.
+
+So the initialisation order has to be like this
+tc35877_reset -> dsi_clock_on -> tc35877_config -> dsi_data_on
+
+This is not possible to implement with the current drm bridge functions
+so we misuse the tc_mode_set function to reset the chip as early as
+possible and move the initialization to the pre_enable.
+---
+ drivers/gpu/drm/bridge/tc358775.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/tc358775.c b/drivers/gpu/drm/bridge/tc358775.c
+index 0b4efaca6..73b00fb33 100644
+--- a/drivers/gpu/drm/bridge/tc358775.c
++++ b/drivers/gpu/drm/bridge/tc358775.c
+@@ -287,7 +287,11 @@ static inline struct tc_data *bridge_to_tc(struct drm_bridge *b)
+ 	return container_of(b, struct tc_data, bridge);
+ }
+ 
+-static void tc_bridge_pre_enable(struct drm_bridge *bridge)
++
++static void
++tc_mode_set(struct drm_bridge *bridge,
++	      const struct drm_display_mode *info,
++	      const struct drm_display_mode *mode)
+ {
+ 	struct tc_data *tc = bridge_to_tc(bridge);
+ 	struct device *dev = &tc->dsi->dev;
+@@ -310,6 +314,7 @@ static void tc_bridge_pre_enable(struct drm_bridge *bridge)
+ 	usleep_range(10, 20);
+ }
+ 
++
+ static void tc_bridge_post_disable(struct drm_bridge *bridge)
+ {
+ 	struct tc_data *tc = bridge_to_tc(bridge);
+@@ -382,7 +387,7 @@ static struct drm_connector *get_connector(struct drm_encoder *encoder)
+ 	return NULL;
+ }
+ 
+-static void tc_bridge_enable(struct drm_bridge *bridge)
++static void tc_bridge_pre_enable(struct drm_bridge *bridge)
+ {
+ 	struct tc_data *tc = bridge_to_tc(bridge);
+ 	u32 hback_porch, hsync_len, hfront_porch, hactive, htime1, htime2;
+@@ -602,8 +607,8 @@ static int tc_bridge_attach(struct drm_bridge *bridge,
+ static const struct drm_bridge_funcs tc_bridge_funcs = {
+ 	.attach = tc_bridge_attach,
+ 	.pre_enable = tc_bridge_pre_enable,
+-	.enable = tc_bridge_enable,
+ 	.mode_valid = tc_mode_valid,
++	.mode_set = tc_mode_set,
+ 	.post_disable = tc_bridge_post_disable,
+ };
+ 
+-- 
+2.40.1
+

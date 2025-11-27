@@ -1,0 +1,763 @@
+From 0fd6ac9fc0f88c070eba631d8e6e3feb29e7a0fe Mon Sep 17 00:00:00 2001
+Message-Id: <0fd6ac9fc0f88c070eba631d8e6e3feb29e7a0fe.1764249235.git.gerbach@fs-net.de>
+In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Wed, 19 Nov 2025 09:57:43 +0100
+Subject: [PATCH 10/11] Improve fsimx8mm devicetees for mainline support
+
+Based on the F&S Kernel. Not fully tested yet. Some properties might not
+have any effect.
+---
+ arch/arm64/boot/dts/F+S/Makefile              | 19 ++++-
+ .../F+S/displays/imx8mm-adp-mipi2lvds1.dtsi   | 13 +--
+ ...8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi | 29 ++++++-
+ .../imx8mm-lcdif-tc358775-j070wvtc0211.dtsi   | 21 ++---
+ .../imx8mm-tc358775-BT070L1060CS0I1AD-A.dtsi  | 36 ++++----
+ arch/arm64/boot/dts/F+S/osm8mm-adp.dtsi       | 85 +++++++++++++++++--
+ ...m8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dts | 22 +++--
+ arch/arm64/boot/dts/F+S/osm8mm.dts            |  4 +-
+ arch/arm64/boot/dts/F+S/osm8mm.dtsi           | 44 +++++++---
+ .../boot/dts/F+S/picocoremx8mm-ddr3l.dts      | 18 ++--
+ arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi    | 18 ++--
+ 11 files changed, 220 insertions(+), 89 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/F+S/Makefile b/arch/arm64/boot/dts/F+S/Makefile
+index aeb97fd4e..5d0f03696 100644
+--- a/arch/arm64/boot/dts/F+S/Makefile
++++ b/arch/arm64/boot/dts/F+S/Makefile
+@@ -21,5 +21,20 @@ dtb-$(CONFIG_ARCH_MXC) += fssmmx8mp.dtb \
+ 			  fssmmx8mp-lcdif-j070wvtc0211.dtb \
+ 			  fssmmx8mp-BT070L1060CS0I1AD-A.dtb \
+ 			  fssmmx8mp-EE1010B1T-1CP.dtb
+-
+-
++dtb-$(CONFIG_ARCH_MXC) += picocoremx8mm-lpddr4.dtb \
++			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
++			  picocoremx8mm-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mmr2-lpddr4.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mmr2-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mm-ddr3l.dtb \
++			  picocoremx8mm-ddr3l-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mm-ddr3l-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-ddr3l-tc358775-BT070L1060CS0I1AD-A.dtb
++dtb-$(CONFIG_ARCH_MXC) += osm8mm.dtb \
++			  osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  osm8mm-lcdif-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi
+index 08603cd24..e9b520992 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi
+@@ -16,14 +16,16 @@ &lcdif {
+ 
+ &mipi_dsi {
+         status = "okay";
+-        bus-fmt = <0x100a>;
+-        port@1 {
++        samsung,esc-clock-frequency = <10000000>;
++        samsung,burst-clock-frequency =<232000000>;
++        ports {
++            port@1 {
+                 reg = <1>;
+                 dsim_to_lvds: endpoint {
+-                        remote-endpoint = <&lvds_from_dsim>;
+-                        data-lanes = <0 1 2 3>;
+-                        attach-bridge;
++                    remote-endpoint = <&lvds_from_dsim>;
++                    data-lanes = <0 1 2 3>;
+                 };
++            };
+         };
+ };
+ 
+@@ -46,6 +48,7 @@ port@0 {
+  
+                                 lvds_from_dsim: endpoint {
+                                         remote-endpoint = <&dsim_to_lvds>;
++                                        data-lanes = <0 1 2 3>;
+                                 };
+                         };
+ 
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
+index f2d4dfc39..e354899d4 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
+@@ -21,7 +21,7 @@ reg_mipi_bl: backlight_mipi {
+ 	};
+ 
+ 	/* MIPI-DSI backlight PWM on adapter MIPI2MIPI1 */
+-	backlight_mipi_dsi {
++	backlight_mipi_dsi: backlight_mipi_dsi {
+ 		compatible = "pwm-backlight";
+ 		/* only 32 kHz available */
+ 		pwms = <&max7315 1 31250 PWM_POLARITY_INVERTED>;
+@@ -39,15 +39,36 @@ &lcdif {
+ };
+ 
+ &mipi_dsi {
++
++    samsung,esc-clock-frequency = <20000000>;
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	status = "okay";
+ 
+ 	panel@0 {
+-		compatible = "eagleeyetech,ee0350et-2";
++		compatible = "newvision,nv3051d-ee0350et";
+ 		reg = <0>;
+ 		reset-gpios = <&max7315 4 GPIO_ACTIVE_LOW>;
+-		/* VLCD is not needed */
+-		//vci-supply = <&reg_vlcd>;
++		vdd-supply = <&reg_vlcd>;
++		backlight = <&backlight_mipi_dsi>;
+ 		status = "okay";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&mipi_dsi_out>;
++			};
++		};
++	};
++
++	ports {
++		port@1 {
++			reg = <1>;
++
++			mipi_dsi_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-tc358775-j070wvtc0211.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-tc358775-j070wvtc0211.dtsi
+index 139e5c8f7..dea13c2ae 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-tc358775-j070wvtc0211.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mm-lcdif-tc358775-j070wvtc0211.dtsi
+@@ -16,15 +16,15 @@ &lcdif {
+ 
+ &mipi_dsi {
+ 	status = "okay";
+-
+-	bus-fmt = <0x100a>;
+-
+-	port@1 {
+-		reg = <1>;
+-		dsim_to_lvds: endpoint {
+-			remote-endpoint = <&lvds_from_dsim>;
+-			data-lanes = <0 1 2 3>;
+-			attach-bridge;
++    samsung,esc-clock-frequency = <10000000>;
++	samsung,burst-clock-frequency =<232000000>;
++	ports {
++		port@1 {
++			reg = <1>;
++			dsim_to_lvds: endpoint {
++				remote-endpoint = <&lvds_from_dsim>;
++				data-lanes = <0 1 2 3>;
++			};
+ 		};
+ 	};
+ };
+@@ -52,6 +52,7 @@ port@0 {
+ 
+ 				lvds_from_dsim: endpoint {
+ 					remote-endpoint = <&dsim_to_lvds>;
++					data-lanes = <0 1 2 3>;
+ 				};
+ 			};
+ 
+@@ -77,7 +78,7 @@ panel: panel {
+ 		height-mm = <86>;
+ 
+ 		panel-timing {
+-				clock-frequency = <33000000>;
++				clock-frequency = <33500000>;
+ 				hactive = <800>;
+ 				vactive = <480>;
+ 				hback-porch = <42>;
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mm-tc358775-BT070L1060CS0I1AD-A.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mm-tc358775-BT070L1060CS0I1AD-A.dtsi
+index 698342b58..6b2cc8806 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mm-tc358775-BT070L1060CS0I1AD-A.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mm-tc358775-BT070L1060CS0I1AD-A.dtsi
+@@ -15,16 +15,17 @@ &lcdif {
+ };
+ 
+ &mipi_dsi {
+-        status = "okay";
+-        bus-fmt = <0x100a>;
++    samsung,esc-clock-frequency = <10000000>;
++    status = "okay";
++	ports {
+         port@1 {
+                 reg = <1>;
+                 dsim_to_lvds: endpoint {
+                         remote-endpoint = <&lvds_from_dsim>;
+                         data-lanes = <0 1 2 3>;
+-                        attach-bridge;
+                 };
+         };
++	};
+ };
+ 
+ &IMX8MM_LVDS_I2C {
+@@ -49,6 +50,7 @@ port@0 {
+  
+                                 lvds_from_dsim: endpoint {
+                                         remote-endpoint = <&dsim_to_lvds>;
++					data-lanes = <0 1 2 3>;
+                                 };
+                         };
+ 
+@@ -67,23 +69,23 @@ /{
+         panel: panel {
+                 compatible = "panel-lvds";
+                 backlight = <&backlight_ldb>;
+-                reset-gpios = <&pca963x 3 GPIO_ACTIVE_LOW>;
++                enable-gpios = <&pca963x 3 GPIO_ACTIVE_LOW>;
+                 data-mapping = "vesa-24";
+                 width-mm = <155>;
+                 height-mm = <86>;
+ 
+                 panel-timing {
+-                                clock-frequency = <63000000>;
+-                                hactive = <1024>;
+-                                vactive = <600>;
+-                                hback-porch = <160>;
+-                                hfront-porch = <76>;
+-                                hsync-len = <140>;
+-                                vback-porch = <23>;
+-                                vfront-porch = <107>;
+-                                vsync-len = <20>;
+-                                pixelclk-active = <0>;
+-                                de-active = <1>;
++                        clock-frequency = <63000000>;
++                        hactive = <1024>;
++                        vactive = <600>;
++                        hback-porch = <160>;
++                        hfront-porch = <76>;
++                        hsync-len = <140>;
++                        vback-porch = <23>;
++                        vfront-porch = <107>;
++                        vsync-len = <20>;
++                        pixelclk-active = <0>;
++                        de-active = <1>;
+                 };
+ 
+                 port@0 {
+@@ -94,6 +96,8 @@ panel_from_lvds: endpoint {
+         };
+ 
+         backlight_ldb: backlight_ldb {
++                enable-gpio = <&pca963x 0 GPIO_ACTIVE_HIGH>;
++                post-pwm-on-delay-ms = <500>;
+                 pwms = <&pca963x 1 5263157 1>;
+                 brightness-levels = <0 1 5 10 18 28 41 56
+                                      73 92 113 137 163 192 222 255>;
+@@ -102,7 +106,7 @@ backlight_ldb: backlight_ldb {
+ };
+ 
+ &reg_ldb_bl{
+-	gpio = <&pca963x 0 GPIO_ACTIVE_HIGH>;
++        /delete-property/ gpio;
+ };
+ 
+ &IMX8MM_TOUCH_I2C {
+diff --git a/arch/arm64/boot/dts/F+S/osm8mm-adp.dtsi b/arch/arm64/boot/dts/F+S/osm8mm-adp.dtsi
+index 9104bac84..9cec6ce27 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mm-adp.dtsi
++++ b/arch/arm64/boot/dts/F+S/osm8mm-adp.dtsi
+@@ -11,7 +11,7 @@
+ /* Set board revision as 3-digit number, e.g. 110 for board rev. 1.10 */
+ #define CONFIG_OSM8MM_BOARD_REVISION	120
+ /* Set adapter revision as 3-digit number, e.g. 110 for board rev. 1.10 */
+-#define CONFIG_ADP_OSM_BOARD_REVISION	120
++#define CONFIG_ADP_OSM_BOARD_REVISION	130
+ /* Set baseboard revision as 3-digit number, e.g. 110 for board rev. 1.10 */
+ #define CONFIG_PICOCOREBBDSI_BOARD_REVISION	140
+ 
+@@ -20,7 +20,7 @@
+ 
+ /* Display device-trees enables MIPI DSI */
+ /* MIPI DSI */
+-//#define CONFIG_OSM8MM_MIPI_DSI
++#define CONFIG_OSM8MM_MIPI_DSI
+ 
+ /* Network */
+ #define CONFIG_OSM8MM_ETH_A
+@@ -63,11 +63,11 @@
+ #define CONFIG_OSM8MM_I2S_A
+ 
+ /* Camera on serial MIPI CSI interface */
+-#define CONFIG_OSM8MM_SERIAL_CAMERA
++//#define CONFIG_OSM8MM_SERIAL_CAMERA
+ /* Experimental implementation for Basler dart daA4200-30mci.
+  * Define CONFIG_OSM8MM_SERIAL_CAMERA must also be set.
+  */
+-
++//#define CONFIG_OSM8MM_CAMERA_BASLER_daA4200
+ /*
+  * SD_A - External SD port with Card Detect (CD) and Write Protect (WP)
+  * On picocoremx8mm SKIT: external port is Micro-SD card slot with CD but
+@@ -250,6 +250,34 @@ &reg_ldb_bl {
+ #endif
+ #endif
+ 
++#if CONFIG_ADP_OSM_BOARD_REVISION >= 130
++&osm_i2c_b {
++	/* GPIO expander */
++	pca6416: gpio@20 {
++		compatible = "nxp,pcal6416";
++		reg = <0x20>;
++		vcc-supply = <&reg_vref_1v8>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
++		/* Enable Open-Drain for Port 0 and 1 */
++		pcal6416,open-drain;
++	};
++};
++
++&reg_mipi_rst {
++	gpio = <&pca6416 5 GPIO_ACTIVE_HIGH>;
++};
++
++&reg_touch_rst {
++	gpio = <&pca6416 6 GPIO_ACTIVE_HIGH>;
++};
++
++#endif
++
+ &osm_i2c_b {
+ 	sgtl5000: sgtl5000@a {
+ 		#sound-dai-cells = <0>;
+@@ -270,8 +298,10 @@ sgtl5000: sgtl5000@a {
+ 	ptn5110: tcpc@52 {
+ 		compatible = "nxp,ptn5110";
+ #ifdef CONFIG_OSM8MM_USB_A_USBC_ALERT
++#if CONFIG_ADP_OSM_BOARD_REVISION < 130
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++#endif
+ #endif
+ 		reg = <0x52>;
+ 		status = "okay";
+@@ -299,6 +329,7 @@ typec1_con: connector {
+ #endif
+ };
+ 
++#ifdef CONFIG_OSM8MM_CAMERA_BASLER_daA4200
+ &osm_i2c_cam_pci {
+ 	basler_camera_mipi1: basler_camera_mipi@36 {
+ 		compatible = "basler,basler-camera";
+@@ -320,6 +351,7 @@ basler_camera_mipi1_ep: endpoint {
+ 		};
+ 	};
+ };
++#endif
+ 
+ #if 0
+ /* SPI not implemented in NXP FlexSPI driver, so use SPI-GPIO */
+@@ -351,6 +383,13 @@ ethphy4: ethernet-phy@4 {
+ 			rtl821x,ssc-clkout-enable;
+ 			rtl821x,led-link = <2>; // LED1 for link indication
+ 			rtl821x,led-act = <2>; // LED1 for activity
++#if CONFIG_ADP_OSM_BOARD_REVISION >= 130
++			reset-gpios = <&pca6416 0 GPIO_ACTIVE_LOW>;
++			reset-assert-us = <10000>;
++			reset-deassert-us = <100000>;
++			interrupt-parent = <&pca6416>;
++			interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++#endif
+ 			eee-broken-1000t;
+ 		};
+ 	};
+@@ -375,7 +414,7 @@ usb1_drd_sw: endpoint {
+ &osm_usb_b {
+ 	dr_mode = "host";
+ };
+-
++#ifdef CONFIG_OSM8MM_SERIAL_CAMERA
+ &osm_csi {
+ 	/delete-property/ csi,mipi_rst;
+ 
+@@ -415,7 +454,7 @@ csi1_ep: endpoint {
+ 		};
+ 	};
+ };
+-
++#endif
+ /delete-node/ &pinctrl_osm_i2s_a;
+ 
+ &iomuxc {
+@@ -438,25 +477,53 @@ MX8MM_IOMUXC_SAI5_MCLK_SAI5_MCLK	0x000d6
+ #ifdef IMX8MM_TOUCH_INTERRUPT_PINCTRL
+ 		pinctrl_touch_int: touchintgrp {
+ 			fsl,pins = <
++#if CONFIG_ADP_OSM_BOARD_REVISION < 130
+ 				MX8MM_IOMUXC_GPIO1_IO05_GPIO1_IO5	0x00084
++#else
++				MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0	0x00084
++#endif
+ 			>;
+ 		};
+ #endif
+ 	};
+ };
+ 
++/*
++ * MK 2025-09-03:
++ * The drive-strength for SDIO_A must be increased to compensate
++ * for a longer route through the adapter (OSM -> ADP -> BB)
++ */
++&pinctrl_osm_sdio_a {
++	fsl,pins = <
++		MX8MM_IOMUXC_SD2_CLK_USDHC2_CLK		0x00194
++		MX8MM_IOMUXC_SD2_CMD_USDHC2_CMD		0x001d4
++		MX8MM_IOMUXC_SD2_DATA0_USDHC2_DATA0	0x001d4
++		MX8MM_IOMUXC_SD2_DATA1_USDHC2_DATA1	0x001d4
++		MX8MM_IOMUXC_SD2_DATA2_USDHC2_DATA2	0x001d4
++		MX8MM_IOMUXC_SD2_DATA3_USDHC2_DATA3	0x001d4
++	>;
++};
++
+ &pinctrl_hog {
+ 	fsl,pins = <
+ 		/* CARRIER_PWR_EN */
+ 		MX8MM_IOMUXC_SAI2_MCLK_GPIO4_IO27	0x00004
++		/* SD_A_VSEL */
++		MX8MM_IOMUXC_GPIO1_IO03_GPIO1_IO3	0x00004
+ 
+ 		/* GPIO_A */
+-		/* 0 */ MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0	0x00004
+-		/* 1 */ MX8MM_IOMUXC_GPIO1_IO01_GPIO1_IO1	0x00004
+-		/* 2 */ MX8MM_IOMUXC_GPIO1_IO04_GPIO1_IO4	0x00004
+ #ifndef IMX8MM_TOUCH_INTERRUPT_PINCTRL
++		/* 0 */ MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0	0x00004
++		/* 3 */ MX8MM_IOMUXC_GPIO1_IO05_GPIO1_IO5	0x00004
++#else
++#if CONFIG_ADP_OSM_BOARD_REVISION < 130
++		/* 0 */ MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0	0x00004
++#else
+ 		/* 3 */ MX8MM_IOMUXC_GPIO1_IO05_GPIO1_IO5	0x00004
+ #endif
++#endif
++		/* 1 */ MX8MM_IOMUXC_GPIO1_IO01_GPIO1_IO1	0x00004
++		/* 2 */ MX8MM_IOMUXC_GPIO1_IO04_GPIO1_IO4	0x00004
+ 		/* 4 */ MX8MM_IOMUXC_GPIO1_IO06_GPIO1_IO6	0x00004
+ 		/* 5 */ MX8MM_IOMUXC_GPIO1_IO07_GPIO1_IO7	0x00004
+ #ifndef CONFIG_OSM8MM_SPI_A_CS1
+diff --git a/arch/arm64/boot/dts/F+S/osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dts b/arch/arm64/boot/dts/F+S/osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dts
+index 87cc09fa0..0b66c8a27 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dts
++++ b/arch/arm64/boot/dts/F+S/osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dts
+@@ -1,5 +1,5 @@
+ /*
+-* Copyright (C) 2024 F&S Elektronik Systeme GmbH
++* Copyright (C) 2025 F&S Elektronik Systeme GmbH
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+@@ -8,12 +8,24 @@
+ 
+ #define CONFIG_OSM8MM_MIPI_DSI
+ 
+-#define IMX8MM_TOUCH_INTERRUPT_GPIO_BANK	gpio1
+-#define IMX8MM_TOUCH_INTERRUPT_GPIO_NUM		5
+-
+ #define IMX8MM_TOUCH_I2C osm_i2c_cam_pci
+-#define IMX8MM_TOUCH_INTERRUPT_PINCTRL
+ 
+ #include "osm8mm-adp.dtsi"
++
++#define IMX8MM_TOUCH_INTERRUPT_GPIO_BANK	gpio1
++#if CONFIG_ADP_OSM_BOARD_REVISION < 130
++#define IMX8MM_TOUCH_INTERRUPT_GPIO_NUM		5
++#else
++#define IMX8MM_TOUCH_INTERRUPT_GPIO_NUM		0
++#endif
++
+ #include "displays/imx8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi"
+ 
++#if CONFIG_ADP_OSM_BOARD_REVISION >= 130
++&IMX8MM_TOUCH_I2C {
++	/* Atmel PCAP touch on Touch Connector (I2C) */
++	mxt336u@4a {
++		interrupts = <IMX8MM_TOUCH_INTERRUPT_GPIO_NUM IRQ_TYPE_EDGE_RISING>;
++	};
++};
++#endif
+diff --git a/arch/arm64/boot/dts/F+S/osm8mm.dts b/arch/arm64/boot/dts/F+S/osm8mm.dts
+index e57a5eb75..443e504ec 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mm.dts
++++ b/arch/arm64/boot/dts/F+S/osm8mm.dts
+@@ -80,11 +80,11 @@ Revision 1.40. Otherwise use polling with ~100ms */
+ #define CONFIG_OSM8MM_I2S_A
+ 
+ /* Camera on serial MIPI CSI interface */
+-#define CONFIG_OSM8MM_SERIAL_CAMERA
++//#define CONFIG_OSM8MM_SERIAL_CAMERA
+ /* Experimental implementation for Basler dart daA4200-30mci.
+  * Define CONFIG_OSM8MM_SERIAL_CAMERA must also be set.
+  */
+-#define CONFIG_OSM8MM_CAMERA_BASLER_daA4200
++//#define CONFIG_OSM8MM_CAMERA_BASLER_daA4200
+ 
+ /*
+  * SD_A - External SD port with Card Detect (CD) and Write Protect (WP)
+diff --git a/arch/arm64/boot/dts/F+S/osm8mm.dtsi b/arch/arm64/boot/dts/F+S/osm8mm.dtsi
+index 8bd4bcbbb..5675471f6 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mm.dtsi
++++ b/arch/arm64/boot/dts/F+S/osm8mm.dtsi
+@@ -11,10 +11,8 @@
+ 
+ #include "fsimx8mm.dtsi"
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
+ 
+ /* SOC-nodes to OSM-nodes */
+ osm_emmc: &usdhc1 {};
+@@ -34,8 +32,8 @@
+ osm_usb_b: &usbotg2 {};
+ osm_sdio_a: &usdhc2 {};
+ osm_sdio_b: &usdhc3 {};
+-osm_csi: &mipi_csi_1 {};
+-osm_csi_bridge: &csi1_bridge {};
++osm_csi: &mipi_csi {};
++osm_csi_bridge: &csi {};
+ rtc_soc: &snvs_rtc {};
+ osm_pwm_0: &pwm4 {};
+ osm_pwm_1: &pwm1 {};
+@@ -80,7 +78,6 @@ aliases {
+ 	/* -------------------- BOARD INFO -------------------- */
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	reserved-memory {
+@@ -156,6 +153,21 @@ reg_carrier_pwr: regulator_carrier_pwr {
+ 			off-on-delay-us = <12000>;
+ 		};
+ 
++#ifdef CONFIG_OSM8MM_SDIO_A
++		reg_sdio_a_vsel: regulator_sdio_a_vsel {
++			compatible = "regulator-gpio";
++			regulator-name = "SDIO_A_VSEL";
++			gpios = <&gpio1 3 GPIO_ACTIVE_HIGH>;
++			regulator-min-microvolt = <1800000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-type = "voltage";
++			regulator-boot-on;
++			regulator-always-on;
++			enable-active-high;
++			states = <1800000 0x1 3300000 0x0>;
++		};
++#endif
++
+ #if defined(CONFIG_OSM8MM_MIPI_DSI) \
+ || defined(CONFIG_OSM8MM_MIPI_DSI_LVDS)
+ 		/* LCD power on voltage */
+@@ -348,10 +360,9 @@ ldo6_reg: LDO6 {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ };
+ 
+@@ -640,6 +651,8 @@ &osm_emmc {
+ 
+ #ifdef CONFIG_OSM8MM_SDIO_A
+ &osm_sdio_a {
++	assigned-clocks = <&clk IMX8MM_CLK_USDHC2>;
++	assigned-clock-rates = <200000000>;
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_osm_sdio_a>, <&pinctrl_osm_sdio_a_gpio>;
+ 	pinctrl-1 = <&pinctrl_osm_sdio_a_100mhz>, <&pinctrl_osm_sdio_a_gpio>;
+@@ -652,7 +665,8 @@ &osm_sdio_a {
+ #endif
+ 	bus-width = <4>;
+ 	vmmc-supply = <&reg_vref_3v3>;
+-	vqmmc-supply = <&reg_vref_3v3>;
++	vqmmc-supply = <&reg_sdio_a_vsel>;
++	voltage-ranges = <1800 3300>;
+ 	keep-power-in-suspend;
+ 	status = "okay";
+ 
+@@ -730,19 +744,19 @@ &A53_3 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+ 
+-&gpu {
++&gpu_2d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g1 {
++&gpu_3d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g2 {
++&vpu_g1 {
+ 	status = "okay";
+ };
+ 
+-&vpu_h1 {
++&vpu_g2 {
+ 	status = "okay";
+ };
+ 
+@@ -773,6 +787,8 @@ pinctrl_hog: hoggrp {
+ 			fsl,pins = <
+ 				/* CARRIER_PWR_EN */
+ 				MX8MM_IOMUXC_SAI2_MCLK_GPIO4_IO27	0x00004
++				/* SD_A_VSEL */
++				MX8MM_IOMUXC_GPIO1_IO03_GPIO1_IO3	0x00004
+ 
+ 				/* GPIO_A */
+ 				/* 0 */ MX8MM_IOMUXC_GPIO1_IO00_GPIO1_IO0	0x00004
+diff --git a/arch/arm64/boot/dts/F+S/picocoremx8mm-ddr3l.dts b/arch/arm64/boot/dts/F+S/picocoremx8mm-ddr3l.dts
+index a5dba56f2..a95f3ccee 100644
+--- a/arch/arm64/boot/dts/F+S/picocoremx8mm-ddr3l.dts
++++ b/arch/arm64/boot/dts/F+S/picocoremx8mm-ddr3l.dts
+@@ -132,10 +132,8 @@ Revision 1.40. Otherwise use polling with ~100ms */
+ 
+ #include "fsimx8mm.dtsi"
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
+ 
+ / {
+ 	model = "F&S PicoCoreMX8MM-DDR3L";
+@@ -172,7 +170,6 @@ aliases {
+ 	bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "picocoremx8mm-ddr3l";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ #if 0
+@@ -518,10 +515,9 @@ ldo6_reg: LDO6 {
+ 	rtcpcf85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ 
+ #ifdef CONFIG_PICOCOREMX8MX_USB_OTG1_USBC
+@@ -1100,19 +1096,19 @@ &A53_3 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+ 
+-&gpu {
++&gpu_2d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g1 {
++&gpu_3d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g2 {
++&vpu_g1 {
+ 	status = "okay";
+ };
+ 
+-&vpu_h1 {
++&vpu_g2 {
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi b/arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi
+index d9abc4ff4..1c4c0f050 100644
+--- a/arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi
++++ b/arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi
+@@ -11,10 +11,8 @@
+ 
+ #include "fsimx8mm.dtsi"
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
+ 
+ / {
+ 	compatible = "fus,imx8mm-picocoremx8mm", "fsl,imx8mm";
+@@ -35,7 +33,6 @@ aliases {
+ 	/* -------------------- BOARD INFO -------------------- */
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ #if 0
+@@ -429,10 +426,9 @@ rtc85063: rtc85063@51 {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ 
+ #ifdef CONFIG_PICOCOREMX8MM_USB_OTG1_USBC
+@@ -902,19 +898,19 @@ &A53_3 {
+ 	cpu-supply = <&buck2_reg>;
+ };
+ 
+-&gpu {
++&gpu_2d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g1 {
++&gpu_3d {
+ 	status = "okay";
+ };
+ 
+-&vpu_g2 {
++&vpu_g1 {
+ 	status = "okay";
+ };
+ 
+-&vpu_h1 {
++&vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-- 
+2.40.1
+

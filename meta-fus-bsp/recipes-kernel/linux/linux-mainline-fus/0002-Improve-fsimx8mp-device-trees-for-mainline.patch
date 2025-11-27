@@ -1,0 +1,1391 @@
+From e53c39ce242ce7f3536a8b8ead1298d95681ffe5 Mon Sep 17 00:00:00 2001
+Message-Id: <e53c39ce242ce7f3536a8b8ead1298d95681ffe5.1764249235.git.gerbach@fs-net.de>
+In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Tue, 13 May 2025 16:30:45 +0200
+Subject: [PATCH 02/11] Improve fsimx8mp device trees for mainline
+
+Based on the F&S Kernel. Not fully tested yet. Some properties might not
+have any effect.
+---
+ arch/arm64/boot/dts/F+S/Makefile              |  77 +---------
+ arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi    | 137 ++++++------------
+ .../displays/imx8mp-BT070L1060CS0I1AD-A.dtsi  |  22 +--
+ .../F+S/displays/imx8mp-EE1010B1T-1CP.dtsi    |  14 +-
+ ...8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi | 113 ++++-----------
+ .../F+S/displays/imx8mp-lcdif-g133han01.dtsi  |   2 +-
+ .../displays/imx8mp-lcdif-j070wvtc0211.dtsi   |  32 +---
+ arch/arm64/boot/dts/F+S/efusmx8mp.dtsi        | 137 ++++++------------
+ arch/arm64/boot/dts/F+S/fsimx8mp.dtsi         |  20 +--
+ arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi        | 102 ++++---------
+ arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi    |  76 +++-------
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ 12 files changed, 185 insertions(+), 548 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/F+S/Makefile b/arch/arm64/boot/dts/F+S/Makefile
+index aa181fa0a..aeb97fd4e 100644
+--- a/arch/arm64/boot/dts/F+S/Makefile
++++ b/arch/arm64/boot/dts/F+S/Makefile
+@@ -5,61 +5,14 @@ DTC_FLAGS += -@
+ dtb-$(CONFIG_ARCH_MXC) += armstonemx8mp.dtb \
+ 			  armstonemx8mp-BT070L1060CS0I1AD-A.dtb \
+ 			  armstonemx8mp-EE1010B1T-1CP.dtb
+-dtb-$(CONFIG_ARCH_MXC) += picocoremx8mm-lpddr4.dtb \
+-			  picocoremx8mm-lpddr4-lcdif-tc358764-g070y2-l01.dtb \
+-			  picocoremx8mm-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
+-			  picocoremx8mm-lpddr4-lcdif-g050tan01.dtb \
+-			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mm-lpddr4-lcdif-adp-mipi2rgb.dtb \
+-			  picocoremx8mm-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
+-			  tbs2.dtb \
+-			  tbs2-lcdif-adp-mipi2rgb-etm0350.dtb \
+-			  picocoremx8mm-ddr3l.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-tc358775-g133han01.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-tc358775-j070wvtc0211.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-g050tan01.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-adp-mipi2lvds1-j070wvtc0211-single-display.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-adp-mipi2lvds1-g133han01.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mm-ddr3l-lcdif-adp-mipi2rgb.dtb \
+-			  picocoremx8mm-ddr3l-tc358775-BT070L1060CS0I1AD-A.dtb
+-dtb-$(CONFIG_ARCH_MXC) += efusmx8x.dtb \
+-			  efusmx8x-lcdif-j070wvtc0211.dtb \
+-			  efusmx8x-lcdif-rgt070qyh-13cp.dtb
+-dtb-$(CONFIG_ARCH_MXC) += picocoremx8mn-lpddr4.dtb \
+-			  picocoremx8mn-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
+-			  picocoremx8mn-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mn-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
+-			  picocoremx8mn-ddr3l.dtb \
+-			  picocoremx8mn-ddr3l-lcdif-tc358775-j070wvtc0211.dtb \
+-			  picocoremx8mn-ddr3l-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mn-ddr3l-lcdif-adp-mipi2rgb.dtb \
+-			  picocoremx8mn-ddr3l-tc358775-BT070L1060CS0I1AD-A.dtb
+ dtb-$(CONFIG_ARCH_MXC) += picocoremx8mp.dtb \
+-			  picocoremx8mp-lcdif-adp-mipi2lvds1-j070wvtc0211-single-display.dtb \
+ 			  picocoremx8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+ 			  picocoremx8mp-lcdif-j070wvtc0211.dtb \
+-			  picocoremx8mp-lcdif-g133han01.dtb \
+-			  picocoremx8mp-adp-aud1.dtb \
+-			  picocoremx8mp-basler-isp.dtb \
+-			  picocoremx8mpr2-basler-isp.dtb \
+-			  picocoremx8mp-BT070L1060CS0I1AD-A.dtb \
+-			  picocoremx8mp-EE1010B1T-1CP.dtb
+-dtb-$(CONFIG_ARCH_MXC) += picocoremx8mmr2-lpddr4.dtb \
+-			  picocoremx8mmr2-lpddr4-lcdif-tc358764-g070y2-l01.dtb \
+-			  picocoremx8mmr2-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
+-			  picocoremx8mmr2-lpddr4-lcdif-g050tan01.dtb \
+-			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2rgb.dtb \
+-			  picocoremx8mmr2-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb
++			  picocoremx8mp-BT070L1060CS0I1AD-A.dtb
+ dtb-$(CONFIG_ARCH_MXC) += picocoremx8mpr2.dtb \
+ 			  picocoremx8mpr2-lcdif-j070wvtc0211.dtb \
+-			  picocoremx8mpr2-lcdif-adp-mipi2lvds1-j070wvtc0211-single-display.dtb \
+ 			  picocoremx8mpr2-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8mpr2-lcdif-g133han01.dtb \
+-			  picocoremx8mpr2-adp-aud1.dtb \
+-			  picocoremx8mpr2-BT070L1060CS0I1AD-A.dtb \
+-			  picocoremx8mpr2-EE1010B1T-1CP.dtb
++			  picocoremx8mpr2-BT070L1060CS0I1AD-A.dtb
+ dtb-$(CONFIG_ARCH_MXC) += efusmx8mp.dtb \
+ 			  efusmx8mp-BT070L1060CS0I1AD-A.dtb \
+ 			  efusmx8mp-EE1010B1T-1CP.dtb \
+@@ -68,27 +21,5 @@ dtb-$(CONFIG_ARCH_MXC) += fssmmx8mp.dtb \
+ 			  fssmmx8mp-lcdif-j070wvtc0211.dtb \
+ 			  fssmmx8mp-BT070L1060CS0I1AD-A.dtb \
+ 			  fssmmx8mp-EE1010B1T-1CP.dtb
+-dtb-$(CONFIG_ARCH_MXC) += osm8mm.dtb \
+-			  osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  osm8mm-lcdif-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  soldercore8ulp-bbhd.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  picocoremx8ulp.dtb \
+-			  picocoremx8ulp-adp-mipi2mipi1-ee0350et-2cp.dtb \
+-			  picocoremx8ulp-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  fs-osm-sf-mx8ulp-adp-osm-bb.dtb \
+-			  fs-osm-sf-mx8ulp-adp-osm-bb-ee0350et-2cp.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  picocoremx93.dtb \
+-			  picocoremx93-BT070L1060CS0I1AD-A.dtb \
+-			  picocoremx93-adp-lvds2lvds2-EE1010B1T-1CP.dtb \
+-			  picocoremx93-adp-mipi2mip1-ee0350et-2cp.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  fs-osm-sf-mx93-adp-osm-bb.dtb \
+-			  fs-osm-sf-mx93-adp-osm-bb_BT070L1060CS0I1AD-A.dtb
+-dtb-$(CONFIG_ARCH_MXC) += \
+-			  efusmx93-SINTF.dtb \
+-			  efusmx93-SINTF-ET070080DH6.dtb \
+-			  efusmx93-SINTF-BT070L1060CS0I1AD-A.dtb
++
++
+diff --git a/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi b/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi
+index 55ae3d24c..e9bffba57 100644
+--- a/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi
+@@ -13,9 +13,7 @@
+ 
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
+ 
+ /* Do we have HDMI? */
+ #if ((CONFIG_ARMSTONEMX8MP_PANEL0 == DISPLAY_HDMI) \
+@@ -188,7 +186,6 @@ &mu 1 1
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "armstonemx8mp";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	regulators {
+@@ -255,7 +252,7 @@ reg_ldb_bl: ldb-bl {
+ 		enable-active-high;
+ 	};
+ #endif
+-
++#ifdef CONFIG_ARMSTONEMX8MP_USB_OTG
+ 	cbtl04gp {
+ 		compatible = "nxp,cbtl04gp";
+ 		pinctrl-names = "default";
+@@ -269,14 +266,6 @@ usb3_data_ss: endpoint {
+ 			};
+ 		};
+ 	};
+-
+-#ifdef CONFIG_ARMSTONEMX8MP_USB_HOST
+-	usb_host_reset: gpio-reset {
+-		compatible = "gpio-reset";
+-		reset-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
+-		reset-delay-us = <10>;
+-		#reset-cells = <0>;
+-	};
+ #endif
+ 
+ #ifdef CONFIG_ARMSTONEMX8MP_AUDIO_CODEC
+@@ -419,16 +408,22 @@ &gpio3 4 0
+ 		linux,keymap = <>;
+ 	};
+ #endif
+-};
+ 
+-&aud2htx {
+-#ifdef CONFIG_ARMSTONEMX8MP_HDMI_AUDIO
+-	status = "okay";
+-#else
+-	status = "disabled";
++#ifdef CONFIG_ARMSTONEMX8MP_HDMI
++	native-hdmi-connector {
++		compatible = "hdmi-connector";
++		label = "X14";
++		type = "a";
++
++		port {
++			native_hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_tx_out>;
++			};
++		};
++	};
+ #endif
+-};
+ 
++};
+ 
+ &clk {
+ 	init-on-array = <IMX8MP_CLK_HSIO_ROOT>;
+@@ -668,10 +663,9 @@ typec_con_ss: endpoint {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ #endif /* CONFIG_ARMSTONEMX8MP_EXT_RTC */
+ 
+@@ -760,6 +754,8 @@ basler_ep_0: endpoint {
+ };
+ #endif /* CONFIG_ARMSTONEMX8MP_I2C_D */
+ 
++
++
+ #ifdef CONFIG_ARMSTONEMX8MP_I2C_C
+ /* J20 feature connector - pins 19,21 */
+ &i2c2 {
+@@ -1161,8 +1157,6 @@ &pcie_phy {
+ #ifdef CONFIG_ARMSTONEMX8MP_USB_HOST
+ /* USB1 */
+ &usb3_phy0 {
+-	fsl,phy-tx-preemp-amp-tune = <3>;
+-	fsl,phy-tx-vref-tune = <0xb>;
+ 	status = "okay";
+ };
+ 
+@@ -1174,7 +1168,6 @@ &usb_dwc3_0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usb1_pwr>;
+ 	dr_mode = "host";
+-	resets = <&usb_host_reset>;
+ 	status = "okay";
+ };
+ #endif
+@@ -1298,32 +1291,33 @@ &wdog1 {
+ };
+ 
+ #ifdef CONFIG_ARMSTONEMX8MP_HDMI
+-&irqsteer_hdmi {
+-	status = "okay";
+-};
+ 
+-&hdmi_pavi {
++&hdmi_pvi {
+ 	status = "okay";
+ };
+ 
+-&hdmi {
++&hdmi_tx {
++
+ 	status = "okay";
++	ports {
++		port@1 {
++			hdmi_tx_out: endpoint {
++				remote-endpoint = <&native_hdmi_connector_in>;
++			};
++		};
++	};
+ };
+ 
+-&hdmiphy {
++&hdmi_tx_phy {
+ 	status = "okay";
+ };
+ 
+-
+-&hdmi_blk_ctrl {
++&aud2htx {
+ 	status = "okay";
+ };
+ 
+ &lcdif3 {
+ 	status = "okay";
+-	thres-low  = <1 2>;             /* (FIFO * 1 / 2) */
+-	thres-high = <3 4>;             /* (FIFO * 3 / 4) */
+-
+ };
+ #endif
+ 
+@@ -1332,52 +1326,31 @@ &lcdif2 {
+ 	status = "okay";
+ };
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "okay";
+-#ifdef CONFIG_ARMSTONEMX8MP_LVDS_DUAL_CHANNEL
+-	fsl,dual-channel;
+-#endif /* CONFIG_ARMSTONEMX8MP_LVDS_DUAL_CHANNEL */
+-
++	ports {
+ #ifdef CONFIG_ARMSTONEMX8MP_LVDS0
+ 	/* LVDSA or DSI */
+-	lvds-channel@0 {
+-		fsl,data-mapping = CONFIG_ARMSTONEMX8MP_LVDS0_CHANNEL_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEMX8MP_LVDS0_CHANNEL_DATA_WIDTH>;
+-		status = "okay";
+-
++        #address-cells = <1>;
++        #size-cells = <0>;
+ 		port@1 {
+ 			reg = <1>;
+ 			lvds0_out: endpoint {
+ 				remote-endpoint = <&panel_lvds0_in>;
+ 			};
+ 		};
+-	};
+ #endif
+-
+ #ifdef CONFIG_ARMSTONEMX8MP_LVDS1
+-	/* LVDSB */
+-	lvds-channel@1 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		fsl,data-mapping = CONFIG_ARMSTONEMX8MP_LVDS1_CHANNEL_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEMX8MP_LVDS1_CHANNEL_DATA_WIDTH>;
+-#ifndef CONFIG_ARMSTONEMX8MP_LVDS_DUAL_CHANNEL
+-		status = "okay";
+-#endif
+-
+-		port@1 {
+-			reg = <1>;
++		port@2 {
++			reg = <2>;
+ 			lvds1_out: endpoint {
+ 				remote-endpoint = <&panel_lvds1_in>;
+ 			};
+ 		};
+-	};
+ #endif
++	};
+ };
+ 
+-&ldb_phy {
+-	status = "okay";
+-};
+ #endif
+ /* defined(CONFIG_ARMSTONEMX8MP_LVDS0) || defined(CONFIG_ARMSTONEMX8MP_LVDS1) */
+ 
+@@ -1402,31 +1375,11 @@ &vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-&vpu_vc8000e {
+-	status = "okay";
+-};
+-
+-&vpu_v4l2 {
+-	status = "okay";
+-};
+-
+-&gpu_3d {
+-	status = "okay";
+-};
+-
+-&gpu_2d {
+-	status = "okay";
+-};
+-
+-&ml_vipsi {
+-	status = "okay";
+-};
+-
+-&mix_gpu_ml {
++&gpu3d {
+ 	status = "okay";
+ };
+ 
+-&cameradev {
++&gpu2d {
+ 	status = "okay";
+ };
+ 
+@@ -1462,14 +1415,6 @@ m2m_device {
+ #endif
+ };
+ 
+-&isi_1 {
+-	status = "disabled";
+-
+-	cap_device {
+-		status = "okay";
+-	};
+-};
+-
+ &dsp {
+ #ifdef CONFIG_ARMSTONEMX8MP_DSP
+ 	memory-region = <&dsp_vdev0buffer>, <&dsp_vdev0vring0>,
+@@ -1831,7 +1776,7 @@ MX8MP_IOMUXC_NAND_DATA03__UART4_DCE_RTS	0x140
+ #ifdef CONFIG_ARMSTONEMX8MP_USB_HOST
+ 		pinctrl_usb1_pwr: usb1grp {
+ 			fsl,pins = <
+-				MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x19
++				MX8MP_IOMUXC_GPIO1_IO12__USB1_OTG_PWR	0x19
+ 			>;
+ 		};
+ #endif /* CONFIG_ARMSTONEMX8MP_USB_HOST */
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
+index 9c65122d9..976e7bd2d 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
+@@ -57,29 +57,13 @@ &lcdif2 {
+ 	status = "okay";
+ };
+ 
+-&ldb_phy {
+-	status = "okay";
+-};
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "okay";
+-	/* TODO: disabled for now because does not work */
+-#ifdef CONFIG_PICOCOREMX8MP_LDB_DUAL_CHANNEL
+-	fsl,dual-channel;
+-#endif /* CONFIG_PICOCOREMX8MP_LDB_DUAL_CHANNEL */
+-	/* DSI_A */
+-	lvds-channel@0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+-	};
+-	/* DSI_B */
+-	lvds-channel@1 {
++	ports {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "okay";
++
+ 		port@1 {
+ 			reg = <1>;
+ 			lvds1_out: endpoint {
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi
+index 54452f10c..dd1ad76e1 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi
+@@ -58,19 +58,13 @@ &lcdif2 {
+ 	status = "okay";
+ };
+ 
+-&ldb_phy {
+-	status = "okay";
+-};
+ 
+-&ldb {
++
++&lvds_bridge {
+ 	status = "okay";
+-	lvds-channel@IMX8MP_LVDS_CHANNEL {
++	ports{
+ 		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "okay";
++        #size-cells = <0>;
+ 
+ 		port@1 {
+ 			reg = <1>;
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
+index 5afd906a5..7654d754c 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi
+@@ -11,11 +11,7 @@ regulators {
+ 		reg_mipi_bl: backlight_mipi {
+ 			compatible = "regulator-fixed";
+ 			regulator-name = "mipi-bl";
+-#if CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 120
+ 			gpio = <&max7315 0 GPIO_ACTIVE_HIGH>;
+-#elif CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 100
+-			gpio = <&pca963x 1 GPIO_ACTIVE_HIGH>;
+-#endif
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+ 			enable-active-high;
+@@ -23,21 +19,14 @@ reg_mipi_bl: backlight_mipi {
+ 	};
+ 
+ 	/* MIPI-DSI backlight PWM on adapter MIPI2MIPI1 */
+-	backlight_mipi_dsi {
++	backlight_mipi_dsi: backlight_mipi_dsi {
+ 		compatible = "pwm-backlight";
+-#if CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 120
+ 		/* only 32 kHz available */
+ 		pwms = <&max7315 1 31250 PWM_POLARITY_INVERTED>;
+ 		power-supply = <&reg_mipi_bl>;
+ 		/* calculated without sigma so it´s linear */
+ 		brightness-levels = <0 17 34 51 68 85 102 119 136
+ 				     153 170 187 204 221 238 255>;
+-#elif CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 100
+-		pwms = <&pca963x 0 10752 0>; /* 1.5625 kHz */
+-		power-supply = <&reg_mipi_bl>;
+-		brightness-levels = <0 30 32 35 39 46 55 66
+-				     80 96 115 137 162 190 221 255>;
+-#endif
+ 		default-brightness-level = <14>;
+ 		fb-names = "mipi_dsi";
+ 	};
+@@ -51,27 +40,11 @@ &lcdif2 {
+ 	status = "disabled";
+ };
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "disabled";
+-
+-	/* DSI_A */
+-	lvds-channel@0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+-	};
+-
+-	/* DSI_B */
+-	lvds-channel@1 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+-	};
+ };
+ 
+-&ldb_phy {
+-	status = "disabled";
+-};
++
+ 
+ &lcdif3 {
+ 	status = "disabled";
+@@ -82,24 +55,40 @@ &lcdif3 {
+ 
+ 
+ &mipi_dsi {
++
++    samsung,esc-clock-frequency = <20000000>;
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
+ 	status = "okay";
+ 
+ 	panel@0 {
+-		compatible = "eagleeyetech,ee0350et-2";
++		compatible = "newvision,nv3051d-ee0350et";
+ 		reg = <0>;
+-#if CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 120
+ 		reset-gpios = <&max7315 4 GPIO_ACTIVE_LOW>;
+-#elif CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 100
+-		reset-gpios = <&pca963x 2 GPIO_ACTIVE_HIGH>;
+-		vci-supply = <&reg_vlcd>;
+-#endif
++		vdd-supply = <&reg_vlcd>;
++		backlight = <&backlight_mipi_dsi>;
+ 		status = "okay";
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&mipi_dsi_out>;
++			};
++		};
++	};
++
++	ports {
++		port@1 {
++			reg = <1>;
++
++			mipi_dsi_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
+ 	};
+ };
+ 
+ &i2c4 {
+-
+-#if CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 120
+ 	/* LED-driver on adapter board MIPI2MIPI1 */
+ 	max7315: max7315@20 { /* LED-driver */
+ 		compatible = "maxim,max7315";
+@@ -125,53 +114,5 @@ mxt336u@4a {
+ 		//reset-gpios = <&max7315 6 GPIO_ACTIVE_LOW>;
+ 		reset-gpios = <&gpio5 5 GPIO_ACTIVE_LOW>;
+ 	};
+-#elif CONFIG_ADP_MIPI2MIPI1_BOARD_REVISION == 100
+-	/* LED-driver on adapter board MIPI2MIPI1 */
+-	pca963x: pca9632@60 { /* LED-driver */
+-		compatible = "nxp,pca9632";
+-		reg = <0x60>;
+-		nxp,totem-pole;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		#pwm-cells = <3>;
+-		#gpio-cells = <2>;
+-		led@0 {
+-			reg = <0>;
+-			label = "1-LEDCTRL";
+-			type = "PWM";
+-			default-on;		/* or: keep-value */
+-			active-low;
+-		};
+-		led@1 {
+-			reg = <1>;
+-			label = "0-PWRCTL";
+-			type = "GPIO";
+-			default-on;		/* or: keep-value */
+-			active-high;
+-		};
+-		led@2 {
+-			reg = <2>;
+-			label = "2-TOUCH-RST";
+-			type = "GPIO";
+-			active-low;
+-		};
+-		led@3 {
+-			reg = <3>;
+-			label = "2-MIPI-RST";
+-			type = "GPIO";
+-			active-low;
+-		};
+-	};
+-
+-	/* Atmel PCAP touch on Touch Connector (I2C) */
+-	mxt336u@4a {
+-		compatible = "atmel,maxtouch";
+-		reg = <0x4a>;
+-		interrupt-parent = <&gpio1>;
+-		interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
+-		atmel,cfg_name = "atmel/mxt336u-gloves.cfg";
+-		reset-gpios = <&gpio5 5 GPIO_ACTIVE_LOW>;
+-	};
+-#endif
+ };
+ 
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-g133han01.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-g133han01.dtsi
+index fd1ed3d13..84beb4250 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-g133han01.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-g133han01.dtsi
+@@ -107,7 +107,7 @@ &ldb_phy {
+ 	status = "okay";
+ };
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "okay";
+ #ifdef CONFIG_PICOCOREMX8MP_LVDS_DUAL_CHANNEL
+ 	fsl,dual-channel;
+diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-j070wvtc0211.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-j070wvtc0211.dtsi
+index c67ac133f..c307ba5b1 100644
+--- a/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-j070wvtc0211.dtsi
++++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-lcdif-j070wvtc0211.dtsi
+@@ -96,23 +96,12 @@ &lcdif3 {
+ 	status = "disabled";
+ };
+ 
+-&ldb_phy {
++&lvds_bridge {
+ 	status = "okay";
+-};
+-
+-&ldb {
+-	status = "okay";
+-	/* TODO: disabled for now because does not work */
+-#ifdef CONFIG_PICOCOREMX8MP_LDB_DUAL_CHANNEL
+-	fsl,dual-channel;
+-#endif /* CONFIG_PICOCOREMX8MP_LDB_DUAL_CHANNEL */
+-
+-	/* DSI_A */
+-	lvds-channel@0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+ 
++	ports {
++       #address-cells = <1>;
++       #size-cells = <0>;
+ 		port@1 {
+ 			reg = <1>;
+ 
+@@ -120,18 +109,9 @@ lvds0_out: endpoint {
+ 				remote-endpoint = <&panel_lvds0_in>;
+ 			};
+ 		};
+-	};
+ 
+-	/* DSI_B */
+-	lvds-channel@1 {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "okay";
+-
+-		port@1 {
+-			reg = <1>;
++		port@2 {
++			reg = <2>;
+ 
+ 			lvds1_out: endpoint {
+ 				remote-endpoint = <&panel_lvds1_in>;
+diff --git a/arch/arm64/boot/dts/F+S/efusmx8mp.dtsi b/arch/arm64/boot/dts/F+S/efusmx8mp.dtsi
+index 82ac4636d..ad87f7590 100644
+--- a/arch/arm64/boot/dts/F+S/efusmx8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/efusmx8mp.dtsi
+@@ -13,9 +13,8 @@
+ 
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
++
+ 
+ /* Do we have HDMI? */
+ #if ((CONFIG_EFUSMX8MP_PANEL0 == DISPLAY_HDMI) \
+@@ -196,7 +195,6 @@ &mu 1 1
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "efusmx8mp";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	regulators {
+@@ -434,9 +432,25 @@ extcon_usb: extcon_usb {
+ 		vbus-gpio = <&gpio1 14 GPIO_ACTIVE_LOW>;
+ 	};
+ #endif
+-};
++
+ 
+ #ifdef CONFIG_EFUSMX8MP_HDMI
++	native-hdmi-connector {
++		compatible = "hdmi-connector";
++		label = "X14";
++		type = "a";
++
++		port {
++			native_hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_tx_out>;
++			};
++		};
++	};
++#endif
++};
++
++
++
+ &aud2htx {
+ #ifdef CONFIG_EFUSMX8MP_HDMI_AUDIO
+ 	status = "okay";
+@@ -444,8 +458,6 @@ &aud2htx {
+ 	status = "disabled";
+ #endif
+ };
+-#endif
+-
+ 
+ &clk {
+ 	init-on-array = <IMX8MP_CLK_HSIO_ROOT>;
+@@ -656,10 +668,9 @@ eeprom: eeprom@50 {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ #endif /* CONFIG_EFUSMX8MP_EXT_RTC */
+ 
+@@ -1385,7 +1396,7 @@ &wdog1 {
+ 	status = "okay";
+ };
+ 
+-&irqsteer_hdmi {
++&hdmi_pvi {
+ #ifdef CONFIG_EFUSMX8MP_HDMI
+ 	status = "okay";
+ #else
+@@ -1393,37 +1404,19 @@ &irqsteer_hdmi {
+ #endif
+ };
+ 
+-&hdmi_pavi {
+-#ifdef CONFIG_EFUSMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status="disabled";
+-#endif
+-};
+-
+-&hdmi {
++&hdmi_tx {
+ #ifndef CONFIG_EFUSMX8MP_HDMI_I2C
+ 	ddc-i2c-bus = <&i2c5>;
+ #endif
+ #ifdef CONFIG_EFUSMX8MP_HDMI
+ 	status = "okay";
+-#else
+-	status="disabled";
+-#endif
+-};
+-
+-&hdmiphy {
+-#ifdef CONFIG_EFUSMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status="disabled";
+-#endif
+-};
+-
+-
+-&hdmi_blk_ctrl {
+-#ifdef CONFIG_EFUSMX8MP_HDMI
+-	status = "okay";
++	ports {
++		port@1 {
++			hdmi_tx_out: endpoint {
++				remote-endpoint = <&native_hdmi_connector_in>;
++			};
++		};
++	};
+ #else
+ 	status="disabled";
+ #endif
+@@ -1449,50 +1442,31 @@ &lcdif3 {
+ #endif
+ 
+ #if defined(CONFIG_EFUSMX8MP_LVDS0) || defined(CONFIG_EFUSMX8MP_LVDS1)
+-&ldb {
++&lvds_bridge {
+ 	status = "okay";
+-#ifdef CONFIG_EFUSMX8MP_LVDS_DUAL_CHANNEL
+-	fsl,dual-channel;
+-#endif /* CONFIG_EFUSMX8MP_LVDS_DUAL_CHANNEL */
+ 
++	ports{
++		#address-cells = <1>;
++        #size-cells = <0>;
+ #ifdef CONFIG_EFUSMX8MP_LVDS0
+-	/* LVDSA or DSI */
+-	lvds-channel@0 {
+-		fsl,data-mapping = CONFIG_EFUSMX8MP_LVDS0_CHANNEL_MAPPING;
+-		fsl,data-width = <CONFIG_EFUSMX8MP_LVDS0_CHANNEL_DATA_WIDTH>;
+-		status = "okay";
+-
+ 		port@1 {
+ 			reg = <1>;
+ 			lvds0_out: endpoint {
+ 				remote-endpoint = <&panel_lvds0_in>;
+ 			};
+ 		};
+-	};
+ #endif
+-
+ #ifdef CONFIG_EFUSMX8MP_LVDS1
+-	/* LVDSB */
+-	lvds-channel@1 {
+-		fsl,data-mapping = CONFIG_EFUSMX8MP_LVDS1_CHANNEL_MAPPING;
+-		fsl,data-width = <CONFIG_EFUSMX8MP_LVDS1_CHANNEL_DATA_WIDTH>;
+-#ifndef CONFIG_EFUSMX8MP_LVDS_DUAL_CHANNEL
+-		status = "okay";
+-#endif
+-
+-		port@1 {
+-			reg = <1>;
++		port@2 {
++			reg = <2>;
+ 			lvds1_out: endpoint {
+ 				remote-endpoint = <&panel_lvds1_in>;
+ 			};
+ 		};
+-	};
+ #endif
++	};
+ };
+ 
+-&ldb_phy {
+-	status = "okay";
+-};
+ #endif
+ 
+ &mipi_dsi {
+@@ -1501,8 +1475,9 @@ &mipi_dsi {
+ #else
+ 	status = "okay";
+ #endif
+-	
+ 	bus-fmt = <0x100a>; /*MEDIA_BUS_FMT_RGB888_1X24*/
++	#address-cells = <1>;
++    #size-cells = <0>;
+ 	port@1{
+ 		reg = <1>;
+ 		dsim_to_rgb: endpoint {
+@@ -1527,35 +1502,15 @@ &vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-&vpu_vc8000e {
++&gpu3d {
+ 	status = "okay";
+ };
+ 
+-&vpu_v4l2 {
+-	status = "okay";
+-};
+-
+-&gpu_3d {
+-	status = "okay";
+-};
+-
+-&gpu_2d {
+-	status = "okay";
+-};
+-
+-&ml_vipsi {
+-	status = "okay";
+-};
+-
+-&mix_gpu_ml {
++&gpu2d {
+ 	status = "okay";
+ };
+ 
+ #ifdef CONFIG_EFUSMX8MP_CSI_A
+-&cameradev {
+-	status = "okay";
+-};
+-
+ &isp_0 {
+ 	/* remove this property because this region used
+ 	 * only by tuning tool
+@@ -1580,14 +1535,6 @@ m2m_device {
+ #endif
+ };
+ 
+-&isi_1 {
+-	status = "disabled";
+-
+-	cap_device {
+-		status = "okay";
+-	};
+-};
+-
+ &dsp {
+ #ifdef CONFIG_EFUSMX8MP_DSP
+ 	memory-region = <&dsp_vdev0buffer>, <&dsp_vdev0vring0>,
+@@ -1951,7 +1898,7 @@ MX8MP_IOMUXC_GPIO1_IO12__GPIO1_IO12	0x19
+ #ifdef CONFIG_EFUSMX8MP_USB_OTG
+ 		pinctrl_usb2: usb2grp {
+ 			fsl,pins = <
+-				MX8MP_IOMUXC_GPIO1_IO15__USB2_OC	0x80
++				MX8MP_IOMUXC_GPIO1_IO15__USB2_OTG_OC	0x80
+ 			>;
+ 		};
+ 		pinctrl_usb2_vbus: usb2grp_vbus {
+diff --git a/arch/arm64/boot/dts/F+S/fsimx8mp.dtsi b/arch/arm64/boot/dts/F+S/fsimx8mp.dtsi
+index 9a93d4e14..c2df56004 100644
+--- a/arch/arm64/boot/dts/F+S/fsimx8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/fsimx8mp.dtsi
+@@ -1,21 +1,7 @@
+ #include "../freescale/imx8mp.dtsi"
+ 
+-/delete-node/ &gpu_reserved;
++/* These padmuxes are not documented, but have proven to work */
++#define MX8MP_IOMUXC_SAI1_RXD0__AUDIOMIX_SAI5_RX_DATA00              0x150 0x3B0 0x4F8 0x1 0x1
++#define MX8MP_IOMUXC_SAI1_MCLK__AUDIOMIX_SAI5_MCLK                   0x198 0x3F8 0x4F0 0x1 0x1
+ 
+-&mix_gpu_ml {
+-	/delete-property/ memory-region;
+-};
+-
+-
+-&pgc_vpu_g1 {
+-	/delete-property/ power-domains;
+-};
+-
+-&pgc_vpu_g2 {
+-	/delete-property/ power-domains;
+-};
+-
+-&pgc_vpu_vc8000e {
+-	/delete-property/ power-domains;
+-};
+ 
+diff --git a/arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi b/arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi
+index 90cb46335..d7caa8033 100644
+--- a/arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi
+@@ -13,9 +13,7 @@
+ 
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+-#include <fsversion.h>
+ 
+ / {
+ 	chosen {
+@@ -135,7 +133,6 @@ &mu 1 1
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "fssmmx8mp";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	regulators {
+@@ -351,6 +348,21 @@ sound-hdmi {
+ 		status = "okay";
+ 	};
+ #endif /* CONFIG_FSSMMX8MP_HDMI_AUDIO */
++
++#ifdef CONFIG_FSSMMX8MP_HDMI
++	native-hdmi-connector {
++		compatible = "hdmi-connector";
++		label = "X14";
++		type = "a";
++
++		port {
++			native_hdmi_connector_in: endpoint {
++				remote-endpoint = <&hdmi_tx_out>;
++			};
++		};
++	};
++#endif
++
+ };
+ 
+ &aud2htx {
+@@ -802,10 +814,9 @@ ldo5: LDO5 {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ #endif /* CONFIG_FSSMMX8MP_EXT_RTC */
+ 
+@@ -1155,23 +1166,7 @@ &wdog1 {
+ 	status = "okay";
+ };
+ 
+-&irqsteer_hdmi {
+-#ifdef CONFIG_FSSMMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status = "disabled";
+-#endif
+-};
+-
+-&hdmi_pavi {
+-#ifdef CONFIG_FSSMMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status = "disabled";
+-#endif
+-};
+-
+-&hdmi {
++&hdmi_pvi {
+ #ifdef CONFIG_FSSMMX8MP_HDMI
+ 	status = "okay";
+ #else
+@@ -1179,24 +1174,21 @@ &hdmi {
+ #endif
+ };
+ 
+-&hdmiphy {
+-#ifdef CONFIG_FSSMMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status = "disabled";
+-#endif
+-};
+-
+-
+-&hdmi_blk_ctrl {
++&hdmi_tx {
+ #ifdef CONFIG_FSSMMX8MP_HDMI
+ 	status = "okay";
++	ports {
++		port@1 {
++			hdmi_tx_out: endpoint {
++				remote-endpoint = <&native_hdmi_connector_in>;
++			};
++		};
++	};
+ #else
+ 	status = "disabled";
+ #endif
+ };
+ 
+-
+ &lcdif1 {
+ 	status = "disabled";
+ };
+@@ -1215,13 +1207,10 @@ &lcdif3 {
+ #endif
+ };
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "disabled";
+ };
+ 
+-&ldb_phy {
+-	status = "disabled";
+-};
+ 
+ &mipi_dsi {
+ 	status = "disabled";
+@@ -1240,33 +1229,17 @@ &vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-&vpu_vc8000e {
+-	status = "okay";
+-};
+ 
+-&vpu_v4l2 {
+-	status = "okay";
+-};
+ 
+-&gpu_3d {
++&gpu3d {
+ 	status = "okay";
+ };
+ 
+-&gpu_2d {
++&gpu2d {
+ 	status = "okay";
+ };
+ 
+-&ml_vipsi {
+-	status = "okay";
+-};
+ 
+-&mix_gpu_ml {
+-	status = "okay";
+-};
+-
+-&cameradev {
+-	status = "okay";
+-};
+ 
+ &isi_0 {
+ 	status = "disabled";
+@@ -1275,17 +1248,6 @@ &isi_0 {
+ 	fsl,chain_buf;
+ };
+ 
+-&isi_1 {
+-#ifdef CONFIG_FSSMMX8MP_CAMERA_BASLER_daA4200
+-	status = "okay";
+-#else
+-	status = "disabled";
+-#endif
+-	dma-coherent;
+-	bsl,dma-invalidate;
+-	fsl,chain_buf;
+-};
+-
+ &isp_0 {
+ 	/* remove this property because this region used
+ 	 * only by tuning tool
+@@ -1681,7 +1643,7 @@ MX8MP_IOMUXC_NAND_DATA03__UART4_DCE_RTS	0x140
+ #ifdef CONFIG_FSSMMX8MP_USB_OTG
+ 		pinctrl_usb3_0_pwr: usb0grp {
+ 			fsl,pins = <
+-				MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x19
++				MX8MP_IOMUXC_GPIO1_IO12__USB1_OTG_PWR	0x19
+ 			>;
+ 		};
+ 
+@@ -1695,7 +1657,7 @@ MX8MP_IOMUXC_GPIO1_IO10__GPIO1_IO10	0x149
+ #ifdef CONFIG_FSSMMX8MP_USB_HOST
+ 		pinctrl_usb3_1_pwr: usb1grp {
+ 			fsl,pins = <
+-				MX8MP_IOMUXC_GPIO1_IO14__USB2_PWR	0x19
++				MX8MP_IOMUXC_GPIO1_IO14__USB2_OTG_PWR	0x19
+ 			>;
+ 		};
+ #endif /* CONFIG_FSSMMX8MP_USB_HOST */
+diff --git a/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi b/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi
+index 3ba0afa4a..6df2f6212 100644
+--- a/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi
+@@ -10,10 +10,8 @@
+ 
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+ #include "fsimx8mp.dtsi"
+-#include <fsversion.h>
+ 
+ / {
+ 	compatible = "fus,imx8mp-picocoremx8mp", "fsl,imx8mp";
+@@ -34,8 +32,8 @@ aliases {
+ 		lcdif1 = &lcdif1;
+ 		lcdif2 = &lcdif2;
+ 		lcdif3 = &lcdif3;
+-		ldb = &ldb;
+-		ldb_phy = &ldb_phy;
++		ldb = &lvds_bridge;
++
+ 		snvs_rtc = &snvs_rtc;
+ 		ethernet0 = &eqos;
+ 		ethernet1 = &fec;
+@@ -52,7 +50,6 @@ aliases {
+ 	/* -------------------- BOARD INFO -------------------- */
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	chosen {
+@@ -318,6 +315,7 @@ sound_sgtl5000: sound-sgtl5000 {
+ 			"Line Out Jack", "LINE_OUT",
+ 			"Headphone Jack", "HP_OUT";
+ 	};
++
+ #endif
+ 
+ #ifdef CONFIG_PICOCOREMX8MP_USB_OTG
+@@ -507,10 +505,9 @@ &i2c1 {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ #endif
+ 
+@@ -729,7 +726,7 @@ &hdmi_blk_ctrl {
+ #endif
+ };
+ 
+-&irqsteer_hdmi {
++&hdmi_pvi {
+ #ifdef CONFIG_PICOCOREMX8MP_HDMI
+ 	status = "okay";
+ #else
+@@ -737,23 +734,23 @@ &irqsteer_hdmi {
+ #endif
+ };
+ 
+-&hdmi_pavi {
++&hdmi_tx {
+ #ifdef CONFIG_PICOCOREMX8MP_HDMI
+ 	status = "okay";
++	ports {
++		port@1 {
++			hdmi_tx_out: endpoint {
++				remote-endpoint = <&native_hdmi_connector_in>;
++			};
++		};
+ #else
+ 	status = "disabled";
+ #endif
+ };
+ 
+-&hdmi {
+-#ifdef CONFIG_PICOCOREMX8MP_HDMI
+-	status = "okay";
+-#else
+-	status = "disabled";
+-#endif
+-};
+ 
+-&hdmiphy {
++
++&hdmi_tx_phy {
+ #ifdef CONFIG_PICOCOREMX8MP_HDMI
+ 	status = "okay";
+ #else
+@@ -779,11 +776,7 @@ &lcdif3 {
+ #endif
+ };
+ 
+-&ldb {
+-	status = "disabled";
+-};
+-
+-&ldb_phy {
++&lvds_bridge {
+ 	status = "disabled";
+ };
+ 
+@@ -1076,33 +1069,14 @@ &vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-&vpu_vc8000e {
+-	status = "okay";
+-};
+-
+-&vpu_v4l2 {
++&gpu3d {
+ 	status = "okay";
+ };
+ 
+-&gpu_3d {
++&gpu2d {
+ 	status = "okay";
+ };
+ 
+-&gpu_2d {
+-	status = "okay";
+-};
+-
+-&ml_vipsi {
+-	status = "okay";
+-};
+-
+-&mix_gpu_ml {
+-	status = "okay";
+-};
+-
+-&cameradev {
+-	status = "okay";
+-};
+ 
+ &isp_0 {
+ 	/* remove this property because this region used
+@@ -1123,14 +1097,6 @@ m2m_device {
+ 	};
+ };
+ 
+-&isi_1 {
+-	status = "disabled";
+-
+-	cap_device {
+-		status = "okay";
+-	};
+-};
+-
+ &dsp {
+ #ifdef CONFIG_PICOCOREMX8MP_DSP
+ 	memory-region = <&dsp_vdev0buffer>, <&dsp_vdev0vring0>,
+@@ -1495,7 +1461,7 @@ MX8MP_IOMUXC_NAND_DATA03__UART4_DCE_RTS	0x140
+ #ifdef CONFIG_PICOCOREMX8MP_USB_HOST
+ 	pinctrl_usb1_pwr: usb1grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x19
++			MX8MP_IOMUXC_GPIO1_IO12__USB1_OTG_PWR	0x19
+ 		>;
+ 	};
+ #endif
+@@ -1503,7 +1469,7 @@ MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x19
+ #ifdef CONFIG_PICOCOREMX8MP_USB_OTG_PWR
+ 	pinctrl_usb2_pwr: usb2grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO14__USB2_PWR	0x144
++			MX8MP_IOMUXC_GPIO1_IO14__USB2_OTG_PWR	0x144
+ 		>;
+ 	};
+ #endif
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 21cd3a87f..35ea17d21 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -14,6 +14,7 @@ subdir-y += broadcom
+ subdir-y += cavium
+ subdir-y += exynos
+ subdir-y += freescale
++subdir-y += F+S
+ subdir-y += hisilicon
+ subdir-y += intel
+ subdir-y += lg
+-- 
+2.40.1
+

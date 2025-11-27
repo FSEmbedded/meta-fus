@@ -65,6 +65,7 @@ print_usage()
 	echo "              directory already exists else setup-environment"
 	echo "              will be executed instead."
 	echo "  -h          shows this help"
+	echo "  -build-mainline    build the mainline release"
 	echo "  -add-chromium      adds chromium to the image"
 	echo "  -add-spdx [org]    adds SPDX license information to the image"
 	echo "                     [org] is the name of the organization that"

@@ -25,7 +25,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     freerdp \
     fs-remote\
     hostapd \
-    kernel-module-nxp-wlan \
     liberation-fonts \
     libsndfile1 \
     libubootenv \
@@ -49,6 +48,10 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     ${@bb.utils.contains('DISTRO_FEATURES', 'wayland', 'weston-init weston-examples', '', d)} \
     ${@bb.utils.contains('DISTRO_FEATURES', 'x11 wayland', 'weston-xwayland xterm', '', d)} \
     ${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-test', '', d)} \
+"
+
+CORE_IMAGE_EXTRA_INSTALL:append:imx-nxp-bsp = " \
+	kernel-module-nxp-wlan \
 "
 
 # remove getty tty1 service because of using runtime generated

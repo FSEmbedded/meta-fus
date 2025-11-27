@@ -1,0 +1,83 @@
+From 66c5f4fbec22ec1a8a301875c93f33815b9b152e Mon Sep 17 00:00:00 2001
+Message-Id: <66c5f4fbec22ec1a8a301875c93f33815b9b152e.1764249235.git.gerbach@fs-net.de>
+In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Tue, 13 May 2025 16:56:49 +0200
+Subject: [PATCH 09/11] Improve aarch64 defconfig for F&S boards
+
+Remove unneeded architectures. This decreases the kernel size by 20MB.
+
+Add some F&S specific drivers.
+---
+ arch/arm64/configs/defconfig | 57 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 8fe7dbae3..6ac7df963 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -1723,3 +1723,60 @@ CONFIG_CORESIGHT_STM=m
+ CONFIG_CORESIGHT_CPU_DEBUG=m
+ CONFIG_CORESIGHT_CTI=m
+ CONFIG_MEMTEST=y
++
++
++# CONFIG_ARCH_ACTIONS is not set
++# CONFIG_ARCH_AIROHA is not set
++# CONFIG_ARCH_SUNXI is not set
++# CONFIG_ARCH_ALPINE is not set
++# CONFIG_ARCH_APPLE is not set
++# CONFIG_ARCH_BCM is not set
++# CONFIG_ARCH_BCM2835 is not set
++# CONFIG_ARCH_BCM_IPROC is not set
++# CONFIG_ARCH_BCMBCA is not set
++# CONFIG_ARCH_BRCMSTB is not set
++# CONFIG_ARCH_BERLIN is not set
++# CONFIG_ARCH_EXYNOS is not set
++# CONFIG_ARCH_SPARX5 is not set
++# CONFIG_ARCH_K3 is not set
++# CONFIG_ARCH_LG1K is not set
++# CONFIG_ARCH_HISI is not set
++# CONFIG_ARCH_KEEMBAY is not set
++# CONFIG_ARCH_MEDIATEK is not set
++# CONFIG_ARCH_MESON is not set
++# CONFIG_ARCH_MVEBU is not set
++# CONFIG_ARCH_S32 is not set
++# CONFIG_ARCH_MA35 is not set
++# CONFIG_ARCH_NPCM is not set
++# CONFIG_ARCH_QCOM is not set
++# CONFIG_ARCH_REALTEK is not set
++# CONFIG_ARCH_RENESAS is not set
++# CONFIG_ARCH_SEATTLE is not set
++# CONFIG_ARCH_INTEL_SOCFPGA is not set
++# CONFIG_ARCH_STM32 is not set
++# CONFIG_ARCH_SYNQUACER is not set
++# CONFIG_ARCH_TEGRA is not set
++# CONFIG_ARCH_TESLA_FSD is not set
++# CONFIG_ARCH_SPRD is not set
++# CONFIG_ARCH_THUNDER is not set
++# CONFIG_ARCH_THUNDER2 is not set
++# CONFIG_ARCH_UNIPHIER is not set
++# CONFIG_ARCH_VEXPRESS is not set
++# CONFIG_ARCH_VISCONTI is not set
++# CONFIG_ARCH_XGENE is not set
++# CONFIG_ARCH_ZYNQMP is not set
++# CONFIG_SND_SOC_IMX_SGTL5000 is not set
++CONFIG_SND_SOC_SGTL5000=m
++CONFIG_DRM_PANEL_NEWVISION_NV3051D=m
++CONFIG_GPIOLIB=y
++CONFIG_LEDS_PCA963X_FUS=y
++CONFIG_TOUCHSCREEN_ILITEK=y
++CONFIG_MXS_DMA=y
++CONFIG_MTD_NAND_GPMI_NAND=y
++CONFIG_MTD_UBI=y
++CONFIG_UBIFS_FS=y
++CONFIG_MTD_UBI=y
++CONFIG_MTD_UBI_FASTMAP=n
++CONFIG_MTD_UBI_BLOCK=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_DRM_TOSHIBA_TC358775=m
+-- 
+2.40.1
+

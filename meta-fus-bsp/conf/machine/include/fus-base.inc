@@ -19,6 +19,7 @@ PREFERRED_PROVIDER_virtual/kernel:mx8mn-nxp-bsp ??= "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel:mx8mp-nxp-bsp ??= "linux-fus"
 PREFERRED_PROVIDER_virtual/kernel:mx8ulp-nxp-bsp ??= "linux-fus"
 
+PREFERRED_PROVIDER_virtual/kernel:mx8mm-mainline-bsp ??= "linux-mainline-fus"
 PREFERRED_PROVIDER_virtual/kernel:mx93-nxp-bsp ??= "linux-fus"
 
 PREFERRED_PROVIDER_virtual/bootloader:mx6-nxp-bsp    ??= "u-boot-fus"

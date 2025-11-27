@@ -1,0 +1,34 @@
+From b18596119c6fad991dd56f8128afa857fc6ecc87 Mon Sep 17 00:00:00 2001
+Message-Id: <b18596119c6fad991dd56f8128afa857fc6ecc87.1764249235.git.gerbach@fs-net.de>
+In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Tue, 13 May 2025 16:55:30 +0200
+Subject: [PATCH 08/11] Fix sgtl5000 i2c codec driver
+
+The sgtl5000 needs a clock to be configured by i2c. We use the sai
+master clock for but somehow it takes a lot longer the the default time
+to be reachable. Increase the time.
+
+This seems to be an F&S specific problem so we will not get this
+mainline.
+---
+ sound/soc/codecs/sgtl5000.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/sound/soc/codecs/sgtl5000.c b/sound/soc/codecs/sgtl5000.c
+index 7aa89e346..adefec281 100644
+--- a/sound/soc/codecs/sgtl5000.c
++++ b/sound/soc/codecs/sgtl5000.c
+@@ -1622,7 +1622,7 @@ static int sgtl5000_i2c_probe(struct i2c_client *client)
+ 	}
+ 
+ 	/* Need 8 clocks before I2C accesses */
+-	udelay(1);
++	usleep_range(2000000,3000000);
+ 
+ 	/* read chip information */
+ 	ret = regmap_read(sgtl5000->regmap, SGTL5000_CHIP_ID, &reg);
+-- 
+2.40.1
+
