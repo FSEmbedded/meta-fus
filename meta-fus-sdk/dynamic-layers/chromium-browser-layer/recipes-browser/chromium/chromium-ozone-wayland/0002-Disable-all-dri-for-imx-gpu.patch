@@ -1,0 +1,57 @@
+From c29791a09f661891bd36687c2cc92ed5fd32e87e Mon Sep 17 00:00:00 2001
+Message-ID: <c29791a09f661891bd36687c2cc92ed5fd32e87e.1760538829.git.gerbach@fs-net.de>
+From: Philip Gerbach <gerbach@fs-net.de>
+Date: Wed, 15 Oct 2025 14:06:00 +0200
+Subject: [PATCH] Disable all dri for imx gpu
+
+---
+ content/gpu/BUILD.gn       | 2 +-
+ media/gpu/args.gni         | 5 +++++
+ media/gpu/sandbox/BUILD.gn | 2 +-
+ 3 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/content/gpu/BUILD.gn b/content/gpu/BUILD.gn
+index 0980825..e009660 100644
+--- a/content/gpu/BUILD.gn
++++ b/content/gpu/BUILD.gn
+@@ -128,7 +128,7 @@ target(link_target_type, "gpu_sources") {
+ 
+   # Use DRI on desktop Linux builds.
+   if (current_cpu != "s390x" && current_cpu != "ppc64" && is_linux &&
+-      !is_castos) {
++      !is_castos && !use_imxgpu) {
+     configs += [ "//build/config/linux/dri" ]
+   }
+ }
+diff --git a/media/gpu/args.gni b/media/gpu/args.gni
+index 3775111..95f6b66 100644
+--- a/media/gpu/args.gni
++++ b/media/gpu/args.gni
+@@ -5,6 +5,11 @@
+ import("//build/config/chromeos/ui_mode.gni")
+ import("//build/config/ozone.gni")
+ 
++declare_args() {
++  # Checks if i.MX GPU is being used
++  use_imxgpu = false
++}
++
+ declare_args() {
+   # Indicates if V4L plugin is used.
+   use_v4lplugin = false
+diff --git a/media/gpu/sandbox/BUILD.gn b/media/gpu/sandbox/BUILD.gn
+index cfcb7fa..bdaf03f 100644
+--- a/media/gpu/sandbox/BUILD.gn
++++ b/media/gpu/sandbox/BUILD.gn
+@@ -31,7 +31,7 @@ source_set("sandbox") {
+     deps += [ "//media/gpu/v4l2" ]
+   }
+   if (current_cpu != "s390x" && current_cpu != "ppc64" && is_linux &&
+-      !is_castos) {
++      !is_castos && !use_imxgpu) {
+     # For DRI_DRIVER_DIR.
+     configs += [ "//build/config/linux/dri" ]
+   }
+-- 
+2.49.0
+
