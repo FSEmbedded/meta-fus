@@ -20,14 +20,14 @@ do_install:append () {
     install -d ${D}${sysconfdir}/modprobe.d/
     install -m 0755 ${WORKDIR}/mxm-wifiex.conf ${D}${sysconfdir}/modprobe.d/mxm-wifiex.conf
     # install mxm-wifiex-filters to define loading sequency
-    # first wifi and second bluetooth
-    install -d ${D}${sysconfdir}/modules-load.d/
-    install -m 0644 ${WORKDIR}/mxm-wifiex-filters.conf ${D}${sysconfdir}/modules-load.d/mxm-wifiex-filters.conf
 
     do_install_${SOC_FAMILY}
 }
 
 do_install_mx93 () {
+    # first wifi and second bluetooth
+    install -d ${D}${sysconfdir}/modules-load.d/
+    install -m 0644 ${WORKDIR}/mxm-wifiex-filters.conf ${D}${sysconfdir}/modules-load.d/mxm-wifiex-filters.conf
     # use moal driver by default.
     # comment blacklist entries
     sed -i '3,5 s/^/#/' ${D}${sysconfdir}/modprobe.d/mxm-wifiex.conf
