@@ -2,7 +2,7 @@ require linux-fus.inc
 
 # Based on Version fslc-6.6.112-2.2.1
 SRCBRANCH="master"
-SRCREV = "0386232f971a6d901996cf77f9cf1a7bf8845bd7"
+SRCREV = "127cf2da653a5bacc16c1fff6fb4d8b3d36434d7"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
