@@ -89,7 +89,6 @@ do_deploy:append() {
 	for config in ${UBOOT_CONFIG}; do
 		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
 		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
-		cd ${DEPLOY_DIR_IMAGE}/ && ln -sf Firmware/uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 	done
 }
