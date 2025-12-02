@@ -30,3 +30,15 @@ RRECOMMENDS:${KERNEL_PACKAGE_NAME}-base = ""
 KERNEL_MODULE_PACKAGE_SUFFIX = "${@legitimize_package_name(d.getVar('KERNEL_VERSION'))}"
 
 INHERIT:append ?= " image-buildinfo"
+
+# do not use ptest for qtbase and qtdeclarative.
+# set to 0 in local.conf to use
+DISABLE_PTEST:pn-qtbase ??= "1"
+DISABLE_PTEST:pn-qtdeclarative ??= "1"
+DISABLE_PTEST:pn-qtlanguageserver ??= "1"
+DISABLE_PTEST:pn-qtwayland ??= "1"
+
+DISTRO_FEATURES:remove:pn-qtbase = "${@bb.utils.contains('DISABLE_PTEST:pn-qtbase', '1', 'ptest', '', d)}"
+DISTRO_FEATURES:remove:pn-qtdeclarative = "${@bb.utils.contains('DISABLE_PTEST:pn-qtdeclarative', '1', 'ptest', '', d)}"
+DISTRO_FEATURES:remove:pn-qtlanguageserver = "${@bb.utils.contains('DISABLE_PTEST:pn-qtlanguageserver', '1', 'ptest', '', d)}"
+DISTRO_FEATURES:remove:pn-qtwayland = "${@bb.utils.contains('DISABLE_PTEST:pn-qtwayland', '1', 'ptest', '', d)}"
