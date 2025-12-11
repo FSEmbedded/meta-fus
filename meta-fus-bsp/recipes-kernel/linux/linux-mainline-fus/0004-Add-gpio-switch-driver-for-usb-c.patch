@@ -1,7 +1,7 @@
-From d939fb5d8e3aba9d006fde8f52365fed973ed7ba Mon Sep 17 00:00:00 2001
-Message-Id: <d939fb5d8e3aba9d006fde8f52365fed973ed7ba.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From a415cbb44f21aeb97161e819999bfbaeee4ec808 Mon Sep 17 00:00:00 2001
+Message-Id: <a415cbb44f21aeb97161e819999bfbaeee4ec808.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:47:00 +0200
 Subject: [PATCH 04/11] Add gpio-switch driver for usb-c

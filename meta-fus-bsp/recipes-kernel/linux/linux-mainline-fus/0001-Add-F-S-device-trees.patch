@@ -1,5 +1,5 @@
 From 1136d5984def64a1ed82cb36ba313f2651b7c130 Mon Sep 17 00:00:00 2001
-Message-Id: <1136d5984def64a1ed82cb36ba313f2651b7c130.1764249443.git.gerbach@fs-net.de>
+Message-Id: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 22 Apr 2025 11:24:33 +0200
 Subject: [PATCH 01/11] Add F&S device trees

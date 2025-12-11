@@ -1,7 +1,7 @@
-From b6fca0f36a60902d562e0725d11d16483838962f Mon Sep 17 00:00:00 2001
-Message-Id: <b6fca0f36a60902d562e0725d11d16483838962f.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From c44cb3f74d5fe4e7bc04399c995c39f9c7d356e7 Mon Sep 17 00:00:00 2001
+Message-Id: <c44cb3f74d5fe4e7bc04399c995c39f9c7d356e7.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:49:07 +0200
 Subject: [PATCH 05/11] Improve rtc-pcf85363 driver

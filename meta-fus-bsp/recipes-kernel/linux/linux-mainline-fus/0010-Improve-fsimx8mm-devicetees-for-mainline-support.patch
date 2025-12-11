@@ -1,7 +1,7 @@
-From 0fd6ac9fc0f88c070eba631d8e6e3feb29e7a0fe Mon Sep 17 00:00:00 2001
-Message-Id: <0fd6ac9fc0f88c070eba631d8e6e3feb29e7a0fe.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From 7ff39cec76ef42386e805d30e830b761d4328783 Mon Sep 17 00:00:00 2001
+Message-Id: <7ff39cec76ef42386e805d30e830b761d4328783.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Wed, 19 Nov 2025 09:57:43 +0100
 Subject: [PATCH 10/11] Improve fsimx8mm devicetees for mainline support
@@ -9,7 +9,6 @@ Subject: [PATCH 10/11] Improve fsimx8mm devicetees for mainline support
 Based on the F&S Kernel. Not fully tested yet. Some properties might not
 have any effect.
 ---
- arch/arm64/boot/dts/F+S/Makefile              | 19 ++++-
  .../F+S/displays/imx8mm-adp-mipi2lvds1.dtsi   | 13 +--
  ...8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi | 29 ++++++-
  .../imx8mm-lcdif-tc358775-j070wvtc0211.dtsi   | 21 ++---
@@ -20,35 +19,8 @@ have any effect.
  arch/arm64/boot/dts/F+S/osm8mm.dtsi           | 44 +++++++---
  .../boot/dts/F+S/picocoremx8mm-ddr3l.dts      | 18 ++--
  arch/arm64/boot/dts/F+S/picocoremx8mm.dtsi    | 18 ++--
- 11 files changed, 220 insertions(+), 89 deletions(-)
+ 10 files changed, 203 insertions(+), 87 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/F+S/Makefile b/arch/arm64/boot/dts/F+S/Makefile
-index aeb97fd4e..5d0f03696 100644
---- a/arch/arm64/boot/dts/F+S/Makefile
-+++ b/arch/arm64/boot/dts/F+S/Makefile
-@@ -21,5 +21,20 @@ dtb-$(CONFIG_ARCH_MXC) += fssmmx8mp.dtb \
- 			  fssmmx8mp-lcdif-j070wvtc0211.dtb \
- 			  fssmmx8mp-BT070L1060CS0I1AD-A.dtb \
- 			  fssmmx8mp-EE1010B1T-1CP.dtb
--
--
-+dtb-$(CONFIG_ARCH_MXC) += picocoremx8mm-lpddr4.dtb \
-+			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  picocoremx8mm-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
-+			  picocoremx8mm-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
-+			  picocoremx8mmr2-lpddr4.dtb \
-+			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  picocoremx8mmr2-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
-+			  picocoremx8mmr2-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
-+			  picocoremx8mm-ddr3l.dtb \
-+			  picocoremx8mm-ddr3l-lcdif-tc358775-j070wvtc0211.dtb \
-+			  picocoremx8mm-ddr3l-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  picocoremx8mm-ddr3l-tc358775-BT070L1060CS0I1AD-A.dtb
-+dtb-$(CONFIG_ARCH_MXC) += osm8mm.dtb \
-+			  osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
-+			  osm8mm-lcdif-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
 diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi
 index 08603cd24..e9b520992 100644
 --- a/arch/arm64/boot/dts/F+S/displays/imx8mm-adp-mipi2lvds1.dtsi

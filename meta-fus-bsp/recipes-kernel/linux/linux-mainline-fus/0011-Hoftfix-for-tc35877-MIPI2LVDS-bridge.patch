@@ -1,7 +1,7 @@
-From b7ccf8d4c6fe7db9d9735d5dc079e69f61c3c8f6 Mon Sep 17 00:00:00 2001
-Message-Id: <b7ccf8d4c6fe7db9d9735d5dc079e69f61c3c8f6.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From 8e58623fcd66799854b9261d60ec3a4dc65d7cfb Mon Sep 17 00:00:00 2001
+Message-Id: <8e58623fcd66799854b9261d60ec3a4dc65d7cfb.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Thu, 27 Nov 2025 14:00:59 +0100
 Subject: [PATCH 11/11] Hoftfix for tc35877 MIPI2LVDS bridge

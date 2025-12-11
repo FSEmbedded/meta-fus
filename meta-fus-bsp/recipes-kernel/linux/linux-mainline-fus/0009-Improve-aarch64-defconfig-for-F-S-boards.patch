@@ -1,7 +1,7 @@
-From 66c5f4fbec22ec1a8a301875c93f33815b9b152e Mon Sep 17 00:00:00 2001
-Message-Id: <66c5f4fbec22ec1a8a301875c93f33815b9b152e.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From 919f9a6fa995951d683bde6af2f19e7c1e248542 Mon Sep 17 00:00:00 2001
+Message-Id: <919f9a6fa995951d683bde6af2f19e7c1e248542.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:56:49 +0200
 Subject: [PATCH 09/11] Improve aarch64 defconfig for F&S boards

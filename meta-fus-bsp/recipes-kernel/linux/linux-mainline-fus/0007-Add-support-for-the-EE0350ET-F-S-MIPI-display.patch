@@ -1,7 +1,7 @@
-From 8b5088e5e95e981a53b9eac264d1d2291f9bcc7f Mon Sep 17 00:00:00 2001
-Message-Id: <8b5088e5e95e981a53b9eac264d1d2291f9bcc7f.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From d24290b18729c3f00d16330e4941a91c9263ddd0 Mon Sep 17 00:00:00 2001
+Message-Id: <d24290b18729c3f00d16330e4941a91c9263ddd0.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:53:22 +0200
 Subject: [PATCH 07/11] Add support for the EE0350ET F&S MIPI display

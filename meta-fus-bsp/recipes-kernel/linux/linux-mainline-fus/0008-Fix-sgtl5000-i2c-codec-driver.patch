@@ -1,7 +1,7 @@
-From b18596119c6fad991dd56f8128afa857fc6ecc87 Mon Sep 17 00:00:00 2001
-Message-Id: <b18596119c6fad991dd56f8128afa857fc6ecc87.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From 99e4ea67f147b8c2833561f0f8b574208c39fa48 Mon Sep 17 00:00:00 2001
+Message-Id: <99e4ea67f147b8c2833561f0f8b574208c39fa48.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:55:30 +0200
 Subject: [PATCH 08/11] Fix sgtl5000 i2c codec driver

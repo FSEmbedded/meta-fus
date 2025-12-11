@@ -1,7 +1,7 @@
-From e53c39ce242ce7f3536a8b8ead1298d95681ffe5 Mon Sep 17 00:00:00 2001
-Message-Id: <e53c39ce242ce7f3536a8b8ead1298d95681ffe5.1764249235.git.gerbach@fs-net.de>
-In-Reply-To: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
-References: <58ad0b7562e0114082e19f98da1053f1896ae596.1764249234.git.gerbach@fs-net.de>
+From 85d145417958c341b8422a0a350f09b17df921aa Mon Sep 17 00:00:00 2001
+Message-Id: <85d145417958c341b8422a0a350f09b17df921aa.1765541409.git.gerbach@fs-net.de>
+In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:30:45 +0200
 Subject: [PATCH 02/11] Improve fsimx8mp device trees for mainline
@@ -9,9 +9,9 @@ Subject: [PATCH 02/11] Improve fsimx8mp device trees for mainline
 Based on the F&S Kernel. Not fully tested yet. Some properties might not
 have any effect.
 ---
- arch/arm64/boot/dts/F+S/Makefile              |  77 +---------
+ arch/arm64/boot/dts/F+S/Makefile              |  89 +++---------
  arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi    | 137 ++++++------------
- .../displays/imx8mp-BT070L1060CS0I1AD-A.dtsi  |  22 +--
+ .../displays/imx8mp-BT070L1060CS0I1AD-A.dtsi  |  26 +---
  .../F+S/displays/imx8mp-EE1010B1T-1CP.dtsi    |  14 +-
  ...8mp-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtsi | 113 ++++-----------
  .../F+S/displays/imx8mp-lcdif-g133han01.dtsi  |   2 +-
@@ -19,12 +19,16 @@ have any effect.
  arch/arm64/boot/dts/F+S/efusmx8mp.dtsi        | 137 ++++++------------
  arch/arm64/boot/dts/F+S/fsimx8mp.dtsi         |  20 +--
  arch/arm64/boot/dts/F+S/fssmmx8mp.dtsi        | 102 ++++---------
+ .../dts/F+S/osm8mp-BT070L1060CS0I1AD-A.dts    |  22 ++-
+ .../boot/dts/F+S/osm8mp-EE1010B1T-1CP.dts     |  11 --
+ arch/arm64/boot/dts/F+S/osm8mp-adp.dtsi       |   3 -
+ arch/arm64/boot/dts/F+S/osm8mp.dtsi           |  63 ++------
  arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi    |  76 +++-------
  arch/arm64/boot/dts/Makefile                  |   1 +
- 12 files changed, 185 insertions(+), 548 deletions(-)
+ 16 files changed, 223 insertions(+), 625 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/F+S/Makefile b/arch/arm64/boot/dts/F+S/Makefile
-index aa181fa0a..aeb97fd4e 100644
+index aa181fa0a..14076696a 100644
 --- a/arch/arm64/boot/dts/F+S/Makefile
 +++ b/arch/arm64/boot/dts/F+S/Makefile
 @@ -5,61 +5,14 @@ DTC_FLAGS += -@
@@ -91,13 +95,30 @@ index aa181fa0a..aeb97fd4e 100644
  dtb-$(CONFIG_ARCH_MXC) += efusmx8mp.dtb \
  			  efusmx8mp-BT070L1060CS0I1AD-A.dtb \
  			  efusmx8mp-EE1010B1T-1CP.dtb \
-@@ -68,27 +21,5 @@ dtb-$(CONFIG_ARCH_MXC) += fssmmx8mp.dtb \
+@@ -68,27 +21,23 @@ dtb-$(CONFIG_ARCH_MXC) += fssmmx8mp.dtb \
  			  fssmmx8mp-lcdif-j070wvtc0211.dtb \
  			  fssmmx8mp-BT070L1060CS0I1AD-A.dtb \
  			  fssmmx8mp-EE1010B1T-1CP.dtb
--dtb-$(CONFIG_ARCH_MXC) += osm8mm.dtb \
--			  osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
--			  osm8mm-lcdif-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
++dtb-$(CONFIG_ARCH_MXC) += osm8mp.dtb \
++			  osm8mp-EE1010B1T-1CP.dtb \
++			  osm8mp-BT070L1060CS0I1AD-A.dtb
++dtb-$(CONFIG_ARCH_MXC) += picocoremx8mm-lpddr4.dtb \
++			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
++			  picocoremx8mm-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mmr2-lpddr4.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mmr2-lpddr4-tc358775-BT070L1060CS0I1AD-A.dtb \
++			  picocoremx8mmr2-lpddr4-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mm-ddr3l.dtb \
++			  picocoremx8mm-ddr3l-lcdif-tc358775-j070wvtc0211.dtb \
++			  picocoremx8mm-ddr3l-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
++			  picocoremx8mm-ddr3l-tc358775-BT070L1060CS0I1AD-A.dtb
+ dtb-$(CONFIG_ARCH_MXC) += osm8mm.dtb \
+ 			  osm8mm-lcdif-adp-mipi2mipi1-ee0350et-2cp.dtb \
+ 			  osm8mm-lcdif-adp-mipi2lvds1-BT070L1060CS0I1AD-A.dtb
 -dtb-$(CONFIG_ARCH_MXC) += \
 -			  soldercore8ulp-bbhd.dtb
 -dtb-$(CONFIG_ARCH_MXC) += \
@@ -119,8 +140,6 @@ index aa181fa0a..aeb97fd4e 100644
 -			  efusmx93-SINTF.dtb \
 -			  efusmx93-SINTF-ET070080DH6.dtb \
 -			  efusmx93-SINTF-BT070L1060CS0I1AD-A.dtb
-+
-+
 diff --git a/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi b/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi
 index 55ae3d24c..e9bffba57 100644
 --- a/arch/arm64/boot/dts/F+S/armstonemx8mp.dtsi
@@ -401,10 +420,10 @@ index 55ae3d24c..e9bffba57 100644
  		};
  #endif /* CONFIG_ARMSTONEMX8MP_USB_HOST */
 diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
-index 9c65122d9..976e7bd2d 100644
+index 9c65122d9..f35083b89 100644
 --- a/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
 +++ b/arch/arm64/boot/dts/F+S/displays/imx8mp-BT070L1060CS0I1AD-A.dtsi
-@@ -57,29 +57,13 @@ &lcdif2 {
+@@ -57,31 +57,15 @@ &lcdif2 {
  	status = "okay";
  };
  
@@ -433,10 +452,14 @@ index 9c65122d9..976e7bd2d 100644
 -		fsl,data-mapping = "spwg";
 -		fsl,data-width = <24>;
 -		status = "okay";
+-		port@1 {
+-			reg = <1>;
 +
- 		port@1 {
- 			reg = <1>;
++		port@2 {
++			reg = <2>;
  			lvds1_out: endpoint {
+ 				remote-endpoint = <&panel_lvds1_in>;
+ 			};
 diff --git a/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi b/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi
 index 54452f10c..dd1ad76e1 100644
 --- a/arch/arm64/boot/dts/F+S/displays/imx8mp-EE1010B1T-1CP.dtsi
@@ -1194,6 +1217,223 @@ index 90cb46335..d7caa8033 100644
  			>;
  		};
  #endif /* CONFIG_FSSMMX8MP_USB_HOST */
+diff --git a/arch/arm64/boot/dts/F+S/osm8mp-BT070L1060CS0I1AD-A.dts b/arch/arm64/boot/dts/F+S/osm8mp-BT070L1060CS0I1AD-A.dts
+index 54620bcc4..58d9af7db 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mp-BT070L1060CS0I1AD-A.dts
++++ b/arch/arm64/boot/dts/F+S/osm8mp-BT070L1060CS0I1AD-A.dts
+@@ -25,26 +25,22 @@
+ 
+ #include "displays/imx8mp-BT070L1060CS0I1AD-A.dtsi"
+ 
+-&ldb {
++&lvds_bridge {
+ 	status = "okay";
+-	/* DSI_A */
+-	lvds-channel@0 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "okay";
++	ports {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		port@1 {
+ 			reg = <1>;
+ 			lvds1_out: endpoint {
+ 				remote-endpoint = <&panel_lvds1_in>;
+ 			};
+ 		};
+-	};
+-	/* DSI_B */
+-	lvds-channel@1 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+-		/delete-node/ port@1;
++		port@2 {
++			reg = <2>;
++		/delete-node/ endpoint;
++		};
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/F+S/osm8mp-EE1010B1T-1CP.dts b/arch/arm64/boot/dts/F+S/osm8mp-EE1010B1T-1CP.dts
+index 24485eef8..1138a3ee9 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mp-EE1010B1T-1CP.dts
++++ b/arch/arm64/boot/dts/F+S/osm8mp-EE1010B1T-1CP.dts
+@@ -27,17 +27,6 @@
+ 
+ #include "displays/imx8mp-EE1010B1T-1CP.dtsi"
+ 
+-&ldb {
+-	status = "okay";
+-	/* DSI_B */
+-	lvds-channel@1 {
+-		fsl,data-mapping = "spwg";
+-		fsl,data-width = <24>;
+-		status = "disabled";
+-		/delete-node/ port@1;
+-	};
+-};
+-
+ #ifdef IMX8MP_TOUCH_INTERRUPT_PINCTRL
+ &touch {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/F+S/osm8mp-adp.dtsi b/arch/arm64/boot/dts/F+S/osm8mp-adp.dtsi
+index f18b67246..c1b496019 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mp-adp.dtsi
++++ b/arch/arm64/boot/dts/F+S/osm8mp-adp.dtsi
+@@ -524,9 +524,6 @@ mipi1_sensor_ep: endpoint@1 {
+ 	};
+ };
+ 
+-&cameradev {
+-	status = "okay";
+-};
+ 
+ &isi_0 {
+ 	status = "disabled";
+diff --git a/arch/arm64/boot/dts/F+S/osm8mp.dtsi b/arch/arm64/boot/dts/F+S/osm8mp.dtsi
+index 92daa85b7..f4ee1b690 100644
+--- a/arch/arm64/boot/dts/F+S/osm8mp.dtsi
++++ b/arch/arm64/boot/dts/F+S/osm8mp.dtsi
+@@ -10,10 +10,9 @@
+ 
+ #include <dt-bindings/usb/pd.h>
+ #include <dt-bindings/pwm/pwm.h>
+-#include <dt-bindings/rtc/nxp,pcf85263.h>
+ #include <dt-bindings/phy/phy-imx8-pcie.h>
+ #include "fsimx8mp.dtsi"
+-#include <fsversion.h>
++
+ 
+ /* SOC-nodes to OSM-nodes */
+ 
+@@ -98,7 +97,6 @@ aliases {
+ 	/* -------------------- BOARD INFO -------------------- */
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ 	chosen {
+@@ -352,10 +350,9 @@ &i2c_int {
+ 	rtc85263: rtc85263@51 {
+ 		compatible = "nxp,pcf85263";
+ 		reg = <0x51>;
+-		clock-out = <PCF85263_CLK_OUT_32p768kHz>;
+-
+-		quartz-load-capacitance = <PCF85263_QUARTZCAP_12p5pF>;
+-		quartz-drive-strength = <PCF85263_QUARTZDRIVE_LOW>;
++		clock-out-Hz = <32768>;
++		quartz-load-femtofarads = <12500>;
++		quartz-drive-kiloohm = <60>;
+ 	};
+ 
+ 	pmic: pca9450@25 {
+@@ -636,19 +633,15 @@ &hdmi_blk_ctrl {
+ 	status = "disabled";
+ };
+ 
+-&irqsteer_hdmi {
+-	status = "disabled";
+-};
+-
+-&hdmi_pavi {
++&hdmi_pvi {
+ 	status = "disabled";
+ };
+ 
+-&hdmi {
++&hdmi_tx {
+ 	status = "disabled";
+ };
+ 
+-&hdmiphy {
++&hdmi_tx_phy {
+ 	status = "disabled";
+ };
+ 
+@@ -664,11 +657,7 @@ &lcdif3 {
+ 	status = "disabled";
+ };
+ 
+-&ldb {
+-	status = "disabled";
+-};
+-
+-&ldb_phy {
++&lvds_bridge {
+ 	status = "disabled";
+ };
+ 
+@@ -893,31 +882,11 @@ &vpu_g2 {
+ 	status = "okay";
+ };
+ 
+-&vpu_vc8000e {
+-	status = "okay";
+-};
+-
+-&vpu_v4l2 {
+-	status = "okay";
+-};
+-
+-&gpu_3d {
+-	status = "okay";
+-};
+-
+-&gpu_2d {
+-	status = "okay";
+-};
+-
+-&ml_vipsi {
+-	status = "okay";
+-};
+-
+-&mix_gpu_ml {
++&gpu3d {
+ 	status = "okay";
+ };
+ 
+-&cameradev {
++&gpu2d {
+ 	status = "okay";
+ };
+ 
+@@ -940,14 +909,6 @@ m2m_device {
+ 	};
+ };
+ 
+-&isi_1 {
+-	status = "disabled";
+-
+-	cap_device {
+-		status = "okay";
+-	};
+-};
+-
+ &dsp {
+ #ifdef CONFIG_OSM8MP_DSP
+ 	memory-region = <&dsp_vdev0buffer>, <&dsp_vdev0vring0>,
+@@ -1454,7 +1415,7 @@ MX8MP_IOMUXC_UART2_TXD__UART2_DCE_TX	0x140
+ #ifdef CONFIG_OSM8MP_USB_A
+ 	pinctrl_osm_usb_a: usb1grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x4
++			MX8MP_IOMUXC_GPIO1_IO12__USB1_OTG_PWR	0x4
+ 		>;
+ 	};
+ #endif
+@@ -1462,7 +1423,7 @@ MX8MP_IOMUXC_GPIO1_IO12__USB1_PWR	0x4
+ #ifdef CONFIG_OSM8MP_USB_C
+ 	pinctrl_osm_usb_c: usb2grp {
+ 		fsl,pins = <
+-			MX8MP_IOMUXC_GPIO1_IO14__USB2_PWR	0x4
++			MX8MP_IOMUXC_GPIO1_IO14__USB2_OTG_PWR	0x4
+ 		>;
+ 	};
+ #endif
 diff --git a/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi b/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi
 index 3ba0afa4a..6df2f6212 100644
 --- a/arch/arm64/boot/dts/F+S/picocoremx8mp.dtsi
