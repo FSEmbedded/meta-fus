@@ -20,7 +20,7 @@ fi
 
 
 # 2. Check if Weston is running
-if pgrep -x $WESTON > /dev/null; then
+if pgrep -f $WESTON > /dev/null; then
     echo "Weston is already running."
 
     if [ -f "$INI" ]; then
@@ -36,3 +36,4 @@ else
     echo "Starting Weston with RDP backend..."
     $WESTON --backend=rdp-backend.so --rdp-tls-cert=$PUB_KEY --rdp-tls-key=$PRIV_KEY --modules=systemd-notify.so --log /var/log/weston.log &
 fi
+sleep 1
