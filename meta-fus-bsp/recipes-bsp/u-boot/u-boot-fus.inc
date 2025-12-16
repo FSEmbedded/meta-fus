@@ -36,15 +36,15 @@ COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
 #                 HOSTSTRIP=true'
 
 NEED_OPTEE = "${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'true', 'false', d)}"
-NEED_ATF = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'true', 'false', d)}"
-UBOOT_FILE = "${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'uboot.fs', 'uboot.fs', d)}"
+NEED_ATF = "${@bb.utils.contains_any('UBOOT_MAKE_TARGET', 'uboot.fs uboot-atf.fs', 'true', 'false', d)}"
+UBOOT_FILE = "${UBOOT_MAKE_TARGET}"
 
 FIRMWARE_DIR = "board/F+S/NXP-Firmware/${MACHINE}"
 
 inherit deploy
 
 do_compile[depends] += " \
-	${@bb.utils.contains('UBOOT_MAKE_TARGET', 'uboot.fs', 'imx-atf:do_deploy', '', d)} \
+	${@bb.utils.contains_any('UBOOT_MAKE_TARGET', 'uboot.fs uboot-atf.fs', 'imx-atf:do_deploy', '', d)} \
 	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os:do_deploy', '', d)} \
 "
 
