@@ -6,7 +6,7 @@ LICENSE = "MIT"
 
 inherit packagegroup
 
-PACKAGES = "packagegroup-fs-benchmark packagegroup-fs-monitor packagegroup-fs-util"
+PACKAGES = "packagegroup-fs-benchmark packagegroup-fs-monitor packagegroup-fs-util packagegroup-fs-dotnet"
 
 RDEPENDS:packagegroup-fs-benchmark = " \
     dhrystone \
@@ -22,6 +22,11 @@ RDEPENDS:packagegroup-fs-monitor = " \
     ltrace \
     procps \
     strace \
+"
+
+RDEPENDS:packagegroup-fs-dotnet = " \
+    icu \
+    procps \
 "
 
 RDEPENDS:packagegroup-fs-util = " \
