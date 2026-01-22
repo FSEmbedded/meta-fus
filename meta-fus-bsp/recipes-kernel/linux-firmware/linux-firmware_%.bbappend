@@ -1,4 +1,5 @@
 # Copyright 2017-2020 F&S Elektronik Systeme
+# Released under the MIT license (see COPYING.MIT for the terms)
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 

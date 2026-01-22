@@ -1,3 +1,6 @@
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+
 DESCRIPTION = "F&S Basler camera support image"
 LICENSE = "MIT"
 

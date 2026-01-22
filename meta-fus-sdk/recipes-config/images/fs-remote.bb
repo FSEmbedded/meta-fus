@@ -1,3 +1,6 @@
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+
 DESCRIPTON = "F&S Remote Desktop activation scripts"
 LICENSE = "MIT"
 

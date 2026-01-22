@@ -1,5 +1,5 @@
-# Copyright 2024 F&S Elektronik Systeme GmbH
-
+# Copyright (C) 2024 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
 
 # Enable building of examples
 PACKAGECONFIG += " \

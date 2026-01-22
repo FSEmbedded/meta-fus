@@ -1,4 +1,5 @@
-# Copyright 2024 F&S Elektronik Systeme GmbH
+# Copyright (C) 2024 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
 
 # find is used to locate all .h files in all subdirectories under /usr/include/*/${PV}.
 # Each found file is then checked to see if it contains a reference to ${TMPDIR},

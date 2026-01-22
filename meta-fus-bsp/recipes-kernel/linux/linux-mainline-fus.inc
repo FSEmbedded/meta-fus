@@ -37,10 +37,3 @@ KERNEL_EXTRA_ARGS += "LOADADDR=${UBOOT_ENTRYPOINT}"
 # To properly expand a defconfig like this, we need to specify: KCONFIG_MODE="--alldefconfig"
 # in the kernel recipe include.
 KCONFIG_MODE="--alldefconfig"
-
-
-
-
-
-
-

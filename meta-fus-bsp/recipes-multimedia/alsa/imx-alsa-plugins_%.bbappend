@@ -1,5 +1,6 @@
 # Copyright (C) 2024 F&S Elektronik Systeme GmbH
 # Released under the MIT license (see COPYING.MIT for the terms)
+
 DESCRIPTION = "F&S standard image"
 LICENSE = "MIT"
 

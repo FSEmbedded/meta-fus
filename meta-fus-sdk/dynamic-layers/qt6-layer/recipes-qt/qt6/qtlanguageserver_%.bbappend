@@ -1,4 +1,5 @@
-# Copyright 2024 F&S Elektronik Systeme GmbH
+# Copyright (C) 2024 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
 
 # used DISABLE_PTEST:pn-qtlanguageserver = 1 disable do_install_ptest_base
 python () {

@@ -1,5 +1,6 @@
 # Copyright (C) 2014 F&S Elektronik Systeme GmbH
 # Released under the GPLv2 license
+
 LICENSE = "GPLv2"
 LIC_FILES_CHKSUM = "file://COPYING;md5=d7810fab7487fb0aad327b76f1be7cd7"
 

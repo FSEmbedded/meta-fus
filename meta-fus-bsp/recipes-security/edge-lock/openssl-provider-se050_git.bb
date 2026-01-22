@@ -1,3 +1,6 @@
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+
 SUMMARY = "OpenSSL Provider for SE050"
 DESCRIPTION="An OpenSSL provider for NXP EdgeLock SE050 secure element product family."
 SECTION = "libs"

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+
 inherit image_types
 
 # rename wic image to be confirmed with naming convention

@@ -1,3 +1,6 @@
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+
 SUMMARY = "F&S board information broadcast tool"
 DESCRIPTION = "Simple F&S tool to broadcast board information over network. The broadcast can be received with the software FSDeviceSpy"
 

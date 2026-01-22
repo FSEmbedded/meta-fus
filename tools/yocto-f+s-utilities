@@ -1,5 +1,8 @@
 #!/bin/sh
 #
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+#
 # Supply some useful helper functions. Call with
 #
 #  source yocto-f+s-utilities

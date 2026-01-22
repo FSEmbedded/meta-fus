@@ -27,7 +27,3 @@ LINUX_VERSION = "6.12.59"
 
 SCMVERSION = "n"
 LOCALVERSION = "-fus-patched"
-
-
-
-

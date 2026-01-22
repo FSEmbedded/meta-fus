@@ -1,5 +1,8 @@
 #!/bin/bash
 #
+# Copyright (C) 2026 F&S Elektronik Systeme GmbH
+# Released under the MIT license (see COPYING.MIT for the terms)
+#
 # This is a wrapper script for NXPs fsl_setup_release.sh.
 # It calls the fsl_setup_release script with the given parameters
 # and adds some F&S specific configurations to the build
