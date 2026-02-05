@@ -1,16 +1,20 @@
 require linux-fus.inc
 
-# Based on Version fslc-6.6.112-2.2.1
 # CVE exclusions
 include recipes-kernel/linux/cve-exclusion.inc
 include recipes-kernel/linux/cve-exclusion_6.6.inc
 
+# Build linux-fus-debug to get config depended
+# cve information as spdx
+do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
+
+# Based on Version fslc-6.6.119-2.2.2
 SRCBRANCH="master"
-SRCREV = "c27bb420bc44ddd9335622f13ad9b9c2107682df"
+SRCREV = "5f221e5d91e081d5d6bd6a20c1df9edd7c5356ae"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
-LINUX_VERSION = "6.6.112"
+LINUX_VERSION = "6.6.119"
 
 KBUILD_DEFCONFIG:mx6-nxp-bsp = "fsimx6_defconfig"
 KBUILD_DEFCONFIG:mx6sx-nxp-bsp = "fsimx6sx_defconfig"
