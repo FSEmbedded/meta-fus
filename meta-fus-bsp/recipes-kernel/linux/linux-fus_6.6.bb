@@ -1,6 +1,10 @@
 require linux-fus.inc
 
 # Based on Version fslc-6.6.112-2.2.1
+# CVE exclusions
+include recipes-kernel/linux/cve-exclusion.inc
+include recipes-kernel/linux/cve-exclusion_6.6.inc
+
 SRCBRANCH="master"
 SRCREV = "c27bb420bc44ddd9335622f13ad9b9c2107682df"
 
