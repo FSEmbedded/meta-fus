@@ -184,6 +184,7 @@ fi
 	add_layer "meta-openembedded/meta-networking"
 	add_layer "meta-openembedded/meta-filesystems"
 	add_layer "meta-qt6"
+	add_layer "meta-cyclonedx"
 
 	##
 	# Run layer dependend init

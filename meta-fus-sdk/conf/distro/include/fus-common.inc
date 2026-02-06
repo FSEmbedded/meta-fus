@@ -29,7 +29,7 @@ RRECOMMENDS:${KERNEL_PACKAGE_NAME}-base = ""
 # need to set variable to convert it to lower case.
 KERNEL_MODULE_PACKAGE_SUFFIX = "${@legitimize_package_name(d.getVar('KERNEL_VERSION'))}"
 
-INHERIT:append ?= " image-buildinfo"
+INHERIT:append ?= " image-buildinfo create-spdx cyclonedx-export"
 
 # do not use ptest for qtbase and qtdeclarative.
 # set to 0 in local.conf to use
@@ -42,3 +42,14 @@ DISTRO_FEATURES:remove:pn-qtbase = "${@bb.utils.contains('DISABLE_PTEST:pn-qtbas
 DISTRO_FEATURES:remove:pn-qtdeclarative = "${@bb.utils.contains('DISABLE_PTEST:pn-qtdeclarative', '1', 'ptest', '', d)}"
 DISTRO_FEATURES:remove:pn-qtlanguageserver = "${@bb.utils.contains('DISABLE_PTEST:pn-qtlanguageserver', '1', 'ptest', '', d)}"
 DISTRO_FEATURES:remove:pn-qtwayland = "${@bb.utils.contains('DISABLE_PTEST:pn-qtwayland', '1', 'ptest', '', d)}"
+
+
+# SPDX_ORG = "F&S Elektronik Systeme GmbH (info@fs-net.de)"
+SPDX_PRETTY ?= "1"
+SPDX_INCLUDE_SOURCES ?= "0"
+SPDX_ARCHIVE_SOURCES ?= "0"
+SPDX_ARCHIVE_PACKAGED ?= "0"
+SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-fus-debug  ?= "1"
+
+CYCLONEDX_SPEC_VERSION ?= "1.6"
+CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "0"
