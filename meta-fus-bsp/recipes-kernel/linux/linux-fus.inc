@@ -19,6 +19,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=${SRCBRANCH};protocol=https"
 
+
 PV = "${LINUX_VERSION}"
 S = "${WORKDIR}/git"
 
@@ -38,7 +39,18 @@ do_extraunpack () {
 }
 
 kernel_do_configure:prepend() {
-	install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
+
+	if [ -e ${WORKDIR}/custom_defconfig ]; then
+		install -m 0644 ${WORKDIR}/custom_defconfig ${WORKDIR}/defconfig
+	else
+		install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
+	fi
+	if [ -e ${WORKDIR}/*.cfg ]; then
+		# Apply config fragments
+		for file in "${WORKDIR}"/*.cfg; do
+			cat "$file" >> ${WORKDIR}/defconfig
+		done
+	fi
 }
 
 kernel_do_configure:append() {
