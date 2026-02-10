@@ -43,6 +43,7 @@ DISTRO_FEATURES:remove:pn-qtdeclarative = "${@bb.utils.contains('DISABLE_PTEST:p
 DISTRO_FEATURES:remove:pn-qtlanguageserver = "${@bb.utils.contains('DISABLE_PTEST:pn-qtlanguageserver', '1', 'ptest', '', d)}"
 DISTRO_FEATURES:remove:pn-qtwayland = "${@bb.utils.contains('DISABLE_PTEST:pn-qtwayland', '1', 'ptest', '', d)}"
 
+include conf/distro/include/cve-extra-exclusions.inc
 
 # SPDX_ORG = "F&S Elektronik Systeme GmbH (info@fs-net.de)"
 SPDX_PRETTY ?= "1"
