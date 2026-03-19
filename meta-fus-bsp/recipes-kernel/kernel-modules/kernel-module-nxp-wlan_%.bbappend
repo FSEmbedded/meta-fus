@@ -12,7 +12,7 @@ SRC_URI += " \
 
 SOC_FAMILY                    = "INVALID"
 SOC_FAMILY:mx93-generic-bsp   = "mx93"
-SOC_FAMILY:mx8ulp-generic-bsp   = "mx8"
+SOC_FAMILY:mx8ulp-generic-bsp   = "mx93"
 SOC_FAMILY:mx8-generic-bsp   = "mx8"
 
 do_install:append () {
