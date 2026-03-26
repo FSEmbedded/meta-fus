@@ -11,6 +11,17 @@ LICENSE = "MIT"
 
 inherit core-image
 
+set_fus_release_version() {
+
+    if [ -n "${FUS_RELEASE_VERSION}" ]; then
+        echo -e "${FUS_RELEASE_VERSION}" >> ${IMAGE_ROOTFS}${sysconfdir}/issue
+        echo -e "${FUS_RELEASE_VERSION}" >> ${IMAGE_ROOTFS}${sysconfdir}/issue.net
+    fi
+
+}
+
+ROOTFS_POSTPROCESS_COMMAND += "set_fus_release_version; "
+
 update_issue() {
 
     local WARNING_TEXT="
