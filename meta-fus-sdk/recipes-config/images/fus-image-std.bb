@@ -1,14 +1,35 @@
 # Copyright (C) 2026 F&S Elektronik Systeme GmbH
 # Released under the MIT license (see COPYING.MIT for the terms)
 
-DESCRIPTION = "F&S standard image"
+### WARNING:
+###  FOR TESTING PURPOSES ONLY
+###  This image is for evaluation and testing only.
+###  DO NOT USE in production or mission-critical environments.
+
+DESCRIPTION = "F&S evaluation image"
 LICENSE = "MIT"
 
 inherit core-image
 
-### WARNING: This image is NOT suitable for production use and is intended
-###          to provide a way for users to reproduce the image used during
-###          the validation process of i.MX BSP releases.
+update_issue() {
+
+    local WARNING_TEXT="
+----------------------------------------------------------
+                 FOR TESTING PURPOSES ONLY
+     This image is for evaluation and testing only!
+DO NOT USE in production or mission-critical environments!
+----------------------------------------------------------
+"
+    echo -e "${WARNING_TEXT}" >> ${IMAGE_ROOTFS}${sysconfdir}/issue
+    echo -e "${WARNING_TEXT}" >> ${IMAGE_ROOTFS}${sysconfdir}/issue.net
+
+    bbwarn "$WARNING_TEXT"
+    if ${@bb.utils.contains_any('CORE_IMAGE_EXTRA_INSTALL', 'openssh', 'true', 'false', d)}; then
+        echo -e "Banner /etc/issue.net" >> ${IMAGE_ROOTFS}${sysconfdir}/ssh/sshd_config
+    fi
+}
+
+ROOTFS_POSTPROCESS_COMMAND += "update_issue; "
 
 ## Select Image Features
 IMAGE_FEATURES += " \
@@ -61,7 +82,7 @@ CORE_IMAGE_EXTRA_INSTALL:append:imx-nxp-bsp = " \
 
 # remove getty tty1 service because of using runtime generated
 # 'fsserial-getty@.service' service
-ROOTFS_POSTPROCESS_COMMAND = "remove_default_getty_service; "
+ROOTFS_POSTPROCESS_COMMAND += "remove_default_getty_service; "
 remove_default_getty_service () {
     rm -f ${IMAGE_ROOTFS}/lib/systemd/system/getty@.service
     rm -f ${IMAGE_ROOTFS}/etc/systemd/system/getty.target.wants/getty@tty1.service
