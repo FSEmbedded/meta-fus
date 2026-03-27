@@ -1,0 +1,2 @@
+EXTRA_OEMAKE:append:fsimx8mm = " CFG_TZDRAM_START=0x56000000"
+
