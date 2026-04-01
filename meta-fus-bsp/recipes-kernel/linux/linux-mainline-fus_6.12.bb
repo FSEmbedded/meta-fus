@@ -19,11 +19,11 @@ SRC_URI:append:mx8-mainline-bsp = " \
 SRC_URI:append:mx8-mainline-bsp = " file://fsimx8_defconfig "
 
 SRCBRANCH="linux-6.12.y"
-SRCREV = "d5dc97879a97b328a89ec092271faa3db9f2bff3"
+SRCREV = "c2d104a355013a14bcd73e31fb2c4bc21922115a"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
-LINUX_VERSION = "6.12.59"
+LINUX_VERSION = "6.12.79"
 
 SCMVERSION = "n"
 LOCALVERSION = "-fus-patched"
