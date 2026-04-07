@@ -10,7 +10,6 @@ PACKAGES = "packagegroup-fs-benchmark packagegroup-fs-monitor packagegroup-fs-ut
 
 RDEPENDS:packagegroup-fs-benchmark = " \
     dhrystone \
-    glmark2 \
     iperf3 \
     lmbench \
     stress-ng \
