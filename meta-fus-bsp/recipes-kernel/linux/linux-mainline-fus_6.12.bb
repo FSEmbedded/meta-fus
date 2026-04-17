@@ -1,12 +1,12 @@
 require linux-mainline-fus.inc
 
 SRC_URI:append  = " \
-	 file://0001-Add-F-S-device-trees.patch \
 	 file://0003-Add-fus-version-of-pca963x-led-driver.patch \
 	 file://0005-Improve-rtc-pcf85363-driver.patch \
 "
 
 SRC_URI:append:mx8-mainline-bsp = " \
+	 file://0001-Add-F-S-device-trees.patch \
 	 file://0002-Improve-fsimx8mp-device-trees-for-mainline.patch \
 	 file://0004-Add-gpio-switch-driver-for-usb-c.patch \
 	 file://0006-Add-pwm-functionallity-to-pca953x-gpio-driver.patch \
@@ -16,7 +16,16 @@ SRC_URI:append:mx8-mainline-bsp = " \
 	 file://0011-Hoftfix-for-tc35877-MIPI2LVDS-bridge.patch \
 "
 
+SRC_URI:append:mx6-mainline-bsp = " \
+	 file://0001-Add-fsimx6-sx-ul-original-device-trees.patch \
+	 file://0002-Improve-fsimx6-device-trees-for-mainline.patch \
+	 file://0003-Add-the-F-S-gpmi-nand-driver.patch \
+	 file://0006-Add-support-for-BGR666-format-to-IPU.patch \
+	 file://0007-Remove-support-for-BT-AMP-on-Marvell-SD8787-Bluetoot.patch \
+"
+
 SRC_URI:append:mx8-mainline-bsp = " file://fsimx8_defconfig "
+SRC_URI:append:mx6-mainline-bsp = " file://fsimx6_defconfig "
 
 SRCBRANCH="linux-6.12.y"
 SRCREV = "c2d104a355013a14bcd73e31fb2c4bc21922115a"

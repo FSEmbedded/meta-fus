@@ -1,0 +1,5268 @@
+From 7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a Mon Sep 17 00:00:00 2001
+Message-Id: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Wed, 6 May 2026 16:24:06 +0200
+Subject: [PATCH 1/7] Improve fsimx6 device trees for mainline
+
+Please be aware that not all functionality form the vendor may be given.
+---
+ arch/arm/boot/dts/fus/Makefile             |  52 +-
+ arch/arm/boot/dts/fus/armstonea9dl.dts     |  87 +--
+ arch/arm/boot/dts/fus/armstonea9q.dts      | 110 +---
+ arch/arm/boot/dts/fus/armstonea9qdl.dtsi   | 530 ++++++------------
+ arch/arm/boot/dts/fus/armstonea9r2dl.dts   |  87 ++-
+ arch/arm/boot/dts/fus/armstonea9r2q.dts    | 105 ++--
+ arch/arm/boot/dts/fus/armstonea9r2qdl.dtsi | 383 ++++---------
+ arch/arm/boot/dts/fus/armstonea9r3dl.dts   |  85 +--
+ arch/arm/boot/dts/fus/armstonea9r3q.dts    | 110 +---
+ arch/arm/boot/dts/fus/armstonea9r4dl.dts   |  77 +--
+ arch/arm/boot/dts/fus/armstonea9r4q.dts    |  94 +---
+ arch/arm/boot/dts/fus/efusa9dl.dts         |  93 ++--
+ arch/arm/boot/dts/fus/efusa9q.dts          | 121 ++---
+ arch/arm/boot/dts/fus/efusa9qdl.dtsi       | 593 +++++++--------------
+ arch/arm/boot/dts/fus/efusa9r2dl.dts       |  87 +--
+ arch/arm/boot/dts/fus/efusa9r2q.dts        | 109 +---
+ arch/arm/boot/dts/fus/imx6dl.dtsi          |  12 -
+ arch/arm/boot/dts/fus/imx6q.dtsi           |   8 -
+ arch/arm/boot/dts/fus/imx6qdl.dtsi         |  17 +
+ arch/arm/boot/dts/fus/picomoda9dl.dts      | 109 ++--
+ arch/arm/boot/dts/fus/picomoda9q.dts       | 124 +++--
+ arch/arm/boot/dts/fus/picomoda9qdl.dtsi    | 531 ++++++------------
+ 22 files changed, 1110 insertions(+), 2414 deletions(-)
+
+diff --git a/arch/arm/boot/dts/fus/Makefile b/arch/arm/boot/dts/fus/Makefile
+index 8defbf3a6..ba563f3f2 100644
+--- a/arch/arm/boot/dts/fus/Makefile
++++ b/arch/arm/boot/dts/fus/Makefile
+@@ -1,51 +1,17 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_SOC_IMX6Q) += \
+-	netdcua9dl.dtb \
+-	picomoda9dl.dtb \
+-	efusa9dl.dtb \
+-	efusa9r2dl.dtb \
++	armstonea9q.dtb \
+ 	armstonea9dl.dtb \
+-	armstonea9r2dl.dtb \
++	armstonea9r3q.dtb \
+ 	armstonea9r3dl.dtb \
++	armstonea9r2q.dtb \
++	armstonea9r2dl.dtb \
++	armstonea9r4q.dtb \
+ 	armstonea9r4dl.dtb \
+-	qblissa9dl.dtb \
+-	qblissa9r2dl.dtb \
+-	netdcua9q.dtb \
+-	picomoda9q.dtb \
+ 	efusa9q.dtb \
+ 	efusa9r2q.dtb \
+-	armstonea9q.dtb \
+-	armstonea9r2q.dtb \
+-	armstonea9r3q.dtb \
+-	armstonea9r4q.dtb \
+-	qblissa9q.dtb \
+-	qblissa9r2q.dtb
+-dtb-$(CONFIG_SOC_IMX6SX) += \
+-	efusa9x.dtb \
+-	efusa9xr2.dtb \
+-	picocoremx6sx.dtb \
+-	picocoremx6sxr2.dtb \
+-	vc600.dtb \
+-	bema9x.dtb \
+-	picocoma9x.dtb \
+-	cont1.dtb \
+-	vand3.dtb
+-dtb-$(CONFIG_SOC_IMX6UL) += \
+-	efusa7ul.dtb \
+-	picocom1.2.dtb \
+-	picocoma7.dtb \
+-	picocoremx6ul.dtb \
+-	picocoremx6ul100.dtb \
+-	cubea7ul.dtb \
+-	cube2.0.dtb \
+-	gar1.dtb \
+-	gar2.dtb \
+-	gar3.dtb \
+-	efusa7ull.dtb \
+-	cube2.0ull.dtb \
+-	picocoma7ull.dtb \
+-	picocoremx6ull.dtb \
+-	picocoremx6ull100.dtb
+-dtb-$(CONFIG_SOC_IMX7ULP) += \
+-	picocoremx7ulp.dtb
++	efusa9dl.dtb \
++	efusa9r2dl.dtb \
++	picomoda9q.dtb \
++	picomoda9dl.dtb
+ 
+diff --git a/arch/arm/boot/dts/fus/armstonea9dl.dts b/arch/arm/boot/dts/fus/armstonea9dl.dts
+index 7557a49cd..fa44cd6a3 100644
+--- a/arch/arm/boot/dts/fus/armstonea9dl.dts
++++ b/arch/arm/boot/dts/fus/armstonea9dl.dts
+@@ -16,46 +16,17 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9_MXCFB0	DISPLAY_LCD
+-#define CONFIG_ARMSTONEA9_MXCFB1	DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP0		DISPLAY_LCD
++#define CONFIG_ARMSTONEA9_DISP1		DISPLAY_NONE
+ 
+-/* i.MX6 Solo and DualLite only have one IPU, do not change */
+-#define CONFIG_ARMSTONEA9_USE_ONE_IPU
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_ARMSTONEA9_LCD_BPP	32
+-#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_ARMSTONEA9_BT656_BPP	32
+-#define CONFIG_ARMSTONEA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_ARMSTONEA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9_HDMI_BPP	32
+-#define CONFIG_ARMSTONEA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -66,19 +37,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -94,12 +64,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -121,12 +90,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -142,12 +110,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -185,14 +152,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+diff --git a/arch/arm/boot/dts/fus/armstonea9q.dts b/arch/arm/boot/dts/fus/armstonea9q.dts
+index 44816b5fe..0d5295103 100644
+--- a/arch/arm/boot/dts/fus/armstonea9q.dts
++++ b/arch/arm/boot/dts/fus/armstonea9q.dts
+@@ -16,66 +16,19 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all four settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave the other two at DISPLAY_NONE.
+- * - If you have three displays, set MXCFB0, MXCFB1 and MXCFB2 to a display
+- *   type from above and leave MXCFB3 at DISPLAY_NONE.
+- * - If you have four displays, set all four settings to a valid display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, MXCFB2 will
+- * use /dev/fb4 and MXCFB3 will use /dev/fb5. If you want to restrict the
+- * display output to one IPU (i.MX6 Dual/Quad has two IPUs), for example for
+- * energy saving reasons, you must not use more than two displays and you must
+- * set CONFIG_ARMSTONEA9_USE_ONE_IPU below. Then only MXCFB0 will get a video
+- * overlay and uses /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9_MXCFB0	DISPLAY_LCD
+-#define CONFIG_ARMSTONEA9_MXCFB1	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9_MXCFB2	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9_MXCFB3	DISPLAY_NONE
+ 
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_ARMSTONEA9_USE_ONE_IPU
++#define CONFIG_ARMSTONEA9_DISP0		DISPLAY_LCD
++#define CONFIG_ARMSTONEA9_DISP1		DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP2		DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP3		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_ARMSTONEA9_LCD_BPP	32
+-#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_ARMSTONEA9_BT656_BPP	32
+-#define CONFIG_ARMSTONEA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_ARMSTONEA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9_HDMI_BPP	32
+-#define CONFIG_ARMSTONEA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -86,19 +39,19 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -114,12 +67,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -141,12 +93,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -162,12 +113,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -205,14 +155,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+diff --git a/arch/arm/boot/dts/fus/armstonea9qdl.dtsi b/arch/arm/boot/dts/fus/armstonea9qdl.dtsi
+index e121f6d9e..c7ca394d1 100755
+--- a/arch/arm/boot/dts/fus/armstonea9qdl.dtsi
++++ b/arch/arm/boot/dts/fus/armstonea9qdl.dtsi
+@@ -7,7 +7,6 @@
+  */
+ 
+ #include <dt-bindings/pwm/pwm.h>
+-#include <fsversion.h>
+ 
+ /*
+  * When using one IPU, having LCD and LVDS0 at the same time is not possible,
+@@ -15,22 +14,22 @@
+  * by using LVDS1 instead of LVDS0 and activating Dual Mode.
+  */
+ #ifdef CONFIG_ARMSTONEA9_USE_ONE_IPU
+-#undef CONFIG_ARMSTONEA9_MXCFB2
+-#undef CONFIG_ARMSTONEA9_MXCFB3
+-
+-#if (((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LCD) \
+-      || (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_BT656)) \
+-     && (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS0))
+-#undef CONFIG_ARMSTONEA9_MXCFB1
+-#define CONFIG_ARMSTONEA9_MXCFB1		DISPLAY_LVDS1
++#undef CONFIG_ARMSTONEA9_DISP2
++#undef CONFIG_ARMSTONEA9_DISP3
++
++#if (((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LCD) \
++      || (CONFIG_ARMSTONEA9_DISP0 == DISPLAY_BT656)) \
++     && (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS0))
++#undef CONFIG_ARMSTONEA9_DISP1
++#define CONFIG_ARMSTONEA9_DISP1		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS0) \
+-     && ((CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LCD) \
+-         || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_BT656)))
+-#undef CONFIG_ARMSTONEA9_MXCFB0
+-#define CONFIG_ARMSTONEA9_MXCFB0		DISPLAY_LVDS1
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS0) \
++     && ((CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LCD) \
++         || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_BT656)))
++#undef CONFIG_ARMSTONEA9_DISP0
++#define CONFIG_ARMSTONEA9_DISP0		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+@@ -41,9 +40,6 @@
+ #undef CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH
+ #undef CONFIG_ARMSTONEA9_LVDS1_TIMING
+ #define CONFIG_ARMSTONEA9_LVDS1_MAPPING		CONFIG_ARMSTONEA9_LVDS0_MAPPING
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP		CONFIG_ARMSTONEA9_LVDS0_BPP
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT		CONFIG_ARMSTONEA9_LVDS0_PIX_FMT
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING		CONFIG_ARMSTONEA9_LVDS0_TIMING
+ #ifndef CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+ #define CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+@@ -52,13 +48,13 @@
+ #endif /* CONFIG_ARMSTONEA9_USE_ONE_IPU */
+ 
+ /* Do we have LCD? */
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LCD) \
+-    || (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LCD) \
+-    || (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LCD))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LCD) \
++    || (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_LCD) \
++    || (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_LCD))
+ #define CONFIG_ARMSTONEA9_LCD
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LCD))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LCD))
+ #define __LCD_ON_0_OR_1__	1
+ #define __LCD_ON_2_OR_3__	0
+ #else
+@@ -68,13 +64,13 @@
+ #endif
+ 
+ /* Do we have BT656? */
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_BT656) \
+-    || (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_BT656) \
+-    || (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_BT656))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_BT656) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_BT656) \
++    || (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_BT656) \
++    || (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_BT656))
+ #define CONFIG_ARMSTONEA9_BT656
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_BT656))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_BT656) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_BT656))
+ #define __BT656_ON_0_OR_1__	1
+ #define __BT656_ON_2_OR_3__	0
+ #else
+@@ -84,15 +80,15 @@
+ #endif
+ 
+ /* Do we have HDMI? */
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_HDMI))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_HDMI))
+ #define CONFIG_ARMSTONEA9_HDMI
+ #define CONFIG_ARMSTONEA9_HDMI_AUDIO
+ #define CONFIG_ARMSTONEA9_HDMI_CEC
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_HDMI))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_HDMI))
+ #define __HDMI_ON_0_OR_1__	1
+ #define __HDMI_ON_2_OR_3__	0
+ #else
+@@ -102,13 +98,13 @@
+ #endif
+ 
+ /* Do we have LVDS0? */
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS0))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_LVDS0))
+ #define CONFIG_ARMSTONEA9_LVDS0
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS0))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS0))
+ #define __LVDS0_ON_0_OR_1__	1
+ #define __LVDS0_ON_2_OR_3__	0
+ #else
+@@ -118,13 +114,13 @@
+ #endif
+ 
+ /* Do we have LVDS1? */
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS1))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_LVDS1))
+ #define CONFIG_ARMSTONEA9_LVDS1
+-#if ((CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS1))
++#if ((CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS1))
+ #define __LVDS1_ON_0_OR_1__	1
+ #define __LVDS1_ON_2_OR_3__	0
+ #else
+@@ -134,30 +130,26 @@
+ #endif
+ 
+ /* Check which LVDS will be the primary display */
+-#if (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS0)
++#if (CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9_DISP0 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS0)
++#elif (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9_DISP1 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS0)
++#elif (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9_DISP2 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS0)
++#elif (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9_DISP3 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+ #endif
+ 
+ / {
+ 	aliases {
+-		mxcfb0 = &mxcfb0;
+-		mxcfb1 = &mxcfb1;
+-		mxcfb2 = &mxcfb2;
+-		mxcfb3 = &mxcfb3;
+ #ifdef CONFIG_ARMSTONEA9_SGTL5000_AUDIO
+ 		i2c5 = &i2c_gpio;
+ #endif
+@@ -279,6 +271,12 @@ reg_camera_dvdd: camera_dvdd {
+ 			regulator-max-microvolt = <1500000>;
+ 		};
+ #endif /* CONFIG_ARMSTONEA9_PARALLEL_CAMERA */
++		reg_rtc_clk: regulator-rtc-clk {
++			compatible = "regulator-fixed-clock";
++			regulator-always-on;
++			regulator-name = "RTC_CLK";
++			clocks = <&rtc_clk>;
++		};
+ 	};
+ 
+ 	/* F&S board information */
+@@ -286,7 +284,6 @@ bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "armstonea9";
+ 		ecc_strength = "8";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ #ifdef CONFIG_ARMSTONEA9_HDMI
+@@ -324,7 +321,7 @@ &gpio1 10 GPIO_ACTIVE_HIGH /* scl */
+ 
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+-		cpu-dai = <&ssi1>;
++		ssi-controller = <&ssi1>;
+ 		audio-codec = <&sgtl5000>;
+ 		model = "imx-sgtl5000";
+ 		mux-int-port = <1>;  /* SSI1=1, SSI2=2, SSI3=7 */
+@@ -341,180 +338,11 @@ sound {
+ 	sound-hdmi {
+ 		compatible = "fsl,imx6q-audio-hdmi", "fsl,imx-audio-hdmi";
+ 		model = "imx-audio-hdmi";
+-		hdmi-controller = <&hdmi_audio>;
+-	};
+-#endif
+-
+-	mxcfb0: fb@0 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_ARMSTONEA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_ARMSTONEA9_LCD_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_ARMSTONEA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB0 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb1: fb@1 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_ARMSTONEA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_ARMSTONEA9_LCD_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_ARMSTONEA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB1 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb2: fb@2 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_ARMSTONEA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_ARMSTONEA9_LCD_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_ARMSTONEA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB2 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb3: fb@3 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_ARMSTONEA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_ARMSTONEA9_LCD_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_ARMSTONEA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9_MXCFB3 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-#ifdef CONFIG_ARMSTONEA9_LCD
+-	lcd: lcd@0 {
+-		compatible = "fsl,lcd";
+-		lcd-supply = <&reg_vlcd>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
+-		status = "disabled";
+-	};
+-#endif
+-
+-#ifdef CONFIG_ARMSTONEA9_BT656
+-	bt656: bt656@0 {
+-		compatible = "fsl,bt656";
+-		default_ifmt = "BT656";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_bt656>;
+-		status = "disabled";
+ 	};
+ #endif
+ 
+ 	/* RGB-LCD backlight PWM on RGB adapter */
+-	backlight_lcd {
++	backlight_lcd:backlight_lcd {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pca963x 1 640000 0>;
+ 		power-supply = <&reg_lcd_bl>;
+@@ -576,8 +404,81 @@ status_2 {
+ 			default-state = "keep";
+ 		};
+ 	};
++
++#ifdef CONFIG_ARMSTONEA9_LVDS0
++	panel-lvds0 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_ARMSTONEA9_LVDS0_MAPPING;
++		width-mm = <CONFIG_ARMSTONEA9_LVDS0_WIDTH>;
++		height-mm = <CONFIG_ARMSTONEA9_LVDS0_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_ARMSTONEA9_LVDS0_TIMING;
++
++		port {
++			panel_in_lvds0: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_ARMSTONEA9_LVDS1
++	panel-lvds1 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_ARMSTONEA9_LVDS1_MAPPING;
++		width-mm = <CONFIG_ARMSTONEA9_LVDS1_WIDTH>;
++		height-mm = <CONFIG_ARMSTONEA9_LVDS1_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_ARMSTONEA9_LVDS1_TIMING;
++
++		port {
++			panel_in_lvds1: endpoint {
++				remote-endpoint = <&lvds1_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_ARMSTONEA9_LCD
++	lcd_display: disp0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
++		status = "okay";
++
++		port@0 {
++			reg = <0>;
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port@1 {
++			reg = <1>;
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	panel: panel {
++		compatible = CONFIG_ARMSTONEA9_LCD_MODE_STR;
++		backlight = <&backlight_lcd>;
++		power-supply = <&reg_vlcd>;
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++#endif
+ };
+ 
++
+ /* RAM size for Continuous Memory Allocator; if not defined, use 320 MB */
+ #ifndef CONFIG_ARMSTONEA9_CMA_SIZE
+ #define CONFIG_ARMSTONEA9_CMA_SIZE 0x14000000
+@@ -586,12 +487,6 @@ &cma {
+ 	size = <CONFIG_ARMSTONEA9_CMA_SIZE>;
+ };
+ 
+-&busfreq {
+-	/* Disable bus frequency scaling, because reducing bus frequency to
+-	   24 MHz does not work with all types of DDR3 RAM */
+-	disable-scaling;
+-};
+-
+ /* if you want to use the pmic controller you have to set the arm-supply and
+  * the soc-supply to the regulator of the pmic. Look pfuze comment.*/
+ #if 0
+@@ -705,27 +600,22 @@ &gpc {
+ 	fsl,wdog-reset = <1>; /* watchdog select of reset source */
+ };
+ 
+-#ifdef CONFIG_ARMSTONEA9_HDMI_AUDIO
+-&hdmi_audio {
+-	status = "okay";
+-};
+-#endif
+ 
+-#ifdef CONFIG_ARMSTONEA9_HDMI_CEC
+-&hdmi_cec {
+-//###	pinctrl-names = "default";
+-//###	pinctrl-0 = <&pinctrl_hdmi_cec_1>;
+-	status = "okay";
+-};
++#ifdef CONFIG_ARMSTONEA9_HDMI
++
++#if 0
++/* Force HDMI to IPU 2 */
++/delete-node/&hdmi_mux_0;
++/delete-node/&ipu1_di0_hdmi;
++/delete-node/&hdmi_mux_1;
++/delete-node/&ipu1_di1_hdmi;
+ #endif
+ 
+-#ifdef CONFIG_ARMSTONEA9_HDMI
+-&hdmi_video {
+-	fsl,phy_reg_vlev = <0x0294>;
+-	fsl,phy_reg_cksymtx = <0x800d>;
+-	force-dvi-mode;
++&hdmi {
++	ddc-i2c-bus = <&i2c_gpio_hdmi>;
+ 	status = "okay";
+ };
++
+ #endif
+ 
+ #ifdef CONFIG_ARMSTONEA9_I2C_C
+@@ -765,11 +655,13 @@ &i2c2 {
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	rtc8565@51 {
++	rtc_clk:rtc8565@51 {
+ 		compatible = "nxp,pcf8565", "nxp,pcf8563";
+ 		reg = <0x51>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
++		#clock-cells = <0>;
++		clock-output-names = "rtc_clk32k";
+ 	};
+ 
+ 	// ### TODO: ADC
+@@ -895,7 +787,7 @@ &i2c3 {
+ 	status = "okay";
+ 
+ 	pca963x: pca9632@60 {
+-		compatible = "nxp,pca9632";
++		compatible = "fus,pca9632";
+ 		reg = <0x60>;
+ 		nxp,totem-pole;
+ 		#address-cells = <1>;
+@@ -998,18 +890,18 @@ sx8654@48 {
+ #ifdef CONFIG_ARMSTONEA9_CAPTOUCH_FT5x06
+ 	/* F&S driver V3.0 on Touch Connector (I2C) */
+ 	ft5x06_ts@38 {
+-		compatible = "FocalTech,ft5306";
++		iovcc-supply = <&reg_vlcd>;
++		compatible = "edt,edt-ft5306";
+ 		reg = <0x38>;
+-		fingers = <2>;
+ 		touchscreen-size-x = <800>;
+ 		touchscreen-size-y = <480>;
+ 		threshold = <25>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+ 		reset-gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+-		x-rev;
+-		y-rev;
+-		linux,wakeup;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "okay";
+ 	};
+ #endif
+ 
+@@ -1028,9 +920,9 @@ mxt224@4a {
+ #ifdef CONFIG_ARMSTONEA9_CAPTOUCH_SITRONIX
+ 	/* Sitronix PCAP touch on Touch-Connector (I2C) */
+ 	st1633i@48 {
+-		compatible = "sitronix";
++		compatible = "sitronix,st1633";
+ 		reg = <0x48>;
+-		swap-xy;
++		touchscreen-swapped-x-y;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+ 		reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+@@ -1203,123 +1095,47 @@ &usdhc3 {
+ #endif /* CONFIG_ARMSTONEA9_SD_A */
+ 
+ #ifdef CONFIG_ARMSTONEA9_LCD
+-&lcd {
+-	/* LCD on armStoneA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_ARMSTONEA9_LCD_PIX_FMT;
+-	status = "okay";
+-};
+-#endif
+-
+-#ifdef CONFIG_ARMSTONEA9_BT656
+-&bt656 {
+-	/* BT656 on efusA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_ARMSTONEA9_BT656_PIX_FMT;
+-	status = "okay";
+-};
+-#endif
+-
+-#ifdef CONFIG_ARMSTONEA9_HDMI
+-&hdmi_core {
+-#ifdef CONFIG_ARMSTONEA9_USE_ONE_IPU
+-	/*
+-	 * When using one IPU (id=0):
+-	 * HDMI can go to DI1, unless LVDS1 is also active. In this case LVDS1
+-	 * must go to DI1 and HDMI to DI0.
+-	 */
+-	ipu_id = <0>;
+-#if (__HDMI_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__)
+-	disp_id = <0>;
+-#else
+-	disp_id = <1>;
+-#endif
+-#else /* !CONFIG_ARMSTONEA9_USE_ONE_IPU */
+-	/*
+-	 * When using two IPUs:
+-	 * HDMI can always go to DI1. If HDMI is on MXCFB0 and LCD on MXCFB1,
+-	 * or vice versa, or HDMI is on MXCFB2 and LCD is on MXCFB3, or vice
+-	 * versa, then HDMI has to go to IPU2 (id=1), otherwise to IPU1 (id=0).
+-	 */
+-	disp_id = <1>;
+-#if ((__HDMI_ON_0_OR_1__ && (__LCD_ON_0_OR_1__ || __BT656_ON_0_OR_1__)) \
+-    || (__HDMI_ON_2_OR_3__ && (__LCD_ON_2_OR_3__ || __BT656_ON_2_OR_3__)))
+-	ipu_id = <1>;
+-#else
+-	ipu_id = <0>;
+-#endif
+-#endif /* CONFIG_ARMSTONEA9_USE_ONE_IPU */
+-	status = "okay";
++&ipu1_di0_disp0 {
++	remote-endpoint = <&lcd_display_in>;
+ };
+ #endif
+ 
+ #if (defined(CONFIG_ARMSTONEA9_LVDS0) || defined(CONFIG_ARMSTONEA9_LVDS1))
+ &ldb {
+-	ext_ref;
+-#if defined(CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE)
+-	split-mode;
+-#elif defined(CONFIG_ARMSTONEA9_LVDS_DUAL_MODE)
+-	dual-mode;
++#ifdef CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE
++	fsl,dual-channel;
+ #endif
+-	ldb-supply = <&reg_vlcd>;
+ 	status = "okay";
+-
+ #ifdef CONFIG_ARMSTONEA9_LVDS0
+-	/* LVDS0 must always go to DI0 of an IPU! */
+ 	lvds-channel@0 {
+-		reg = <0>;
+-#ifdef CONFIG_ARMSTONEA9_USE_ONE_IPU
+-		crtc = "ipu1-di0";
+-#else
+-		crtc = "ipu2-di0";
+-#endif
+-		fsl,data-mapping = CONFIG_ARMSTONEA9_LVDS0_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH>;
+-#ifdef __LVDS0_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: CONFIG_ARMSTONEA9_LVDS0_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in_lvds0>;
++			};
+ 		};
+ 	};
+ #endif
+-
+ #ifdef CONFIG_ARMSTONEA9_LVDS1
+-	/* LVDS1 must always go to DI1 of an IPU! */
+ 	lvds-channel@1 {
+-#if defined(CONFIG_ARMSTONEA9_LVDS_DUAL_MODE) \
+-	|| defined(CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE)
+-		reg = <0>;
+-#else
+-		reg = <1>;
+-#endif
+-#if (defined(CONFIG_ARMSTONEA9_USE_ONE_IPU) \
+-    || (__LVDS0_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__) \
+-    || (__LVDS0_ON_2_OR_3__ && __LVDS1_ON_2_OR_3__))
+-		crtc = "ipu1-di1";
+-#else
+-		crtc = "ipu2-di1";
+-#endif
+-		fsl,data-mapping = CONFIG_ARMSTONEA9_LVDS1_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH>;
+-#ifdef __LVDS1_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing1>;
+-			timing1: CONFIG_ARMSTONEA9_LVDS1_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds1_out: endpoint {
++				remote-endpoint = <&panel_in_lvds1>;
++			};
+ 		};
+ 	};
+ #endif
+ };
+-#endif /* CONFIG_ARMSTONEA9_LVDS0 || CONFIG_ARMSTONEA9_LVDS1 */
++#endif
++
++
+ 
+ #ifdef CONFIG_ARMSTONEA9_PCIE
+ &pcie {
+diff --git a/arch/arm/boot/dts/fus/armstonea9r2dl.dts b/arch/arm/boot/dts/fus/armstonea9r2dl.dts
+index 6ab5445d5..1971f9488 100755
+--- a/arch/arm/boot/dts/fus/armstonea9r2dl.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r2dl.dts
+@@ -16,28 +16,8 @@
+ #define DISPLAY_LVDS0	2	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	3	/* LVDS channel 1 */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9R2_MXCFB0	DISPLAY_LVDS0
+-#define CONFIG_ARMSTONEA9R2_MXCFB1	DISPLAY_NONE
+-
+-/* i.MX6 Solo and DualLite only have one IPU, do not change */
+-#define CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9R2_HDMI_BPP		32
+-#define CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9R2_DISP0		DISPLAY_LVDS0
++#define CONFIG_ARMSTONEA9R2_DISP1		DISPLAY_HDMI
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -48,19 +28,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -76,12 +55,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -103,12 +81,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -124,12 +101,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -167,14 +143,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+@@ -262,6 +230,15 @@ wvga {					\
+ / {
+ 	model = "F&S i.MX6 Solo/DualLite armStoneA9r2";
+ 	compatible = "fsl,imx6dl-armstonea9r2", "fsl,imx6dl";
++
++	regulators {
++		reg_rtc_clk: regulator-rtc-clk {
++			compatible = "regulator-fixed-clock";
++			regulator-always-on;
++			regulator-name = "RTC_CLK";
++			clocks = <&rtc_clk>;
++		};
++	};
+ };
+ 
+ &bdinfo {
+@@ -274,11 +251,13 @@ &pxp {
+ };
+ 
+ &i2c1 {
+-	rtc8565@51 {
++	rtc_clk:rtc8565@51 {
+ 		compatible = "nxp,pcf8565", "nxp,pcf8563";
+ 		reg = <0x51>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
++		#clock-cells = <0>;
++		clock-output-names = "rtc_clk32k";
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/fus/armstonea9r2q.dts b/arch/arm/boot/dts/fus/armstonea9r2q.dts
+index 2aa2a4f47..9f87a4df7 100755
+--- a/arch/arm/boot/dts/fus/armstonea9r2q.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r2q.dts
+@@ -16,45 +16,9 @@
+ #define DISPLAY_LVDS0	2	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	3	/* LVDS channel 1 */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all three settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave MXCFB2 at DISPLAY_NONE.
+- * - If you have three displays, set all three settings to a display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, and MXCFB2
+- * will use /dev/fb4. If you want to restrict the display output to one IPU
+- * (i.MX6 Dual/Quad has two IPUs), for example for energy saving reasons, you
+- * must set CONFIG_ARMSTONEA9R2_USE_ONE_IPU below and you must not use more
+- * than two displays. Then only MXCFB0 will get a video overlay and uses
+- * /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9R2_MXCFB0	DISPLAY_LVDS0
+-#define CONFIG_ARMSTONEA9R2_MXCFB1	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9R2_MXCFB2	DISPLAY_NONE
+-
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9R2_HDMI_BPP		32
+-#define CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9R2_DISP0		DISPLAY_LVDS0
++#define CONFIG_ARMSTONEA9R2_DISP1		DISPLAY_HDMI
++#define CONFIG_ARMSTONEA9R2_DISP2		DISPLAY_NONE
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -65,19 +29,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -93,12 +56,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -120,12 +82,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -141,12 +102,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -184,14 +144,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+@@ -277,6 +229,15 @@ wvga {					\
+ / {
+ 	model = "F&S i.MX6 Dual/Quad armStoneA9r2";
+ 	compatible = "fsl,imx6q-armstonea9r2", "fsl,imx6q";
++
++	regulators {
++		reg_rtc_clk: regulator-rtc-clk {
++			compatible = "regulator-fixed-clock";
++			regulator-always-on;
++			regulator-name = "RTC_CLK";
++			clocks = <&rtc_clk>;
++		};
++	};
+ };
+ 
+ &bdinfo {
+@@ -291,11 +252,13 @@ &sata {
+ #endif
+ 
+ &i2c1 {
+-	rtc8565@51 {
++	rtc_clk:rtc8565@51 {
+ 		compatible = "nxp,pcf8565", "nxp,pcf8563";
+ 		reg = <0x51>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
++		#clock-cells = <0>;
++		clock-output-names = "rtc_clk32k";
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/fus/armstonea9r2qdl.dtsi b/arch/arm/boot/dts/fus/armstonea9r2qdl.dtsi
+index 5ec648a84..87f4feaa9 100755
+--- a/arch/arm/boot/dts/fus/armstonea9r2qdl.dtsi
++++ b/arch/arm/boot/dts/fus/armstonea9r2qdl.dtsi
+@@ -7,17 +7,17 @@
+  */
+ 
+ #include <dt-bindings/pwm/pwm.h>
+-#include <fsversion.h>
++
+ 
+ /* Do we have HDMI? */
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_HDMI))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9R2_DISP2 == DISPLAY_HDMI))
+ #define CONFIG_ARMSTONEA9R2_HDMI
+ #define CONFIG_ARMSTONEA9R2_HDMI_AUDIO
+ #define CONFIG_ARMSTONEA9R2_HDMI_CEC
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_HDMI))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_HDMI))
+ #define __HDMI_ON_0_OR_1__	1
+ #else
+ #define __HDMI_ON_0_OR_1__	0
+@@ -25,12 +25,12 @@
+ #endif
+ 
+ /* Do we have LVDS0? */
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS0))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9R2_DISP2 == DISPLAY_LVDS0))
+ #define CONFIG_ARMSTONEA9R2_LVDS0
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS0))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS0))
+ #define __LVDS0_ON_0_OR_1__	1
+ #else
+ #define __LVDS0_ON_0_OR_1__	0
+@@ -38,12 +38,12 @@
+ #endif
+ 
+ /* Do we have LVDS1? */
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS1))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9R2_DISP2 == DISPLAY_LVDS1))
+ #define CONFIG_ARMSTONEA9R2_LVDS1
+-#if ((CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS1))
++#if ((CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS1))
+ #define __LVDS1_ON_0_OR_1__	1
+ #else
+ #define __LVDS1_ON_0_OR_1__	0
+@@ -51,25 +51,22 @@
+ #endif
+ 
+ /* Check which LVDS will be the primary display */
+-#if (CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS0)
++#if (CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9R2_DISP0 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS0)
++#elif (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9R2_DISP1 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS0)
++#elif (CONFIG_ARMSTONEA9R2_DISP2 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS1)
++#elif (CONFIG_ARMSTONEA9R2_DISP2 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+ #endif
+ 
+ / {
+ 	aliases {
+-		mxcfb0 = &mxcfb0;
+-		mxcfb1 = &mxcfb1;
+-		mxcfb2 = &mxcfb2;
+ #if (CONFIG_ARMSTONEA9R2_BOARD_REVISION < 110)
+ 		i2c5 = &i2c_lvds;
+ #endif /* CONFIG_ARMSTONEA9R2_BOARD_REVISION < 110 */
+@@ -217,13 +214,16 @@ bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		board_name = "armstonea9r2";
+ 		ecc_strength = "8";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+-
++#ifdef CONFIG_ARMSTONEA9R2_WLAN
+ 	sdhci1_pwrseq: sdhci1_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&gpio1 27 GPIO_ACTIVE_LOW>;
++      	clocks = <&rtc_clk>;
++      	clock-names = "ext_clock";
+ 	};
++#endif
++
+ #if (CONFIG_ARMSTONEA9R2_BOARD_REVISION < 110)
+ 	i2c_lvds: i2c-gpio-lvds {
+ 		compatible = "i2c-gpio";
+@@ -243,7 +243,7 @@ &gpio2 14 GPIO_ACTIVE_HIGH /* scl */
+ #ifdef CONFIG_ARMSTONEA9R2_SGTL5000_AUDIO
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+-		cpu-dai = <&ssi1>;
++		ssi-controller = <&ssi1>;
+ 		audio-codec = <&sgtl5000>;
+ 		model = "imx-sgtl5000";
+ 		mux-int-port = <1>;  /* SSI1=1, SSI2=2, SSI3=7 */
+@@ -260,81 +260,8 @@ sound {
+ 	sound-hdmi {
+ 		compatible = "fsl,imx6q-audio-hdmi", "fsl,imx-audio-hdmi";
+ 		model = "imx-audio-hdmi";
+-		hdmi-controller = <&hdmi_audio>;
+-	};
+-#endif
+-
+-	mxcfb0: fb@0 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9R2_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB0 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb1: fb@1 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9R2_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB1 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+ 	};
+-
+-	mxcfb2: fb@2 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_ARMSTONEA9R2_HDMI_MODE_STR;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_ARMSTONEA9R2_MXCFB2 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_ARMSTONEA9R2_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+ #endif
+-	};
+ 
+ 	/* LVDS backlight PWM (PWM3) */
+ 	backlight_ldb {
+@@ -416,6 +343,40 @@ status_2 {
+ 		};
+ 	};
+ 
++#ifdef CONFIG_ARMSTONEA9R2_LVDS0
++	panel-lvds0 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_ARMSTONEA9R2_LVDS0_MAPPING;
++		width-mm = <CONFIG_ARMSTONEA9R2_LVDS0_WIDTH>;
++		height-mm = <CONFIG_ARMSTONEA9R2_LVDS0_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_ARMSTONEA9R2_LVDS0_TIMING;
++
++		port {
++			panel_in_lvds0: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_ARMSTONEA9R2_LVDS1
++	panel-lvds1 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_ARMSTONEA9R2_LVDS1_MAPPING;
++		width-mm = <CONFIG_ARMSTONEA9R2_LVDS1_WIDTH>;
++		height-mm = <CONFIG_ARMSTONEA9R2_LVDS1_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_ARMSTONEA9R2_LVDS1_TIMING;
++
++		port {
++			panel_in_lvds1: endpoint {
++				remote-endpoint = <&lvds1_out>;
++			};
++		};
++	};
++#endif
++
+ /* Matrix Keypad not configurated yet, some pins can be multiple declared*/
+ #if 0
+ 		matrix-keypad {
+@@ -460,12 +421,6 @@ &cma {
+ 	size = <CONFIG_ARMSTONEA9R2_CMA_SIZE>;
+ };
+ 
+-&busfreq {
+-	/* Disable bus frequency scaling, because reducing bus frequency to
+-	   24 MHz does not work with all types of DDR3 RAM */
+-	disable-scaling;
+-};
+-
+ /* CKO (via CKO1): 24.576 MHz for Audio Codec, CKO2: 24 MHz for Camera. */
+ &clks {
+ 	assigned-clocks =
+@@ -614,25 +569,18 @@ &gpc {
+ 	fsl,wdog-reset = <1>; /* watchdog select of reset source */
+ };
+ 
+-#ifdef CONFIG_ARMSTONEA9R2_HDMI_AUDIO
+-&hdmi_audio {
+-	status = "okay";
+-};
+-#endif
++#ifdef CONFIG_ARMSTONEA9R2_HDMI
+ 
+-#ifdef CONFIG_ARMSTONEA9R2_HDMI_CEC
+-&hdmi_cec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hdmi_cec_1>;
+-	status = "okay";
+-};
++#if 0
++/* Force HDMI to IPU 2 */
++/delete-node/&hdmi_mux_0;
++/delete-node/&ipu1_di0_hdmi;
++/delete-node/&hdmi_mux_1;
++/delete-node/&ipu1_di1_hdmi;
+ #endif
+ 
+-#ifdef CONFIG_ARMSTONEA9R2_HDMI
+-&hdmi_video {
+-	fsl,phy_reg_vlev = <0x0294>;
+-	fsl,phy_reg_cksymtx = <0x800d>;
+-	force-dvi-mode;
++&hdmi {
++	ddc-i2c-bus = <&i2c1>;
+ 	status = "okay";
+ };
+ #endif
+@@ -671,34 +619,26 @@ sgtl5000: sgtl5000@a {
+  * ck01. Therefore you have to set PLL_AUDIO, CCM_ANALOG_MISC2n[MSB:LSB] */
+ #ifdef CONFIG_ARMSTONEA9R2_SERIAL_CAMERA
+ 	ov564x_mipi: ov564x_mipi@3c {
+-		compatible = "ovti,ov564x_mipi";
++		compatible = "ovti,ov5640";
+ 		reg = <0x3c>;
+ 		/* derived from IMX6QDL_CLK_CKO2 */
+-		clocks = <&clks IMX6QDL_CLK_CKO2>;
+-		clock-names = "csi_mclk";
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		clock-names = "xclk";
+ 		DOVDD-supply = <&reg_camera_dovdd>; /* 1.8v */
+ 		AVDD-supply = <&reg_camera_avdd>;  /* 2.8v, rev C board is VGEN3
+ 						rev B board is VGEN5 */
+ 		DVDD-supply = <&reg_camera_dvdd>;  /* 1.5v*/
+-		pwn-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;
+-		/* With our camera adapter we dont need a reset pin because the
+-		 * reset will be automatically generated on our adapter. Other
+-		 * cameras maybe need a gpio to perform a reset. */
+-		/* rst-gpios = <dummy>; */
+-		csi_id = <0>;
+-		v_channel_id = <0>;
+-		mclk = <24000000>;		/* OSC out */
+-		mclk_source = <0>;
+-	};
+-#ifdef CONFIG_ARMSTONEA9R2_MIPI_CAMERA_ISL7998X
+-	isl7998x_mipi: isl7998x_mipi@44 {
+-		compatible = "intersil,isl7998x_mipi";
+-		reg = <0x44>;
+-		clocks = <&clks IMX6QDL_CLK_CKO2>;	/* Dummy */
+-		clock-names = "csi_mclk";
+-		mclk = <27000000>;		/* Has own oscillator */
++		powerdown-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;
++		/* not available */
++		reset-gpios = <&gpio5 23 GPIO_ACTIVE_LOW>;
++		port {
++			ov5640_to_mipi_csi2: endpoint {
++				remote-endpoint = <&mipi_csi2_in>;
++				clock-lanes = <0>;
++				data-lanes = <1 2>;
++			};
++		};
+ 	};
+-#endif
+ #endif /* CONFIG_ARMSTONEA9R2_SERIAL_CAMERA */
+ };
+ #endif /* CONFIG_ARMSTONEA9R2_I2C_C */
+@@ -762,30 +702,18 @@ tsc2004@4a {
+ #ifdef CONFIG_ARMSTONEA9R2_CAPTOUCH_FT5x06
+ 	/* F&S driver V3.0 on Touch Connector (I2C) */
+ 	ft5x06_ts@38 {
+-		compatible = "FocalTech,ft5306";
++		iovcc-supply = <&reg_vlcd>;
++		compatible = "edt,edt-ft5306";
+ 		reg = <0x38>;
+-		fingers = <2>;
+ 		touchscreen-size-x = <800>;
+ 		touchscreen-size-y = <480>;
+ 		threshold = <25>;
+-		/* There are 2 irq pins for I2C2. You can either chose the irq from the
+-		 * lvds connector or from the hirose connector. below is the
+-		 * interrupt from lvds connector defined. Only one interrupt can
+-		 * be used for one touch. It is only possible if revision >= 1.20 and
+-		 * R223 is not mounted. If R223 is mounted we have the VLCD signal
+-		 * on the IRQ pin on LVDS connector (J11/26).
+-		 */
+-//#if (CONFIG_ARMSTONEA9R2_BOARD_REVISION >= 120)
+-		//interrupt-parent = <&gpio2>;
+-		//interrupts = <13 IRQ_TYPE_EDGE_FALLING>;
+-//#else
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+-//#endif
+ 		reset-gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+-		x-rev;
+-		y-rev;
+-		linux,wakeup;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "okay";
+ 	};
+ #endif
+ 
+@@ -813,12 +741,12 @@ mxt224@4a {
+ 	};
+ #endif
+ 
+-#ifdef CONFIG_ARMSTONEA9_CAPTOUCH_SITRONIX
++#ifdef CONFIG_ARMSTONEA9R2_CAPTOUCH_SITRONIX
+ 	/* Sitronix PCAP touch on Touch-Connector (I2C) */
+ 	st1633i@48 {
+-		compatible = "sitronix";
++		compatible = "sitronix,st1633";
+ 		reg = <0x48>;
+-		swap-xy;
++		touchscreen-swapped-x-y;
+ 		/* There are 2 irq pins for I2C2. You can either chose the irq from the
+ 		 * lvds connector or from the hirose connector. below is the
+ 		 * interrupt from lvds connector defined. Only one interrupt can
+@@ -837,7 +765,7 @@ st1633i@48 {
+ 	};
+ #endif
+ 
+-#ifdef CONFIG_ARMSTONEA9_CAPTOUCH_ILITEK
++#ifdef CONFIG_ARMSTONEA9R2_CAPTOUCH_ILITEK
+ 	/* Ilitek PCAP touch on Touch-Connector (I2C) */
+ 	ili210x@41 {
+ 		compatible = "Ilitek,ili210x";
+@@ -936,37 +864,14 @@ &gpmi {
+ #ifdef CONFIG_ARMSTONEA9R2_SERIAL_CAMERA
+ &mipi_csi {
+ 	status = "okay";
+-	lanes = <2>;
+-
+-	mipi-csi-channel@0 {
+-		ipu_id = <0>;
+-		csi_id = <0>;
+-		v_channel = <0>;
+-		status = "okay";
+-	};
+-
+-	mipi-csi-channel@1 {
+-		ipu_id = <0>;
+-		csi_id = <1>;
+-		v_channel = <1>;
+-		status = "okay";
+-	};
+-
+-#ifndef CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-	mipi-csi-channel@2 {
+-		ipu_id = <1>;
+-		csi_id = <0>;
+-		v_channel = <2>;
+-		status = "okay";
+-	};
+-
+-	mipi-csi-channel@3 {
+-		ipu_id = <1>;
+-		csi_id = <1>;
+-		v_channel = <3>;
+-		status = "okay";
++	port@0 {
++		reg = <0>;
++		mipi_csi2_in: endpoint {
++			remote-endpoint = <&ov5640_to_mipi_csi2>;
++			clock-lanes = <0>;
++			data-lanes = <1 2>;
++		};
+ 	};
+-#endif
+ };
+ #endif
+ 
+@@ -1059,8 +964,8 @@ &usdhc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+ 	/* WLAN is non-removable, but CD tells us if it is equipped or not */
+-	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+-	//non-removable;
++	//cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
++	non-removable;
+ 	bus-width = <4>;
+ 	vmmc-supply = <&reg_vref_3v3>;	/* VDD */
+ 	vqmmc-supply = <&reg_wlan_1v8>;	/* VDD_IO */
+@@ -1103,91 +1008,35 @@ &usdhc3 {
+ };
+ #endif
+ 
+-#ifdef CONFIG_ARMSTONEA9R2_HDMI
+-&hdmi_core {
+-#ifdef CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-	/*
+-	 * When using one IPU (id=0):
+-	 * HDMI can go to DI1, unless LVDS1 is also active. In this case LVDS1
+-	 * must go to DI1 and HDMI to DI0.
+-	 */
+-	ipu_id = <0>;
+-#if (__HDMI_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__)
+-	disp_id = <0>;
+-#else
+-	disp_id = <1>;
+-#endif
+-#else /* !CONFIG_ARMSTONEA9R2_USE_ONE_IPU */
+-	/*
+-	 * When using two IPUs:
+-	 * HDMI can always go to IPU2 (id=1), DI1.
+-	 */
+-	disp_id = <1>;
+-	ipu_id = <0>;
+-#endif /* CONFIG_ARMSTONEA9R2_USE_ONE_IPU */
+-	status = "okay";
+-};
+-#endif
+-
+ #if (defined(CONFIG_ARMSTONEA9R2_LVDS0) || defined(CONFIG_ARMSTONEA9R2_LVDS1))
+ &ldb {
+-	ext_ref;
+-#if defined(CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE)
+-	split-mode;
+-#elif defined(CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE)
+-	dual-mode;
++#ifdef CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE
++	fsl,dual-channel;
+ #endif
+-	ldb-supply = <&reg_vlcd>;
+ 	status = "okay";
+-
+ #ifdef CONFIG_ARMSTONEA9R2_LVDS0
+-	/* LVDS0 must always go to DI0 of an IPU! */
+ 	lvds-channel@0 {
+-		reg = <0>;
+-#ifdef CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-		crtc = "ipu1-di0";
+-#else
+-		crtc = "ipu2-di0";
+-#endif
+-		fsl,data-mapping = CONFIG_ARMSTONEA9R2_LVDS0_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH>;
+-#ifdef __LVDS0_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: CONFIG_ARMSTONEA9R2_LVDS0_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in_lvds0>;
++			};
+ 		};
+ 	};
+ #endif
+-
+ #ifdef CONFIG_ARMSTONEA9R2_LVDS1
+-	/* LVDS1 must always go to DI1 of an IPU! */
+ 	lvds-channel@1 {
+-#if defined(CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE) \
+-	|| defined(CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE)
+-		reg = <0>;
+-#else
+-		reg = <1>;
+-#endif
+-#if (defined(CONFIG_ARMSTONEA9R2_USE_ONE_IPU) \
+-    || (__LVDS0_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__))
+-		crtc = "ipu1-di1";
+-#else
+-		crtc = "ipu2-di1";
+-#endif
+-		fsl,data-mapping = CONFIG_ARMSTONEA9R2_LVDS1_MAPPING;
+-		fsl,data-width = <CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH>;
+-#ifdef __LVDS1_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing1>;
+-			timing1: CONFIG_ARMSTONEA9R2_LVDS1_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds1_out: endpoint {
++				remote-endpoint = <&panel_in_lvds1>;
++			};
+ 		};
+ 	};
+ #endif
+diff --git a/arch/arm/boot/dts/fus/armstonea9r3dl.dts b/arch/arm/boot/dts/fus/armstonea9r3dl.dts
+index fda3a46a8..65cb01ba5 100644
+--- a/arch/arm/boot/dts/fus/armstonea9r3dl.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r3dl.dts
+@@ -16,22 +16,9 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9_MXCFB0	DISPLAY_LCD
+-#define CONFIG_ARMSTONEA9_MXCFB1	DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP0		DISPLAY_LCD
++#define CONFIG_ARMSTONEA9_DISP1		DISPLAY_NONE
+ 
+ /* i.MX6 Solo and DualLite only have one IPU, do not change */
+ #define CONFIG_ARMSTONEA9_USE_ONE_IPU
+@@ -40,22 +27,8 @@
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_ARMSTONEA9_LCD_BPP	32
+-#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_ARMSTONEA9_BT656_BPP	32
+-#define CONFIG_ARMSTONEA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_ARMSTONEA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9_HDMI_BPP	32
+-#define CONFIG_ARMSTONEA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -66,19 +39,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -94,12 +66,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -121,12 +92,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -142,12 +112,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -185,14 +154,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+diff --git a/arch/arm/boot/dts/fus/armstonea9r3q.dts b/arch/arm/boot/dts/fus/armstonea9r3q.dts
+index a496d026a..e81dc0693 100644
+--- a/arch/arm/boot/dts/fus/armstonea9r3q.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r3q.dts
+@@ -16,66 +16,20 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all four settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave the other two at DISPLAY_NONE.
+- * - If you have three displays, set MXCFB0, MXCFB1 and MXCFB2 to a display
+- *   type from above and leave MXCFB3 at DISPLAY_NONE.
+- * - If you have four displays, set all four settings to a valid display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, MXCFB2 will
+- * use /dev/fb4 and MXCFB3 will use /dev/fb5. If you want to restrict the
+- * display output to one IPU (i.MX6 Dual/Quad has two IPUs), for example for
+- * energy saving reasons, you must not use more than two displays and you must
+- * set CONFIG_ARMSTONEA9_USE_ONE_IPU below. Then only MXCFB0 will get a video
+- * overlay and uses /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9_MXCFB0	DISPLAY_LCD
+-#define CONFIG_ARMSTONEA9_MXCFB1	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9_MXCFB2	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9_MXCFB3	DISPLAY_NONE
+ 
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_ARMSTONEA9_USE_ONE_IPU
++
++#define CONFIG_ARMSTONEA9_DISP0		DISPLAY_LCD
++#define CONFIG_ARMSTONEA9_DISP1		DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP2		DISPLAY_NONE
++#define CONFIG_ARMSTONEA9_DISP3		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_ARMSTONEA9_LCD_BPP	32
+-#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_ARMSTONEA9_BT656_BPP	32
+-#define CONFIG_ARMSTONEA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_ARMSTONEA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9_HDMI_BPP	32
+-#define CONFIG_ARMSTONEA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_ARMSTONEA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -86,19 +40,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -114,12 +67,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS0_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -141,12 +93,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -162,12 +113,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9_LVDS1_BPP	32
+-#define CONFIG_ARMSTONEA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -205,14 +155,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+diff --git a/arch/arm/boot/dts/fus/armstonea9r4dl.dts b/arch/arm/boot/dts/fus/armstonea9r4dl.dts
+index 9238635c4..5192a3ca7 100755
+--- a/arch/arm/boot/dts/fus/armstonea9r4dl.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r4dl.dts
+@@ -16,28 +16,8 @@
+ #define DISPLAY_LVDS0	2	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	3	/* LVDS channel 1 */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9R2_MXCFB0	DISPLAY_LVDS0
+-#define CONFIG_ARMSTONEA9R2_MXCFB1	DISPLAY_NONE
+-
+-/* i.MX6 Solo and DualLite only have one IPU, do not change */
+-#define CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9R2_HDMI_BPP		32
+-#define CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9R2_DISP0		DISPLAY_LVDS0
++#define CONFIG_ARMSTONEA9R2_DISP1		DISPLAY_HDMI
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -48,19 +28,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -76,12 +55,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -103,12 +81,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -124,12 +101,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -167,14 +143,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+@@ -215,9 +183,6 @@ wvga {					\
+ /* SD-CARD - SD_A is micro SD */
+ #define CONFIG_ARMSTONEA9R2_SD_A
+ 
+-/* WLAN */
+-#define CONFIG_ARMSTONEA9R2_WLAN
+-
+ /* PCIe */
+ /* On PCIe wire PCIECLKN/P there are some missing terminating resistor
+  * therefore PCIe can´t get a link. These can be fixed if either the
+diff --git a/arch/arm/boot/dts/fus/armstonea9r4q.dts b/arch/arm/boot/dts/fus/armstonea9r4q.dts
+index 1e3a862a2..2d4d6af6b 100755
+--- a/arch/arm/boot/dts/fus/armstonea9r4q.dts
++++ b/arch/arm/boot/dts/fus/armstonea9r4q.dts
+@@ -16,45 +16,9 @@
+ #define DISPLAY_LVDS0	2	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	3	/* LVDS channel 1 */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all three settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave MXCFB2 at DISPLAY_NONE.
+- * - If you have three displays, set all three settings to a display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, and MXCFB2
+- * will use /dev/fb4. If you want to restrict the display output to one IPU
+- * (i.MX6 Dual/Quad has two IPUs), for example for energy saving reasons, you
+- * must set CONFIG_ARMSTONEA9R2_USE_ONE_IPU below and you must not use more
+- * than two displays. Then only MXCFB0 will get a video overlay and uses
+- * /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_ARMSTONEA9R2_MXCFB0	DISPLAY_LVDS0
+-#define CONFIG_ARMSTONEA9R2_MXCFB1	DISPLAY_NONE
+-#define CONFIG_ARMSTONEA9R2_MXCFB2	DISPLAY_NONE
+-
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_ARMSTONEA9R2_USE_ONE_IPU
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_ARMSTONEA9R2_HDMI_BPP		32
+-#define CONFIG_ARMSTONEA9R2_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_ARMSTONEA9R2_DISP0		DISPLAY_LVDS0
++#define CONFIG_ARMSTONEA9R2_DISP1		DISPLAY_HDMI
++#define CONFIG_ARMSTONEA9R2_DISP2		DISPLAY_NONE
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -65,19 +29,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -93,12 +56,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS0_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS0_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS0_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS0_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -120,12 +82,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	24
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -141,12 +102,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_ARMSTONEA9R2_LVDS1_BPP		32
+-#define CONFIG_ARMSTONEA9R2_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_ARMSTONEA9R2_LVDS1_DATA_WIDTH	18
+-#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"spwg"
++#define CONFIG_ARMSTONEA9R2_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_ARMSTONEA9R2_LVDS1_WIDTH 154
++#define CONFIG_ARMSTONEA9R2_LVDS1_HIGHT 86
+ #define CONFIG_ARMSTONEA9R2_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -184,14 +144,6 @@ wvga {					\
+  */
+ //#define CONFIG_ARMSTONEA9R2_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_ARMSTONEA9R2_LVDS_DUAL_MODE
+-
+ /*
+  * Configure touch screen:
+  *
+@@ -226,8 +178,6 @@ wvga {					\
+ //#define CONFIG_ARMSTONEA9R2_MIPI_CAMERA_OV564X
+ #define CONFIG_ARMSTONEA9R2_MIPI_CAMERA_ISL7998X
+ 
+-/* SD-CARD - SD_A is WLAN */
+-#define CONFIG_ARMSTONEA9R2_WLAN
+ /* SD-CARD - SD_B is micro SD */
+ #define CONFIG_ARMSTONEA9R2_SD_A
+ /* SD-CARD - SD_C is eMMC */
+diff --git a/arch/arm/boot/dts/fus/efusa9dl.dts b/arch/arm/boot/dts/fus/efusa9dl.dts
+index 153cab498..4ee30540d 100644
+--- a/arch/arm/boot/dts/fus/efusa9dl.dts
++++ b/arch/arm/boot/dts/fus/efusa9dl.dts
+@@ -16,46 +16,19 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_EFUSA9_MXCFB0		DISPLAY_LCD
+-#define CONFIG_EFUSA9_MXCFB1		DISPLAY_NONE
+ 
+-/* i.MX6 Solo and DualLite only have one IPU, do not change */
+-#define CONFIG_EFUSA9_USE_ONE_IPU
++#define CONFIG_EFUSA9_DISP0		DISPLAY_LCD
++#define CONFIG_EFUSA9_DISP1		DISPLAY_NONE
++
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_EFUSA9_LCD_BPP		32
+-#define CONFIG_EFUSA9_LCD_PIX_FMT	"BGR666"
+-#define CONFIG_EFUSA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_EFUSA9_BT656_BPP		32
+-#define CONFIG_EFUSA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_EFUSA9_BT656_MODE_STR	"BT656-PAL"
+ 
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_EFUSA9_HDMI_BPP		32
+-#define CONFIG_EFUSA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_EFUSA9_LCD_PIX_FMT	"rgb666"
++#define CONFIG_EFUSA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -66,19 +39,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -94,12 +66,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -121,12 +92,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -142,12 +112,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -185,13 +154,6 @@ wvga {					\
+  */
+ //#define CONFIG_EFUSA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_EFUSA9_LVDS_DUAL_MODE
+ 
+ /*
+  * Define this if your LVDS display requires 5V I/O logic voltage. Default is
+@@ -320,3 +282,10 @@ ethphy0: ethernet-phy@4 {
+ 		};
+ 	};
+ };
++
++#ifdef CONFIG_EFUSA9_SERIAL_CAMERA
++&ipu1_csi1_from_ipu1_csi1_mux {
++	clock-lanes = <0>;
++	data-lanes = <1 2>;
++};
++#endif
+diff --git a/arch/arm/boot/dts/fus/efusa9q.dts b/arch/arm/boot/dts/fus/efusa9q.dts
+index 3cad03303..5d6e6e94c 100644
+--- a/arch/arm/boot/dts/fus/efusa9q.dts
++++ b/arch/arm/boot/dts/fus/efusa9q.dts
+@@ -16,66 +16,18 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all four settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave the other two at DISPLAY_NONE.
+- * - If you have three displays, set MXCFB0, MXCFB1 and MXCFB2 to a display
+- *   type from above and leave MXCFB3 at DISPLAY_NONE.
+- * - If you have four displays, set all four settings to a valid display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, MXCFB2 will
+- * use /dev/fb4 and MXCFB3 will use /dev/fb5. If you want to restrict the
+- * display output to one IPU (i.MX6 Dual/Quad has two IPUs), for example for
+- * energy saving reasons, you must not use more than two displays and you must
+- * set CONFIG_EFUSA9_USE_ONE_IPU below. Then only MXCFB0 will get a video
+- * overlay and uses /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_EFUSA9_MXCFB0		DISPLAY_LCD
+-#define CONFIG_EFUSA9_MXCFB1		DISPLAY_NONE
+-#define CONFIG_EFUSA9_MXCFB2		DISPLAY_NONE
+-#define CONFIG_EFUSA9_MXCFB3		DISPLAY_NONE
+-
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_EFUSA9_USE_ONE_IPU
++#define CONFIG_EFUSA9_DISP0		DISPLAY_LCD
++#define CONFIG_EFUSA9_DISP1		DISPLAY_NONE
++#define CONFIG_EFUSA9_DISP2		DISPLAY_NONE
++#define CONFIG_EFUSA9_DISP3		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_EFUSA9_LCD_BPP		32
+-#define CONFIG_EFUSA9_LCD_PIX_FMT	"BGR666"
+-#define CONFIG_EFUSA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_EFUSA9_BT656_BPP		32
+-#define CONFIG_EFUSA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_EFUSA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_EFUSA9_HDMI_BPP		32
+-#define CONFIG_EFUSA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_EFUSA9_LCD_PIX_FMT	"rgb666"
++#define CONFIG_EFUSA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -86,19 +38,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -114,12 +65,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -141,12 +91,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -162,12 +111,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -205,14 +153,6 @@ wvga {					\
+  */
+ //#define CONFIG_EFUSA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_EFUSA9_LVDS_DUAL_MODE
+-
+ /*
+  * Define this if your LVDS display requires 5V I/O logic voltage. Default is
+  * 3.3V. ATTENTION: Setting 5V on a 3.3V display may damage the display!
+@@ -264,8 +204,8 @@ wvga {					\
+ #define CONFIG_EFUSA9_SERIAL_CAMERA
+ 
+ /* In case of MIPI, select one of the following cameras */
+-//#define CONFIG_EFUSA9_MIPI_CAMERA_OV564X
+-#define CONFIG_EFUSA9_MIPI_CAMERA_ISL7998X
++#define CONFIG_EFUSA9_MIPI_CAMERA_OV564X
++//#define CONFIG_EFUSA9_MIPI_CAMERA_ISL7998X
+ 
+ /*
+  * SD_A - External SD port with Card Detect (CD) and Write Protect (WP)
+@@ -342,3 +282,10 @@ ethphy0: ethernet-phy@4 {
+ 		};
+ 	};
+ };
++
++#ifdef CONFIG_EFUSA9_SERIAL_CAMERA
++&ipu1_csi1_from_mipi_vc1 {
++	clock-lanes = <0>;
++	data-lanes = <1 2>;
++};
++#endif
+diff --git a/arch/arm/boot/dts/fus/efusa9qdl.dtsi b/arch/arm/boot/dts/fus/efusa9qdl.dtsi
+index ee261ed53..1233f57af 100644
+--- a/arch/arm/boot/dts/fus/efusa9qdl.dtsi
++++ b/arch/arm/boot/dts/fus/efusa9qdl.dtsi
+@@ -7,30 +7,20 @@
+  */
+ 
+ #include <dt-bindings/pwm/pwm.h>
+-#include <fsversion.h>
+ 
+-/*
+- * When using one IPU, having LCD and LVDS0 at the same time is not possible,
+- * because both devices would need to use display 0. But this can be simulated
+- * by using LVDS1 instead of LVDS0 and activating Dual Mode.
+- */
+-#ifdef CONFIG_EFUSA9_USE_ONE_IPU
+-#undef CONFIG_EFUSA9_MXCFB2
+-#undef CONFIG_EFUSA9_MXCFB3
+-
+-#if (((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LCD) \
+-      || (CONFIG_EFUSA9_MXCFB0 == DISPLAY_BT656)) \
+-     && (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS0))
+-#undef CONFIG_EFUSA9_MXCFB1
+-#define CONFIG_EFUSA9_MXCFB1		DISPLAY_LVDS1
++#if (((CONFIG_EFUSA9_DISP0 == DISPLAY_LCD) \
++      || (CONFIG_EFUSA9_DISP0 == DISPLAY_BT656)) \
++     && (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS0))
++#undef CONFIG_EFUSA9_DISP1
++#define CONFIG_EFUSA9_DISP1		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS0) \
+-     && ((CONFIG_EFUSA9_MXCFB1 == DISPLAY_LCD) \
+-         || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_BT656)))
+-#undef CONFIG_EFUSA9_MXCFB0
+-#define CONFIG_EFUSA9_MXCFB0		DISPLAY_LVDS1
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS0) \
++     && ((CONFIG_EFUSA9_DISP1 == DISPLAY_LCD) \
++         || (CONFIG_EFUSA9_DISP1 == DISPLAY_BT656)))
++#undef CONFIG_EFUSA9_DISP0
++#define CONFIG_EFUSA9_DISP0		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+@@ -49,16 +39,15 @@
+ #define CONFIG_EFUSA9_LVDS_DUAL_MODE
+ #endif
+ #endif
+-#endif /* CONFIG_EFUSA9_USE_ONE_IPU */
+ 
+ /* Do we have LCD? */
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LCD) \
+-    || (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LCD) \
+-    || (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LCD))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LCD) \
++    || (CONFIG_EFUSA9_DISP2 == DISPLAY_LCD) \
++    || (CONFIG_EFUSA9_DISP3 == DISPLAY_LCD))
+ #define CONFIG_EFUSA9_LCD
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LCD))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LCD))
+ #define __LCD_ON_0_OR_1__	1
+ #define __LCD_ON_2_OR_3__	0
+ #else
+@@ -67,32 +56,16 @@
+ #endif
+ #endif
+ 
+-/* Do we have BT656? */
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_BT656) \
+-    || (CONFIG_EFUSA9_MXCFB2 == DISPLAY_BT656) \
+-    || (CONFIG_EFUSA9_MXCFB3 == DISPLAY_BT656))
+-#define CONFIG_EFUSA9_BT656
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_BT656))
+-#define __BT656_ON_0_OR_1__	1
+-#define __BT656_ON_2_OR_3__	0
+-#else
+-#define __BT656_ON_0_OR_1__	0
+-#define __BT656_ON_2_OR_3__	1
+-#endif
+-#endif
+-
+ /* Do we have HDMI? */
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_HDMI) \
+-    || (CONFIG_EFUSA9_MXCFB2 == DISPLAY_HDMI) \
+-    || (CONFIG_EFUSA9_MXCFB3 == DISPLAY_HDMI))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_HDMI) \
++    || (CONFIG_EFUSA9_DISP2 == DISPLAY_HDMI) \
++    || (CONFIG_EFUSA9_DISP3 == DISPLAY_HDMI))
+ #define CONFIG_EFUSA9_HDMI
+ #define CONFIG_EFUSA9_HDMI_AUDIO
+ #define CONFIG_EFUSA9_HDMI_CEC
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_HDMI))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_HDMI))
+ #define __HDMI_ON_0_OR_1__	1
+ #define __HDMI_ON_2_OR_3__	0
+ #else
+@@ -102,13 +75,13 @@
+ #endif
+ 
+ /* Do we have LVDS0? */
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS0) \
+-    || (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS0) \
+-    || (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS0))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS0) \
++    || (CONFIG_EFUSA9_DISP2 == DISPLAY_LVDS0) \
++    || (CONFIG_EFUSA9_DISP3 == DISPLAY_LVDS0))
+ #define CONFIG_EFUSA9_LVDS0
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS0))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS0))
+ #define __LVDS0_ON_0_OR_1__	1
+ #define __LVDS0_ON_2_OR_3__	0
+ #else
+@@ -118,13 +91,13 @@
+ #endif
+ 
+ /* Do we have LVDS1? */
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS1) \
+-    || (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS1) \
+-    || (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS1))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS1) \
++    || (CONFIG_EFUSA9_DISP2 == DISPLAY_LVDS1) \
++    || (CONFIG_EFUSA9_DISP3 == DISPLAY_LVDS1))
+ #define CONFIG_EFUSA9_LVDS1
+-#if ((CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS1))
++#if ((CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS1))
+ #define __LVDS1_ON_0_OR_1__	1
+ #define __LVDS1_ON_2_OR_3__	0
+ #else
+@@ -134,21 +107,21 @@
+ #endif
+ 
+ /* Check which LVDS will be the primary display */
+-#if (CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS0)
++#if (CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS1)
++#elif (CONFIG_EFUSA9_DISP0 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS0)
++#elif (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS1)
++#elif (CONFIG_EFUSA9_DISP1 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS0)
++#elif (CONFIG_EFUSA9_DISP2 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS1)
++#elif (CONFIG_EFUSA9_DISP2 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS0)
++#elif (CONFIG_EFUSA9_DISP3 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS1)
++#elif (CONFIG_EFUSA9_DISP3 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+ #endif
+ 
+@@ -168,10 +141,6 @@
+ 
+ / {
+ 	aliases {
+-		mxcfb0 = &mxcfb0;
+-		mxcfb1 = &mxcfb1;
+-		mxcfb2 = &mxcfb2;
+-		mxcfb3 = &mxcfb3;
+ 		nand = &gpmi;
+ 	};
+ 
+@@ -310,18 +279,23 @@ reg_camera_dvdd: camera_dvdd {
+ 			regulator-max-microvolt = <1500000>;
+ 		};
+ #endif /* CONFIG_EFUSA9_CAMERA */
++		reg_rtc_clk: regulator-rtc-clk {
++			compatible = "regulator-fixed-clock";
++			regulator-always-on;
++			regulator-name = "RTC_CLK";
++			clocks = <&rtc_clk>;
++		};
+ 	};
+ 
+ 	/* F&S board information */
+ 	bdinfo: bdinfo {
+ 		compatible = "bdinfo";
+ 		ecc_strength = "8";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ #ifdef CONFIG_EFUSA9_SGTL5000_AUDIO
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+-		cpu-dai = <&ssi1>;
++		ssi-controller = <&ssi1>;
+ 		audio-codec = <&sgtl5000>;
+ 		model = "imx-sgtl5000";
+ 		mux-int-port = <1>;  /* SSI1=1, SSI2=2, SSI3=7 */
+@@ -334,184 +308,8 @@ sound {
+ 	};
+ #endif
+ 
+-#ifdef CONFIG_EFUSA9_HDMI_AUDIO
+-	sound-hdmi {
+-		compatible = "fsl,imx6q-audio-hdmi", "fsl,imx-audio-hdmi";
+-		model = "imx-audio-hdmi";
+-		hdmi-controller = <&hdmi_audio>;
+-	};
+-#endif
+-
+-	mxcfb0: fb@0 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_EFUSA9_MXCFB0 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_EFUSA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_EFUSA9_LCD_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB0 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_EFUSA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_EFUSA9_MXCFB0 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_EFUSA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_HDMI_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_EFUSA9_MXCFB0 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb1: fb@1 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_EFUSA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_EFUSA9_LCD_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_EFUSA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_EFUSA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_HDMI_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_EFUSA9_MXCFB1 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb2: fb@2 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_EFUSA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_EFUSA9_LCD_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_EFUSA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_EFUSA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_HDMI_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_EFUSA9_MXCFB2 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb3: fb@3 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_EFUSA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_EFUSA9_LCD_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_EFUSA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_EFUSA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_EFUSA9_HDMI_MODE_STR;
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_EFUSA9_MXCFB3 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_EFUSA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_EFUSA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-#ifdef CONFIG_EFUSA9_LCD
+-	lcd: lcd@0 {
+-		compatible = "fsl,lcd";
+-		lcd-supply = <&reg_vlcd>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
+-		status = "disabled";
+-	};
+-#endif
+-
+-#ifdef CONFIG_EFUSA9_BT656
+-	bt656: bt656@0 {
+-		compatible = "fsl,bt656";
+-		default_ifmt = "BT656";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_bt656>;
+-		status = "disabled";
+-	};
+-#endif
+-
+ 	/* RGB-LCD backlight PWM on RGB adapter */
+-	backlight_lcd {
++	backlight_lcd:backlight_lcd {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pca963x 1 640000 0>;
+ 		power-supply = <&reg_lcd_bl>;
+@@ -522,7 +320,7 @@ backlight_lcd {
+ 	};
+ 
+ 	/* LVDS backlight PWM on backlight connector */
+-	backlight_ldb {
++	backlight_ldb:backlight_ldb {
+ 		compatible = "pwm-backlight";
+ 		power-supply = <&reg_ldb_bl>;
+ #ifndef DISPLAY_LVDS_CHIMEI
+@@ -602,6 +400,77 @@ status_2 {
+ 			default-state = "keep";
+ 		};
+ 	};
++#ifdef CONFIG_EFUSA9_LVDS0
++	panel-lvds0 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_EFUSA9_LVDS0_MAPPING;
++		width-mm = <CONFIG_EFUSA9_LVDS0_WIDTH>;
++		height-mm = <CONFIG_EFUSA9_LVDS0_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_EFUSA9_LVDS0_TIMING;
++
++		port {
++			panel_in_lvds0: endpoint {
++				remote-endpoint = <&lvds0_out>;
++};
++		};
++	};
++#endif
++
++#ifdef CONFIG_EFUSA9_LVDS1
++	panel-lvds1 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_EFUSA9_LVDS1_MAPPING;
++		width-mm = <CONFIG_EFUSA9_LVDS1_WIDTH>;
++		height-mm = <CONFIG_EFUSA9_LVDS1_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_EFUSA9_LVDS1_TIMING;
++
++		port {
++			panel_in_lvds1: endpoint {
++				remote-endpoint = <&lvds1_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_EFUSA9_LCD
++	lcd_display: disp0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = CONFIG_EFUSA9_LCD_PIX_FMT;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
++		status = "okay";
++
++		port@0 {
++			reg = <0>;
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port@1 {
++			reg = <1>;
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	panel: panel {
++		compatible = CONFIG_EFUSA9_LCD_MODE_STR;
++		backlight = <&backlight_lcd>;
++		power-supply = <&reg_vlcd>;
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++#endif
+ };
+ 
+ /* RAM size for Continuous Memory Allocator; if not defined, use 320 MB */
+@@ -612,12 +481,6 @@ &cma {
+ 	size = <CONFIG_EFUSA9_CMA_SIZE>;
+ };
+ 
+-&busfreq {
+-	/* Disable bus frequency scaling, because reducing bus frequency to
+-	   24 MHz does not work with all types of DDR3 RAM */
+-	disable-scaling;
+-};
+-
+ &clks {
+ 	assigned-clocks =
+ #ifdef CONFIG_EFUSA9_LVDS0_CLK
+@@ -767,27 +630,22 @@ &gpc {
+ 	fsl,wdog-reset = <1>; /* watchdog select of reset source */
+ };
+ 
+-#ifdef CONFIG_EFUSA9_HDMI_AUDIO
+-&hdmi_audio {
+-	status = "okay";
+-};
+-#endif
+ 
+-#ifdef CONFIG_EFUSA9_HDMI_CEC
+-&hdmi_cec {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_hdmi_cec_1>;
+-	status = "okay";
+-};
++#ifdef CONFIG_EFUSA9_HDMI
++
++#if 0
++/* Force HDMI to IPU 2 */
++/delete-node/&hdmi_mux_0;
++/delete-node/&ipu1_di0_hdmi;
++/delete-node/&hdmi_mux_1;
++/delete-node/&ipu1_di1_hdmi;
+ #endif
+ 
+-#ifdef CONFIG_EFUSA9_HDMI
+-&hdmi_video {
+-	fsl,phy_reg_vlev = <0x0294>;
+-	fsl,phy_reg_cksymtx = <0x800d>;
+-	force-dvi-mode;
++&hdmi {
++	ddc-i2c-bus = <&i2c1>;
+ 	status = "okay";
+ };
++
+ #endif
+ 
+ #ifdef CONFIG_EFUSA9_I2C_C
+@@ -816,31 +674,36 @@ hdmi_edid: edid@50 {
+ 	};
+ #endif
+ 
+-	rtc8565@51 {
++	rtc_clk:rtc8565@51 {
+ 		compatible = "nxp,pcf8565", "nxp,pcf8563";
+ 		reg = <0x51>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
++		#clock-cells = <0>;
++		clock-output-names = "rtc_clk32k";
+ 	};
+ #ifdef CONFIG_EFUSA9_SERIAL_CAMERA
+ #ifdef CONFIG_EFUSA9_MIPI_CAMERA_OV564X
+ 	ov564x_mipi: ov564x_mipi@3c {
+-		compatible = "ovti,ov564x_mipi";
++		compatible = "ovti,ov5640";
+ 		reg = <0x3c>;
+ 		/* derived from IMX6QDL_CLK_CKO2 */
+ 		clocks = <&clks IMX6QDL_CLK_CKO>;
+-		clock-names = "csi_mclk";
++		clock-names = "xclk";
+ 		DOVDD-supply = <&reg_camera_dovdd>; /* 1.8v */
+ 		AVDD-supply = <&reg_camera_avdd>;  /* 2.8v, rev C board is VGEN3
+ 						rev B board is VGEN5 */
+ 		DVDD-supply = <&reg_camera_dvdd>;  /* 1.5v*/
+-		pwn-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;
++		powerdown-gpios = <&gpio5 24 GPIO_ACTIVE_HIGH>;
+ 		/* not available */
+-		rst-gpios = <&gpio5 23 GPIO_ACTIVE_LOW>;
+-		csi_id = <0>;
+-		v_channel_id = <0>;
+-		mclk = <24000000>;
+-		mclk_source = <0>;
++		reset-gpios = <&gpio5 23 GPIO_ACTIVE_LOW>;
++		port {
++			ov5640_to_mipi_csi2: endpoint {
++				remote-endpoint = <&mipi_csi2_in>;
++				clock-lanes = <0>;
++				data-lanes = <1 2>;
++			};
++		};
+ 	};
+ #endif
+ #ifdef CONFIG_EFUSA9_MIPI_CAMERA_ISL7998X
+@@ -884,7 +747,7 @@ &i2c2 {
+ 	status = "okay";
+ 
+ 	pca963x: pca9632@60 { /* LED-driver */
+-		compatible = "nxp,pca9632";
++		compatible = "fus,pca9632";
+ 		reg = <0x60>;
+ 		nxp,totem-pole;
+ 		#address-cells = <1>;
+@@ -987,18 +850,18 @@ tsc2004@4a {
+ #ifdef CONFIG_EFUSA9_CAPTOUCH_FT5x06
+ 	/* F&S driver V3.0 on Touch-Connector (I2C) */
+ 	ft5x06_ts@38 {
+-		compatible = "FocalTech,ft5306";
++		iovcc-supply = <&reg_vlcd>;
++		compatible = "edt,edt-ft5306";
+ 		reg = <0x38>;
+-		fingers = <2>;
+ 		touchscreen-size-x = <800>;
+ 		touchscreen-size-y = <480>;
+ 		threshold = <25>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+ 		reset-gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+-		x-rev;
+-		y-rev;
+-		linux,wakeup;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "okay";
+ 	};
+ #endif
+ 
+@@ -1017,9 +880,9 @@ mxt224@4a {
+ #ifdef CONFIG_EFUSA9_CAPTOUCH_SITRONIX
+ 	/* Sitronix PCAP touch on Touch-Connector (I2C) */
+ 	st1633i@48 {
+-		compatible = "sitronix";
++		compatible = "sitronix,st1633";
+ 		reg = <0x48>;
+-		swap-xy;
++		touchscreen-swapped-x-y;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
+ 		reset-gpio = <&gpio1 29 GPIO_ACTIVE_LOW>;
+@@ -1087,35 +950,14 @@ &gpmi {
+ #ifdef CONFIG_EFUSA9_SERIAL_CAMERA
+ &mipi_csi {
+ 	status = "okay";
+-	lanes = <2>;
+-
+-	mipi-csi-channel@0 {
+-		ipu_id = <0>;
+-		csi_id = <0>;
+-		v_channel = <0>;
+-		status = "okay";
+-	};
+-
+-	mipi-csi-channel@1 {
+-		ipu_id = <0>;
+-		csi_id = <1>;
+-		v_channel = <1>;
+-		status = "okay";
+-	};
+-
+-#ifndef CONFIG_EFUSA9_USE_ONE_IPU
+-	mipi-csi-channel@2 {
+-		ipu_id = <1>;
+-		csi_id = <0>;
+-		v_channel = <2>;
+-		status = "okay";
+-	};
+-
+-	mipi-csi-channel@3 {
+-		ipu_id = <1>;
+-		csi_id = <1>;
+-		v_channel = <3>;
+-		status = "okay";
++#ifdef CONFIG_EFUSA9_MIPI_CAMERA_OV564X
++	port@0 {
++		reg = <0>;
++		mipi_csi2_in: endpoint {
++			remote-endpoint = <&ov5640_to_mipi_csi2>;
++			clock-lanes = <0>;
++			data-lanes = <1 2>;
++		};
+ 	};
+ #endif
+ };
+@@ -1262,118 +1104,45 @@ &usdhc3 {
+ 
+ 
+ #ifdef CONFIG_EFUSA9_LCD
+-&lcd {
+-	/* LCD on efusA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_EFUSA9_LCD_PIX_FMT;
+-	status = "okay";
++&ipu1_di0_disp0 {
++	remote-endpoint = <&lcd_display_in>;
+ };
+ #endif
+ 
+-#ifdef CONFIG_EFUSA9_BT656
+-&bt656 {
+-	/* BT656 on efusA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_EFUSA9_BT656_PIX_FMT;
+-	status = "okay";
+-};
+-#endif
+ 
+-#ifdef CONFIG_EFUSA9_HDMI
+-&hdmi_core {
+-#ifdef CONFIG_EFUSA9_USE_ONE_IPU
+-	/*
+-	 * When using one IPU (id=0):
+-	 * HDMI can go to DI1, unless LVDS1 is also active. In this case LVDS1
+-	 * must go to DI1 and HDMI to DI0.
+-	 */
+-	ipu_id = <0>;
+-#if (__HDMI_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__)
+-	disp_id = <0>;
+-#else
+-	disp_id = <1>;
+-#endif
+-#else /* !CONFIG_EFUSA9_USE_ONE_IPU */
+-	/*
+-	 * When using two IPUs:
+-	 * HDMI can always go to DI1. If HDMI is on MXCFB0 and LCD on MXCFB1,
+-	 * or vice versa, or HDMI is on MXCFB2 and LCD is on MXCFB3, or vice
+-	 * versa, then HDMI has to go to IPU2 (id=1), otherwise to IPU1 (id=0).
+-	 */
+-	disp_id = <1>;
+-#if ((__HDMI_ON_0_OR_1__ && (__LCD_ON_0_OR_1__ || __BT656_ON_0_OR_1__)) \
+-    || (__HDMI_ON_2_OR_3__ && (__LCD_ON_2_OR_3__ || __BT656_ON_2_OR_3__)))
+-	ipu_id = <1>;
+-#else
+-	ipu_id = <0>;
+-#endif
+-#endif /* CONFIG_EFUSA9_USE_ONE_IPU */
+-	status = "okay";
+-};
+-#endif
+ 
+ #if (defined(CONFIG_EFUSA9_LVDS0) || defined(CONFIG_EFUSA9_LVDS1))
+ &ldb {
+-	ext_ref;
+-#if defined(CONFIG_EFUSA9_LVDS_SPLIT_MODE)
+-	split-mode;
+-#elif defined(CONFIG_EFUSA9_LVDS_DUAL_MODE)
+-	dual-mode;
++#ifdef CONFIG_EFUSA9_LVDS_SPLIT_MODE
++	fsl,dual-channel;
+ #endif
+-	ldb-supply = <&reg_vlcd>;
++
+ 	status = "okay";
+ 
+ #ifdef CONFIG_EFUSA9_LVDS0
+-	/* LVDS0 must always go to DI0 of an IPU! */
+ 	lvds-channel@0 {
+-		reg = <0>;
+-#ifdef CONFIG_EFUSA9_USE_ONE_IPU
+-		crtc = "ipu1-di0";
+-#else
+-		crtc = "ipu2-di0";
+-#endif
+-		fsl,data-mapping = CONFIG_EFUSA9_LVDS0_MAPPING;
+-		fsl,data-width = <CONFIG_EFUSA9_LVDS0_DATA_WIDTH>;
+-#ifdef __LVDS0_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: CONFIG_EFUSA9_LVDS0_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in_lvds0>;
++			};
+ 		};
+ 	};
+ #endif
+-
+ #ifdef CONFIG_EFUSA9_LVDS1
+-	/* LVDS1 must always go to DI1 of an IPU! */
+ 	lvds-channel@1 {
+-#if defined(CONFIG_EFUSA9_LVDS_DUAL_MODE) \
+-	|| defined(CONFIG_EFUSA9_LVDS_SPLIT_MODE)
+-		reg = <0>;
+-#else
+-		reg = <1>;
+-#endif
+-#if (defined(CONFIG_EFUSA9_USE_ONE_IPU) \
+-    || (__LVDS0_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__) \
+-    || (__LVDS0_ON_2_OR_3__ && __LVDS1_ON_2_OR_3__))
+-		crtc = "ipu1-di1";
+-#else
+-		crtc = "ipu2-di1";
+-#endif
+-		fsl,data-mapping = CONFIG_EFUSA9_LVDS1_MAPPING;
+-		fsl,data-width = <CONFIG_EFUSA9_LVDS1_DATA_WIDTH>;
+-#ifdef __LVDS1_PRIMARY__
+-		primary;
+-#endif
++
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing1>;
+-			timing1: CONFIG_EFUSA9_LVDS1_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds1_out: endpoint {
++				remote-endpoint = <&panel_in_lvds1>;
++			};
+ 		};
+ 	};
+ #endif
+diff --git a/arch/arm/boot/dts/fus/efusa9r2dl.dts b/arch/arm/boot/dts/fus/efusa9r2dl.dts
+index 94467d77c..adf0e98b7 100644
+--- a/arch/arm/boot/dts/fus/efusa9r2dl.dts
++++ b/arch/arm/boot/dts/fus/efusa9r2dl.dts
+@@ -17,46 +17,17 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_EFUSA9_MXCFB0		DISPLAY_LCD
+-#define CONFIG_EFUSA9_MXCFB1		DISPLAY_NONE
+ 
+-/* i.MX6 Solo and DualLite only have one IPU, do not change */
+-#define CONFIG_EFUSA9_USE_ONE_IPU
++#define CONFIG_EFUSA9_DISP0		DISPLAY_LCD
++#define CONFIG_EFUSA9_DISP1		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_EFUSA9_LCD_BPP		32
+-#define CONFIG_EFUSA9_LCD_PIX_FMT	"BGR666"
+-#define CONFIG_EFUSA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_EFUSA9_BT656_BPP		32
+-#define CONFIG_EFUSA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_EFUSA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_EFUSA9_HDMI_BPP		32
+-#define CONFIG_EFUSA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_EFUSA9_LCD_PIX_FMT	"rgb666"
++#define CONFIG_EFUSA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -67,19 +38,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -95,12 +65,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -122,12 +91,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -143,12 +111,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -186,14 +153,6 @@ wvga {					\
+  */
+ //#define CONFIG_EFUSA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_EFUSA9_LVDS_DUAL_MODE
+-
+ /*
+  * Define this if your LVDS display requires 5V I/O logic voltage. Default is
+  * 3.3V. ATTENTION: Setting 5V on a 3.3V display may damage the display!
+diff --git a/arch/arm/boot/dts/fus/efusa9r2q.dts b/arch/arm/boot/dts/fus/efusa9r2q.dts
+index 9eb89ac80..65ccc8cc7 100644
+--- a/arch/arm/boot/dts/fus/efusa9r2q.dts
++++ b/arch/arm/boot/dts/fus/efusa9r2q.dts
+@@ -17,66 +17,19 @@
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * - If you have no display, set all four settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set MXCFB0 and MXCFB1 to a display type from
+- *   above and leave the other two at DISPLAY_NONE.
+- * - If you have three displays, set MXCFB0, MXCFB1 and MXCFB2 to a display
+- *   type from above and leave MXCFB3 at DISPLAY_NONE.
+- * - If you have four displays, set all four settings to a valid display type.
+- *
+- * You have to use a different type for each display. If you want two LVDS
+- * displays, set one to DISPLAY_LVDS0 and the other to DISPLAY_LVDS1. This
+- * corresponds to the LVDS channel where the display is connected to.
+- *
+- * The first two displays will also get a video overlay, so MXCFB0 will use
+- * /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3, MXCFB2 will
+- * use /dev/fb4 and MXCFB3 will use /dev/fb5. If you want to restrict the
+- * display output to one IPU (i.MX6 Dual/Quad has two IPUs), for example for
+- * energy saving reasons, you must not use more than two displays and you must
+- * set CONFIG_EFUSA9_USE_ONE_IPU below. Then only MXCFB0 will get a video
+- * overlay and uses /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_EFUSA9_MXCFB0		DISPLAY_LCD
+-#define CONFIG_EFUSA9_MXCFB1		DISPLAY_NONE
+-#define CONFIG_EFUSA9_MXCFB2		DISPLAY_NONE
+-#define CONFIG_EFUSA9_MXCFB3		DISPLAY_NONE
+ 
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_EFUSA9_USE_ONE_IPU
++#define CONFIG_EFUSA9_DISP0		DISPLAY_LCD
++#define CONFIG_EFUSA9_DISP1		DISPLAY_NONE
++#define CONFIG_EFUSA9_DISP2		DISPLAY_NONE
++#define CONFIG_EFUSA9_DISP3		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_EFUSA9_LCD_BPP		32
+-#define CONFIG_EFUSA9_LCD_PIX_FMT	"BGR666"
+-#define CONFIG_EFUSA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_EFUSA9_BT656_BPP		32
+-#define CONFIG_EFUSA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_EFUSA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_EFUSA9_HDMI_BPP		32
+-#define CONFIG_EFUSA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_EFUSA9_LCD_PIX_FMT	"rgb666"
++#define CONFIG_EFUSA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -87,19 +40,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -115,12 +67,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS0_BPP		32
+-#define CONFIG_EFUSA9_LVDS0_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS0_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS0_WIDTH 154
++#define CONFIG_EFUSA9_LVDS0_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -142,12 +93,11 @@ wvga {					\
+  * For mapping value see above.
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB24"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	24
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -163,12 +113,11 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_EFUSA9_LVDS1_BPP		32
+-#define CONFIG_EFUSA9_LVDS1_PIX_FMT	"RGB666"
+-#define CONFIG_EFUSA9_LVDS1_DATA_WIDTH	18
+-#define CONFIG_EFUSA9_LVDS1_MAPPING	"spwg"
++#define CONFIG_EFUSA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_EFUSA9_LVDS1_WIDTH 154
++#define CONFIG_EFUSA9_LVDS1_HIGHT 86
+ #define CONFIG_EFUSA9_LVDS1_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -206,14 +155,6 @@ wvga {					\
+  */
+ //#define CONFIG_EFUSA9_LVDS_SPLIT_MODE
+ 
+-/*
+- * Define this if you have two similar displays (same resolution and timings),
+- * one on each LVDS channel. The display content of the framebuffer is shown
+- * on both displays simultaneously (cloned). Only define either DISPLAY_LVDS0
+- * or DISPLAY_LVDS1 in this case, using the resolution of one of the displays.
+- */
+-//#define CONFIG_EFUSA9_LVDS_DUAL_MODE
+-
+ /*
+  * Define this if your LVDS display requires 5V I/O logic voltage. Default is
+  * 3.3V. ATTENTION: Setting 5V on a 3.3V display may damage the display!
+diff --git a/arch/arm/boot/dts/fus/imx6dl.dtsi b/arch/arm/boot/dts/fus/imx6dl.dtsi
+index 27166714a..d32bbd363 100644
+--- a/arch/arm/boot/dts/fus/imx6dl.dtsi
++++ b/arch/arm/boot/dts/fus/imx6dl.dtsi
+@@ -1,14 +1,2 @@
+ #include "../nxp/imx/imx6dl.dtsi"
+ #include "imx6qdl.dtsi"
+-
+-/ {
+-	cpus {
+-		reserved-memory {
+-			cma: linux,cma {};
+-		};
+-	};
+-
+-	soc {
+-		busfreq: busfreq {};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/fus/imx6q.dtsi b/arch/arm/boot/dts/fus/imx6q.dtsi
+index 03d54fa10..b5ff1c53c 100644
+--- a/arch/arm/boot/dts/fus/imx6q.dtsi
++++ b/arch/arm/boot/dts/fus/imx6q.dtsi
+@@ -1,10 +1,2 @@
+ #include "../nxp/imx/imx6q.dtsi"
+ #include "imx6qdl.dtsi"
+-
+-/ {
+-	cpus {
+-		reserved-memory {
+-			cma: linux,cma {};
+-		};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/fus/imx6qdl.dtsi b/arch/arm/boot/dts/fus/imx6qdl.dtsi
+index 6d88054d3..9689045bd 100644
+--- a/arch/arm/boot/dts/fus/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/fus/imx6qdl.dtsi
+@@ -1,5 +1,22 @@
+ #include <dt-bindings/gpio/gpio.h>
+ 
++
++/ {
++	reserved-memory {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		cma:linux,cma {
++			compatible = "shared-dma-pool";
++			reusable;
++			size = <0x6000000>;
++			alloc-ranges = <0 0x10000000 0 0x40000000>;
++			linux,cma-default;
++		};
++	};
++};
++
+ &ssi1 {
+ 	clocks = <&clks IMX6QDL_CLK_SSI1>;
+ 	clock-names = "baud";
+diff --git a/arch/arm/boot/dts/fus/picomoda9dl.dts b/arch/arm/boot/dts/fus/picomoda9dl.dts
+index 8943f8c0f..ac2f63150 100644
+--- a/arch/arm/boot/dts/fus/picomoda9dl.dts
++++ b/arch/arm/boot/dts/fus/picomoda9dl.dts
+@@ -15,25 +15,10 @@
+ #define DISPLAY_LCD	1	/* LCD via RGB adapter */
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * Due to hardware limitations you can only use either LCD or HDMI at the
+- * same time. Furthermore we only have one LVDS channel.
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above
+- *   and leave MXCFB1 at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * The first display will also get a video overlay, so MXCFB0 will use /dev/fb0
+- * and /dev/fb1 and MXCFB1 will use /dev/fb2.
+- */
+-#define CONFIG_PICOMODA9_MXCFB0		DISPLAY_LVDS0
+-#define CONFIG_PICOMODA9_MXCFB1		DISPLAY_NONE
++
++#define CONFIG_PICOMODA9_DISP0		DISPLAY_LCD
++#define CONFIG_PICOMODA9_DISP1		DISPLAY_NONE
+ 
+ /* i.MX6 Solo and DualLite only have one IPU, do not change */
+ #define CONFIG_PICOMODA9_USE_ONE_IPU
+@@ -42,22 +27,8 @@
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_PICOMODA9_LCD_BPP	32
+-#define CONFIG_PICOMODA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_PICOMODA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_PICOMODA9_BT656_BPP	32
+-#define CONFIG_PICOMODA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_PICOMODA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_PICOMODA9_HDMI_BPP	32
+-#define CONFIG_PICOMODA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_PICOMODA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_PICOMODA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_PICOMODA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -68,19 +39,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_PICOMODA9_LVDS0_BPP		32
+-#define CONFIG_PICOMODA9_LVDS0_PIX_FMT		"RGB24"
+-#define CONFIG_PICOMODA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_PICOMODA9_LVDS0_MAPPING		"spwg"
++#define CONFIG_PICOMODA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_PICOMODA9_LVDS0_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS0_HIGHT 86
+ #define CONFIG_PICOMODA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -96,12 +66,57 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_PICOMODA9_LVDS0_BPP		32
+-#define CONFIG_PICOMODA9_LVDS0_PIX_FMT		"RGB666"
+-#define CONFIG_PICOMODA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_PICOMODA9_LVDS0_MAPPING		"spwg"
++#define CONFIG_PICOMODA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_PICOMODA9_LVDS0_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS0_HIGHT 86
+ #define CONFIG_PICOMODA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
++	clock-frequency = <33500000>;	\
++	hactive = <800>;		\
++	vactive = <480>;		\
++	hfront-porch = <40>;		\
++	hback-porch = <88>;		\
++	hsync-len = <128>;		\
++	vback-porch = <33>;		\
++	vfront-porch = <10>;		\
++	vsync-len = <2>;		\
++	hsync-active = <0>;		\
++	vsync-active = <0>;		\
++	de-active = <1>;		\
++	pixelclk-active = <0>;		\
++}
++#endif
++
++/*
++ * Configure LVDS1 settings here (ignored if LVDS1 is not used)
++ * For mapping value see above.
++ */
++#ifndef DISPLAY_LVDS_CHIMEI
++#define CONFIG_PICOMODA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_PICOMODA9_LVDS1_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS1_HIGHT 86
++#define CONFIG_PICOMODA9_LVDS1_TIMING \
++panel-timing {					\
++	clock-frequency = <33300000>;	\
++	hactive = <800>;		\
++	vactive = <480>;		\
++	hfront-porch = <210>;		\
++	hback-porch = <45>;		\
++	hsync-len = <1>;		\
++	vback-porch = <22>;		\
++	vfront-porch = <22>;		\
++	vsync-len = <1>;		\
++	hsync-active = <0>;		\
++	vsync-active = <0>;		\
++	de-active = <1>;		\
++	pixelclk-active = <0>;		\
++}
++#else
++#define CONFIG_PICOMODA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_PICOMODA9_LVDS1_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS1_HIGHT 86
++#define CONFIG_PICOMODA9_LVDS1_TIMING \
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+diff --git a/arch/arm/boot/dts/fus/picomoda9q.dts b/arch/arm/boot/dts/fus/picomoda9q.dts
+index 8cbcfaf58..fa0b8f929 100644
+--- a/arch/arm/boot/dts/fus/picomoda9q.dts
++++ b/arch/arm/boot/dts/fus/picomoda9q.dts
+@@ -15,63 +15,17 @@
+ #define DISPLAY_LCD	1	/* LCD via RGB adapter */
+ #define DISPLAY_HDMI	2	/* DVI/HDMI via HDMI connector */
+ #define DISPLAY_LVDS0	3	/* LVDS channel 0 */
+-#define DISPLAY_BT656	5	/* BT656 via ADV739x */
+ 
+-/*
+- * Set the display configuration:
+- *
+- * Due to hardware limitations you can only use either LCD or HDMI at the
+- * same time. Furthermore we only have one LVDS channel. Based on this
+- * specifications you can connect at most two displays on PicoMODA9. Either
+- * one LVDS and one HDMI display or one LVDS and one LCD display. HDMI also
+- * needs an I2C port on pins 42+44, so CAN_B and UART_D_CTS can not be used
+- * at the same time.
+- *
+- * - If you have no display, set both settings to DISPLAY_NONE.
+- * - If you have one display, set MXCFB0 to one of the display types above and
+- *   leave the other settings at DISPLAY_NONE.
+- * - If you have two displays, set both settings to a display type from above.
+- *   You have to use different types for the two displays.
+- *
+- * If you set up two displays they will also get a video overlay, so MXCFB0
+- * will use /dev/fb0 and /dev/fb1, MXCFB1 will use /dev/fb2 and /dev/fb3. If
+- * you want to restrict the display output to one IPU (i.MX6 Dual/Quad has two
+- * IPUs), for example for energy saving reasons, you must set
+- * CONFIG_PICOMODA9_USE_ONE_IPU below. Then only MXCFB0 will get a video
+- * overlay and uses /dev/fb0 and /dev/fb1, and MXCFB1 will only use /dev/fb2.
+- */
+-#define CONFIG_PICOMODA9_MXCFB0		DISPLAY_LVDS0
+-#define CONFIG_PICOMODA9_MXCFB1		DISPLAY_NONE
+ 
+-/*
+- * Define this if you only want to use one IPU. This means that you can use
+- * at most two displays and only the first display can have a video overlay.
+- * If you want to have more than two displays or if you want to have two
+- * displays with a video overlay each, then you need to use both IPUs of the
+- * i.MX6 Dual/Quad CPU.
+- */
+-//#define CONFIG_PICOMODA9_USE_ONE_IPU
++#define CONFIG_PICOMODA9_DISP0		DISPLAY_LVDS0
++#define CONFIG_PICOMODA9_DISP1		DISPLAY_NONE
+ 
+ /*
+  * Configure LCD settings here (ignored if LCD is not used);
+  * see drivers/video/fbdev/mxc/mxc_lcdif.c for possible LCD mode strings
+  */
+-#define CONFIG_PICOMODA9_LCD_BPP	32
+-#define CONFIG_PICOMODA9_LCD_PIX_FMT	"RGB666"
+-#define CONFIG_PICOMODA9_LCD_MODE_STR	"LCD-ET070080"
+-
+-/*
+- * Configure BT656 settings here (ignored if BT656 is not used);
+- * see drivers/video/fbdev/mxc/mxc_bt656.c for possible mode strings
+- */
+-#define CONFIG_PICOMODA9_BT656_BPP	32
+-#define CONFIG_PICOMODA9_BT656_PIX_FMT	"BT656"
+-#define CONFIG_PICOMODA9_BT656_MODE_STR	"BT656-PAL"
+-
+-/* Configure HDMI settings here (ignored if HDMI is not used) */
+-#define CONFIG_PICOMODA9_HDMI_BPP	32
+-#define CONFIG_PICOMODA9_HDMI_PIX_FMT	"RGB24"
+-#define CONFIG_PICOMODA9_HDMI_MODE_STR	"1920x1080M@60"
++#define CONFIG_PICOMODA9_LCD_PIX_FMT	"bgr666"
++#define CONFIG_PICOMODA9_LCD_MODE_STR	"edt,et070080dh6"
+ 
+ /*
+  * F&S has changed the default LVDS display. To use the previous settings
+@@ -82,19 +36,18 @@
+ /*
+  * Configure LVDS0 settings here (ignored if LVDS0 is not used)
+  * Mapping (refers to LVDS_DATA_WIDTH, not LVDS_BPP):
+- *
+- * - "spwg":  18 bpp or 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
++ * - "jeida-18": 18 bpp
++ * - "vesa-24": 24 bpp, in case of 24 bpp, bits 6 and 7 of each color
+  *            are encoded on fourth LVDS differential data pair
+- * - "jeida": only 24 bpp, bits 6 and 7 of each color are interleaved with
++ * - "jeida-24": 24 bpp, bits 6 and 7 of each color are interleaved with
+  *            all other data bits on all four differential data pairs
+  */
+ #ifndef DISPLAY_LVDS_CHIMEI
+-#define CONFIG_PICOMODA9_LVDS0_BPP		32
+-#define CONFIG_PICOMODA9_LVDS0_PIX_FMT		"RGB24"
+-#define CONFIG_PICOMODA9_LVDS0_DATA_WIDTH	24
+-#define CONFIG_PICOMODA9_LVDS0_MAPPING		"spwg"
++#define CONFIG_PICOMODA9_LVDS0_MAPPING	"vesa-24"
++#define CONFIG_PICOMODA9_LVDS0_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS0_HIGHT 86
+ #define CONFIG_PICOMODA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
+ 	clock-frequency = <33300000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+@@ -110,12 +63,57 @@ wvga {					\
+ 	pixelclk-active = <0>;		\
+ }
+ #else
+-#define CONFIG_PICOMODA9_LVDS0_BPP		32
+-#define CONFIG_PICOMODA9_LVDS0_PIX_FMT		"RGB666"
+-#define CONFIG_PICOMODA9_LVDS0_DATA_WIDTH	18
+-#define CONFIG_PICOMODA9_LVDS0_MAPPING		"spwg"
++#define CONFIG_PICOMODA9_LVDS0_MAPPING	"jeida-18"
++#define CONFIG_PICOMODA9_LVDS0_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS0_HIGHT 86
+ #define CONFIG_PICOMODA9_LVDS0_TIMING \
+-wvga {					\
++panel-timing {					\
++	clock-frequency = <33500000>;	\
++	hactive = <800>;		\
++	vactive = <480>;		\
++	hfront-porch = <40>;		\
++	hback-porch = <88>;		\
++	hsync-len = <128>;		\
++	vback-porch = <33>;		\
++	vfront-porch = <10>;		\
++	vsync-len = <2>;		\
++	hsync-active = <0>;		\
++	vsync-active = <0>;		\
++	de-active = <1>;		\
++	pixelclk-active = <0>;		\
++}
++#endif
++
++/*
++ * Configure LVDS1 settings here (ignored if LVDS1 is not used)
++ * For mapping value see above.
++ */
++#ifndef DISPLAY_LVDS_CHIMEI
++#define CONFIG_PICOMODA9_LVDS1_MAPPING	"vesa-24"
++#define CONFIG_PICOMODA9_LVDS1_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS1_HIGHT 86
++#define CONFIG_PICOMODA9_LVDS1_TIMING \
++panel-timing {					\
++	clock-frequency = <33300000>;	\
++	hactive = <800>;		\
++	vactive = <480>;		\
++	hfront-porch = <210>;		\
++	hback-porch = <45>;		\
++	hsync-len = <1>;		\
++	vback-porch = <22>;		\
++	vfront-porch = <22>;		\
++	vsync-len = <1>;		\
++	hsync-active = <0>;		\
++	vsync-active = <0>;		\
++	de-active = <1>;		\
++	pixelclk-active = <0>;		\
++}
++#else
++#define CONFIG_PICOMODA9_LVDS1_MAPPING	"jeida-18"
++#define CONFIG_PICOMODA9_LVDS1_WIDTH 154
++#define CONFIG_PICOMODA9_LVDS1_HIGHT 86
++#define CONFIG_PICOMODA9_LVDS1_TIMING \
++panel-timing {					\
+ 	clock-frequency = <33500000>;	\
+ 	hactive = <800>;		\
+ 	vactive = <480>;		\
+diff --git a/arch/arm/boot/dts/fus/picomoda9qdl.dtsi b/arch/arm/boot/dts/fus/picomoda9qdl.dtsi
+index a1cf3b0fc..af81abf30 100755
+--- a/arch/arm/boot/dts/fus/picomoda9qdl.dtsi
++++ b/arch/arm/boot/dts/fus/picomoda9qdl.dtsi
+@@ -7,7 +7,6 @@
+  */
+ 
+ #include <dt-bindings/pwm/pwm.h>
+-#include <fsversion.h>
+ 
+ #define DISPLAY_LVDS1	4	/* LVDS channel 1 */
+ 
+@@ -17,22 +16,22 @@
+  * by using LVDS1 instead of LVDS0 and activating Dual Mode.
+  */
+ #ifdef CONFIG_PICOMODA9_USE_ONE_IPU
+-#undef CONFIG_PICOMODA9_MXCFB2
+-#undef CONFIG_PICOMODA9_MXCFB3
+-
+-#if (((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LCD) \
+-      || (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_BT656)) \
+-     && (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS0))
+-#undef CONFIG_PICOMODA9_MXCFB1
+-#define CONFIG_PICOMODA9_MXCFB1		DISPLAY_LVDS1
++#undef CONFIG_PICOMODA9_DISP2
++#undef CONFIG_PICOMODA9_DISP3
++
++#if (((CONFIG_PICOMODA9_DISP0 == DISPLAY_LCD) \
++      || (CONFIG_PICOMODA9_DISP0 == DISPLAY_BT656)) \
++     && (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS0))
++#undef CONFIG_PICOMODA9_DISP1
++#define CONFIG_PICOMODA9_DISP1		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS0) \
+-     && ((CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LCD) \
+-         || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_BT656)))
+-#undef CONFIG_PICOMODA9_MXCFB0
+-#define CONFIG_PICOMODA9_MXCFB0		DISPLAY_LVDS1
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS0) \
++     && ((CONFIG_PICOMODA9_DISP1 == DISPLAY_LCD) \
++         || (CONFIG_PICOMODA9_DISP1 == DISPLAY_BT656)))
++#undef CONFIG_PICOMODA9_DISP0
++#define CONFIG_PICOMODA9_DISP0		DISPLAY_LVDS1
+ #define __MOVE_LVDS0_TO_LVDS1_DUAL_MODE__
+ #endif
+ 
+@@ -54,13 +53,13 @@
+ #endif /* CONFIG_PICOMODA9_USE_ONE_IPU */
+ 
+ /* Do we have LCD? */
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LCD) \
+-    || (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LCD) \
+-    || (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LCD))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LCD) \
++    || (CONFIG_PICOMODA9_DISP2 == DISPLAY_LCD) \
++    || (CONFIG_PICOMODA9_DISP3 == DISPLAY_LCD))
+ #define CONFIG_PICOMODA9_LCD
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LCD) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LCD))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LCD) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LCD))
+ #define __LCD_ON_0_OR_1__	1
+ #define __LCD_ON_2_OR_3__	0
+ #else
+@@ -70,13 +69,13 @@
+ #endif
+ 
+ /* Do we have BT656? */
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_BT656) \
+-    || (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_BT656) \
+-    || (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_BT656))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_BT656) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_BT656) \
++    || (CONFIG_PICOMODA9_DISP2 == DISPLAY_BT656) \
++    || (CONFIG_PICOMODA9_DISP3 == DISPLAY_BT656))
+ #define CONFIG_PICOMODA9_BT656
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_BT656) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_BT656))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_BT656) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_BT656))
+ #define __BT656_ON_0_OR_1__	1
+ #define __BT656_ON_2_OR_3__	0
+ #else
+@@ -86,15 +85,15 @@
+ #endif
+ 
+ /* Do we have HDMI? On PicoMODA9, HDMI and LCD can not be active in parallel */
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_HDMI) \
+-    || (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_HDMI) \
+-    || (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_HDMI))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_HDMI) \
++    || (CONFIG_PICOMODA9_DISP2 == DISPLAY_HDMI) \
++    || (CONFIG_PICOMODA9_DISP3 == DISPLAY_HDMI))
+ #define CONFIG_PICOMODA9_HDMI
+ #define CONFIG_PICOMODA9_HDMI_AUDIO
+ #define CONFIG_PICOMODA9_HDMI_CEC
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_HDMI) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_HDMI))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_HDMI) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_HDMI))
+ #define __HDMI_ON_0_OR_1__	1
+ #define __HDMI_ON_2_OR_3__	0
+ #else
+@@ -104,13 +103,13 @@
+ #endif
+ 
+ /* Do we have LVDS0? */
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS0) \
+-    || (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS0) \
+-    || (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS0))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS0) \
++    || (CONFIG_PICOMODA9_DISP2 == DISPLAY_LVDS0) \
++    || (CONFIG_PICOMODA9_DISP3 == DISPLAY_LVDS0))
+ #define CONFIG_PICOMODA9_LVDS0
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS0) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS0))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS0) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS0))
+ #define __LVDS0_ON_0_OR_1__	1
+ #define __LVDS0_ON_2_OR_3__	0
+ #else
+@@ -120,13 +119,13 @@
+ #endif
+ 
+ /* Do we have LVDS1? */
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS1) \
+-    || (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS1) \
+-    || (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS1))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS1) \
++    || (CONFIG_PICOMODA9_DISP2 == DISPLAY_LVDS1) \
++    || (CONFIG_PICOMODA9_DISP3 == DISPLAY_LVDS1))
+ #define CONFIG_PICOMODA9_LVDS1
+-#if ((CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS1) \
+-    || (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS1))
++#if ((CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS1) \
++    || (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS1))
+ #define __LVDS1_ON_0_OR_1__	1
+ #define __LVDS1_ON_2_OR_3__	0
+ #else
+@@ -136,21 +135,21 @@
+ #endif
+ 
+ /* Check which LVDS will be the primary display */
+-#if (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS0)
++#if (CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS1)
++#elif (CONFIG_PICOMODA9_DISP0 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS0)
++#elif (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS1)
++#elif (CONFIG_PICOMODA9_DISP1 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS0)
++#elif (CONFIG_PICOMODA9_DISP2 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS1)
++#elif (CONFIG_PICOMODA9_DISP2 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS0)
++#elif (CONFIG_PICOMODA9_DISP3 == DISPLAY_LVDS0)
+ #define __LVDS0_PRIMARY__
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS1)
++#elif (CONFIG_PICOMODA9_DISP3 == DISPLAY_LVDS1)
+ #define __LVDS1_PRIMARY__
+ #endif
+ 
+@@ -204,11 +203,6 @@
+ 
+ / {
+ 	aliases {
+-		mxcfb0 = &mxcfb0;
+-		mxcfb1 = &mxcfb1;
+-		mxcfb2 = &mxcfb2;
+-		mxcfb3 = &mxcfb3;
+-
+ #ifdef CONFIG_PICOMODA9_HDMI
+ 		i2c4 = &i2c_gpio_hdmi;
+ #endif
+@@ -371,6 +365,12 @@ reg_camera_dvdd: camera_dvdd {
+ 			regulator-max-microvolt = <1500000>;
+ 		};
+ #endif /* CONFIG_PICOMODA9_PARALLEL_CAMERA */
++		reg_rtc_clk: regulator-rtc-clk {
++			compatible = "regulator-fixed-clock";
++			regulator-always-on;
++			regulator-name = "RTC_CLK";
++			clocks = <&rtc_clk>;
++		};
+ 	};
+ 
+ 	/* F&S board information */
+@@ -379,7 +379,6 @@ bdinfo: bdinfo {
+ 		board_name = "picomoda9";
+ 		//ecc_strength = "40";
+ 		ecc_strength = "8";
+-		dts_version = FS_LINUX_VERSION;
+ 	};
+ 
+ #ifdef CONFIG_PICOMODA9_HDMI
+@@ -421,7 +420,7 @@ &gpio4 15 GPIO_ACTIVE_HIGH /* sclk */
+ #ifdef CONFIG_PICOMODA9_SGTL5000_AUDIO
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+-		cpu-dai = <&ssi1>;
++		ssi-controller = <&ssi1>;
+ 		audio-codec = <&sgtl5000>;
+ 		model = "imx-sgtl5000";
+ 		mux-int-port = <1>;  /* SSI1=1, SSI2=2, SSI3=7 */
+@@ -433,188 +432,8 @@ sound {
+ //			"Line Out Jack", "LINE_OUT";
+ 	};
+ #endif
+-
+-#ifdef CONFIG_PICOMODA9_HDMI_AUDIO
+-	sound-hdmi {
+-		compatible = "fsl,imx6q-audio-hdmi",
+-			     "fsl,imx-audio-hdmi";
+-		model = "imx-audio-hdmi";
+-		hdmi-controller = <&hdmi_audio>;
+-	};
+-#endif
+-
+-	mxcfb0: fb@0 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_PICOMODA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_PICOMODA9_LCD_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_PICOMODA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_PICOMODA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_HDMI_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_PICOMODA9_MXCFB0 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb1: fb@1 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_PICOMODA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_PICOMODA9_LCD_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_PICOMODA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_PICOMODA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_HDMI_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_PICOMODA9_MXCFB1 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb2: fb@2 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_PICOMODA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_PICOMODA9_LCD_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_PICOMODA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_PICOMODA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_HDMI_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_PICOMODA9_MXCFB2 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-	mxcfb3: fb@3 {
+-		compatible = "fsl,mxc_sdc_fb";
+-		late_init = <0>;
+-#if (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LCD)
+-		disp_dev = "lcd";
+-		default_bpp = <CONFIG_PICOMODA9_LCD_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
+-		int_clk = <1>;
+-		mode_str = CONFIG_PICOMODA9_LCD_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_BT656)
+-		disp_dev = "bt656";
+-		default_bpp = <CONFIG_PICOMODA9_BT656_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_BT656_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_BT656_MODE_STR;
+-		clock-frequency = <27000000>;
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_HDMI)
+-		disp_dev = "hdmi";
+-		default_bpp = <CONFIG_PICOMODA9_HDMI_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_HDMI_PIX_FMT;
+-		int_clk = <0>;
+-		mode_str = CONFIG_PICOMODA9_HDMI_MODE_STR;
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS0)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS0_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS0_PIX_FMT;
+-		int_clk = <1>;
+-#elif (CONFIG_PICOMODA9_MXCFB3 == DISPLAY_LVDS1)
+-		disp_dev = "ldb";
+-		default_bpp = <CONFIG_PICOMODA9_LVDS1_BPP>;
+-		interface_pix_fmt = CONFIG_PICOMODA9_LVDS1_PIX_FMT;
+-		int_clk = <1>;
+-#else
+-		status = "disabled";
+-#endif
+-	};
+-
+-#ifdef CONFIG_PICOMODA9_LCD
+-	lcd: lcd@0 {
+-		compatible = "fsl,lcd";
+-		lcd-supply = <&reg_vlcd>;
+-		ena-supply = <&reg_lcd_ena>;
+-		den-supply = <&reg_lcd_den>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
+-		status = "disabled";
+-	};
+-#endif
+-
+-#ifdef CONFIG_PICOMODA9_BT656
+-	bt656: bt656@0 {
+-		compatible = "fsl,bt656";
+-		default_ifmt = "BT656";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_ipu1_bt656>;
+-		status = "disabled";
+-	};
+-#endif
+-
+ 	/* LDB/LCD backlight PWM (PWM3) */
+-	ldb_lcd_backlight {
++	backlight_lcd:ldb_lcd_backlight {
+ 		compatible = "pwm-backlight";
+ #ifdef CONFIG_PICOMODA9_LCD
+ 		pwms = <&pwm3 0 5000000 PWM_POLARITY_INVERTED>;
+@@ -691,8 +510,80 @@ status_4 {
+ 		};
+ #endif
+ 	};
++#ifdef CONFIG_PICOMODA9_LVDS0
++	panel-lvds0 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_PICOMODA9_LVDS0_MAPPING;
++		width-mm = <CONFIG_PICOMODA9_LVDS0_WIDTH>;
++		height-mm = <CONFIG_PICOMODA9_LVDS0_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_PICOMODA9_LVDS0_TIMING;
++
++		port {
++			panel_in_lvds0: endpoint {
++				remote-endpoint = <&lvds0_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_PICOMODA9_LVDS1
++	panel-lvds1 {
++		compatible = "panel-lvds";
++		data-mapping = CONFIG_PICOMODA9_LVDS1_MAPPING;
++		width-mm = <CONFIG_PICOMODA9_LVDS1_WIDTH>;
++		height-mm = <CONFIG_PICOMODA9_LVDS1_HIGHT>;
++		power-supply = <&reg_vlcd>;
++		CONFIG_PICOMODA9_LVDS1_TIMING;
++
++		port {
++			panel_in_lvds1: endpoint {
++				remote-endpoint = <&lvds1_out>;
++			};
++		};
++	};
++#endif
++
++#ifdef CONFIG_PICOMODA9_LCD
++	lcd_display: disp0 {
++		compatible = "fsl,imx-parallel-display";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		interface-pix-fmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ipu1_ctrl &pinctrl_ipu1_dat>;
++		status = "okay";
++
++		port@0 {
++			reg = <0>;
++			lcd_display_in: endpoint {
++				remote-endpoint = <&ipu1_di0_disp0>;
++			};
++		};
++
++		port@1 {
++			reg = <1>;
++			lcd_display_out: endpoint {
++				remote-endpoint = <&lcd_panel_in>;
++			};
++		};
++	};
++
++	panel: panel {
++		compatible = CONFIG_PICOMODA9_LCD_MODE_STR;
++		backlight = <&backlight_lcd>;
++		power-supply = <&reg_vlcd>;
++		port {
++			lcd_panel_in: endpoint {
++				remote-endpoint = <&lcd_display_out>;
++			};
++		};
++	};
++#endif
+ };
+ 
++
+ /* RAM size for Continuous Memory Allocator; if not defined, use 320 MB */
+ #ifndef CONFIG_PICOMODA9_CMA_SIZE
+ #define CONFIG_PICOMODA9_CMA_SIZE 0x14000000
+@@ -701,12 +592,6 @@ &cma {
+ 	size = <CONFIG_PICOMODA9_CMA_SIZE>;
+ };
+ 
+-&busfreq {
+-	/* Disable bus frequency scaling, because reducing bus frequency to
+-	   24 MHz does not work with all types of DDR3 RAM */
+-	disable-scaling;
+-};
+-
+ &clks {
+ 	assigned-clocks =
+ #ifdef CONFIG_PICOMODA9_LVDS0_CLK
+@@ -826,28 +711,24 @@ &gpc {
+ 	fsl,wdog-reset = <1>; /* watchdog select of reset source */
+ };
+ 
+-#ifdef CONFIG_PICOMODA9_HDMI_AUDIO
+-&hdmi_audio {
+-	status = "okay";
+-};
+-#endif
++#ifdef CONFIG_PICOMODA9_HDMI
+ 
+-#ifdef CONFIG_PICOMODA9_HDMI_CEC
+-&hdmi_cec {
+-	status = "okay";
+-};
++#if 0
++/* Force HDMI to IPU 2 */
++/delete-node/&hdmi_mux_0;
++/delete-node/&ipu1_di0_hdmi;
++/delete-node/&hdmi_mux_1;
++/delete-node/&ipu1_di1_hdmi;
+ #endif
+ 
+-#ifdef CONFIG_PICOMODA9_HDMI
+-&hdmi_video {
+-	fsl,phy_reg_vlev = <0x0294>;
+-	fsl,phy_reg_cksymtx = <0x800d>;
+-	hpd-active-low;
+-	force-dvi-mode;
++&hdmi {
++	ddc-i2c-bus = <&i2c3>;
+ 	status = "okay";
+ };
++
+ #endif
+ 
++
+ #ifdef CONFIG_PICOMODA9_I2C_C
+ &i2c1 {
+ 	clock-frequency = <100000>;
+@@ -877,11 +758,13 @@ &i2c2 {
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	rtc8565@51 {
++	rtc_clk:rtc8565@51 {
+ 		compatible = "nxp,pcf8565", "nxp,pcf8563";
+ 		reg = <0x51>;
+ 		interrupt-parent = <&gpio1>;
+ 		interrupts = <6 IRQ_TYPE_EDGE_FALLING>;
++		#clock-cells = <0>;
++		clock-output-names = "rtc_clk32k";
+ 	};
+ 
+ #ifdef CONFIG_PICOMODA9_4WTOUCH_ONBOARD
+@@ -942,18 +825,19 @@ adv739x@2b {
+ #ifdef CONFIG_PICOMODA9_CAPTOUCH_FT5x06
+ 	/* F&S driver V3.0 on Touch Connector (I2C) */
+ 	ft5x06_ts@38 {
+-		compatible = "FocalTech,ft5306";
++		iovcc-supply = <&reg_vlcd>;
++		compatible = "edt,edt-ft5306";
+ 		reg = <0x38>;
+-		fingers = <2>;
++
+ 		touchscreen-size-x = <800>;
+ 		touchscreen-size-y = <480>;
+ 		threshold = <25>;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
+ 		//no reset gpio
+-		x-rev;
+-		y-rev;
+-		linux,wakeup;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++		status = "okay";
+ 	};
+ #endif
+ 
+@@ -972,9 +856,9 @@ mxt224@4a {
+ #ifdef CONFIG_PICOMODA9_CAPTOUCH_SITRONIX
+ 	/* Sitronix PCAP touch on Touch-Connector (I2C) */
+ 	st1633i@48 {
+-		compatible = "sitronix";
++		compatible = "sitronix,st1633";
+ 		reg = <0x48>;
+-		swap-xy;
++		touchscreen-swapped-x-y;
+ 		interrupt-parent = <&gpio2>;
+ 		interrupts = <28 IRQ_TYPE_EDGE_FALLING>;
+ 		//no reset gpio
+@@ -1175,121 +1059,46 @@ &usdhc2 {
+ #endif /* CONFIG_PICOMODA9_SD_B */
+ 
+ #ifdef CONFIG_PICOMODA9_LCD
+-&lcd {
+-	/* LCD on PicoMODA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_PICOMODA9_LCD_PIX_FMT;
+-	status = "okay";
++&ipu1_di0_disp0 {
++	remote-endpoint = <&lcd_display_in>;
+ };
+ #endif
+ 
+-#ifdef CONFIG_PICOMODA9_BT656
+-&bt656 {
+-	/* BT656 on efusA9 is always on IPU1 (id=0), DI0 */
+-	ipu_id = <0>;
+-	disp_id = <0>;
+-	default_ifmt = CONFIG_PICOMODA9_BT656_PIX_FMT;
+-	status = "okay";
+-};
+-#endif
+-
+-#ifdef CONFIG_PICOMODA9_HDMI
+-&hdmi_core {
+-#ifdef CONFIG_PICOMODA9_USE_ONE_IPU
+-	/*
+-	 * When using one IPU (id=0):
+-	 * HDMI can go to DI1, unless LVDS1 is also active. In this case LVDS1
+-	 * must go to DI1 and HDMI to DI0.
+-	 */
+-	ipu_id = <0>;
+-#if (__HDMI_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__)
+-	disp_id = <0>;
+-#else
+-	disp_id = <1>;
+-#endif
+-#else /* !CONFIG_PICOMODA9_USE_ONE_IPU */
+-	/*
+-	 * When using two IPUs:
+-	 * HDMI can always go to DI1. If HDMI is on MXCFB0 and LCD on MXCFB1,
+-	 * or vice versa, or HDMI is on MXCFB2 and LCD is on MXCFB3, or vice
+-	 * versa, then HDMI has to go to IPU2 (id=1), otherwise to IPU1 (id=0).
+-	 */
+-	disp_id = <1>;
+-#if ((__HDMI_ON_0_OR_1__ && (__LCD_ON_0_OR_1__ || __BT656_ON_0_OR_1__)) \
+-    || (__HDMI_ON_2_OR_3__ && (__LCD_ON_2_OR_3__ || __BT656_ON_2_OR_3__)))
+-	ipu_id = <1>;
+-#else
+-	ipu_id = <0>;
+-#endif
+-#endif /* CONFIG_PICOMODA9_USE_ONE_IPU */
+-	status = "okay";
+-};
+-#endif
+ 
+ #if (defined(CONFIG_PICOMODA9_LVDS0) || defined(CONFIG_PICOMODA9_LVDS1))
+ &ldb {
+-	ext_ref;
+-#if defined(CONFIG_PICOMODA9_LVDS_DUAL_MODE)
+-	dual-mode;
++#ifdef CONFIG_PICOMODA9_LVDS_SPLIT_MODE
++	fsl,dual-channel;
+ #endif
+-	ldb-supply = <&reg_vlcd>;
+ 	status = "okay";
+-
+ #ifdef CONFIG_PICOMODA9_LVDS0
+-	/* LVDS0 must always go to DI0 of an IPU! */
+ 	lvds-channel@0 {
+-		reg = <0>;
+-#ifdef CONFIG_PICOMODA9_USE_ONE_IPU
+-		crtc = "ipu1-di0";
+-#else
+-		crtc = "ipu2-di0";
+-#endif
+-		fsl,data-mapping = CONFIG_PICOMODA9_LVDS0_MAPPING;
+-		fsl,data-width = <CONFIG_PICOMODA9_LVDS0_DATA_WIDTH>;
+-#ifdef __LVDS0_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: CONFIG_PICOMODA9_LVDS0_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds0_out: endpoint {
++				remote-endpoint = <&panel_in_lvds0>;
++			};
+ 		};
+ 	};
+ #endif
+-
+ #ifdef CONFIG_PICOMODA9_LVDS1
+-	/* LVDS1 must always go to DI1 of an IPU! */
+ 	lvds-channel@1 {
+-#if defined(CONFIG_PICOMODA9_LVDS_DUAL_MODE) \
+-	|| defined(CONFIG_PICOMODA9_LVDS_SPLIT_MODE)
+-		reg = <0>;
+-#else
+-		reg = <1>;
+-#endif
+-#if (defined(CONFIG_PICOMODA9_USE_ONE_IPU) \
+-    || (__LVDS0_ON_0_OR_1__ && __LVDS1_ON_0_OR_1__) \
+-    || (__LVDS0_ON_2_OR_3__ && __LVDS1_ON_2_OR_3__))
+-		crtc = "ipu1-di1";
+-#else
+-		crtc = "ipu2-di1";
+-#endif
+-		fsl,data-mapping = CONFIG_PICOMODA9_LVDS1_MAPPING;
+-		fsl,data-width = <CONFIG_PICOMODA9_LVDS1_DATA_WIDTH>;
+-#ifdef __LVDS1_PRIMARY__
+-		primary;
+-#endif
+ 		status = "okay";
+ 
+-		display-timings {
+-			native-mode = <&timing1>;
+-			timing1: CONFIG_PICOMODA9_LVDS1_TIMING;
++		port@4 {
++			reg = <4>;
++
++			lvds1_out: endpoint {
++				remote-endpoint = <&panel_in_lvds1>;
++			};
+ 		};
+ 	};
+ #endif
+ };
+-#endif /* CONFIG_PICOMODA9_LVDS0 || CONFIG_PICOMODA9_LVDS1 */
++#endif
+ 
+ &iomuxc {
+ 	pinctrl-names = "default";
+-- 
+2.40.1
+

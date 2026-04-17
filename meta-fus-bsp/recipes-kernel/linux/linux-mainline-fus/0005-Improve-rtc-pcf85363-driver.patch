@@ -1,10 +1,10 @@
-From c44cb3f74d5fe4e7bc04399c995c39f9c7d356e7 Mon Sep 17 00:00:00 2001
-Message-Id: <c44cb3f74d5fe4e7bc04399c995c39f9c7d356e7.1765541409.git.gerbach@fs-net.de>
-In-Reply-To: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
-References: <1136d5984def64a1ed82cb36ba313f2651b7c130.1765541409.git.gerbach@fs-net.de>
+From 1e421c2df2e5595a7747c7dd89c96f1cf79e98e4 Mon Sep 17 00:00:00 2001
+Message-Id: <1e421c2df2e5595a7747c7dd89c96f1cf79e98e4.1778077871.git.gerbach@fs-net.de>
+In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:49:07 +0200
-Subject: [PATCH 05/11] Improve rtc-pcf85363 driver
+Subject: [PATCH 4/7] Improve rtc-pcf85363 driver
 
 This patch adds additional device-tree configuration options, like
 output clock speed, quarz drive strength and quartz low jitter.

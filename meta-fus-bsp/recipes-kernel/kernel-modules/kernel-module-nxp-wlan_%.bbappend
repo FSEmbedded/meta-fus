@@ -14,7 +14,7 @@ SOC_FAMILY                    = "INVALID"
 SOC_FAMILY:mx93-generic-bsp   = "mx93"
 SOC_FAMILY:mx8ulp-generic-bsp   = "mx93"
 SOC_FAMILY:mx8-generic-bsp   = "mx8"
-
+SOC_FAMILY:mx6-generic-bsp   = "mx6"
 do_install:append () {
     # install mxm-wifiex to install, blacklist supported driver
     install -d ${D}${sysconfdir}/modprobe.d/
@@ -36,6 +36,10 @@ do_install_mx93 () {
 }
 
 do_install_mx8 () {
+	echo
+}
+
+do_install_mx6 () {
 	echo
 }
 

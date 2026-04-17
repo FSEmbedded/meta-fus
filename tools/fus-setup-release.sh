@@ -34,6 +34,8 @@ add_chromium() {
 		add_layer "meta-browser/meta-chromium"
 		add_layer "meta-lts-mixins"
 		add_config "IMAGE_INSTALL:append = \" chromium-ozone-wayland\""
+		add_config "MKUBIFS_ARGS = \"-m 2048 -e 126976 -c 2548\""
+
 	fi
 }
 

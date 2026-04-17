@@ -1,7 +1,7 @@
 From d2bc590de9a015843951363174ba1bb8664885e5 Mon Sep 17 00:00:00 2001
-Message-Id: <d2bc590de9a015843951363174ba1bb8664885e5.1778077783.git.gerbach@fs-net.de>
-In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077783.git.gerbach@fs-net.de>
-References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077783.git.gerbach@fs-net.de>
+Message-Id: <d2bc590de9a015843951363174ba1bb8664885e5.1778077871.git.gerbach@fs-net.de>
+In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
 From: Philipp Gerbach <gerbach@fs-net.de>
 Date: Tue, 13 May 2025 16:44:03 +0200
 Subject: [PATCH 3/7] Add fus version of pca963x led driver

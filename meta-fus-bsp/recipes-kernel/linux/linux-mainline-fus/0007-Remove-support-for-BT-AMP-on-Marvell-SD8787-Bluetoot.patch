@@ -1,0 +1,45 @@
+From fced4a43df55b5de548687af00aeb9874372cdd9 Mon Sep 17 00:00:00 2001
+Message-Id: <fced4a43df55b5de548687af00aeb9874372cdd9.1778077871.git.gerbach@fs-net.de>
+In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Fri, 18 Jul 2025 12:45:09 +0200
+Subject: [PATCH 6/7] Remove support for BT-AMP on Marvell SD8787 Bluetooth
+
+WLAN/Bluetooth chips based on Marvell SD8787 have three SDIO functions.
+
+ - Device 0x9119 is the WLAN device (function 1)
+ - Device 0x911a is the main bluetooth device (function 2)
+ - Device 0x911b is the BT-AMP device (function 3)
+
+ Current Marvell firmware versions do not support BT-AMP (function 3).
+ When trying to install the firmware, the device does never indicate
+ success and the driver times out. And even worse, if the WLAN driver
+ had started its initialization before, it will also get into trouble
+ by this long delay and refuses to work afterwards.
+
+ Therefore remove BT-AMP support on this device. This will remove the
+ ugly delay from the timeout when booting and WLAN will work smoothly.
+---
+ drivers/bluetooth/btmrvl_sdio.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/bluetooth/btmrvl_sdio.c b/drivers/bluetooth/btmrvl_sdio.c
+index 07cd308f7..b2c19040a 100644
+--- a/drivers/bluetooth/btmrvl_sdio.c
++++ b/drivers/bluetooth/btmrvl_sdio.c
+@@ -1515,6 +1515,11 @@ static int btmrvl_sdio_probe(struct sdio_func *func,
+ 	BT_INFO("vendor=0x%x, device=0x%x, class=%d, fn=%d",
+ 			id->vendor, id->device, id->class, func->num);
+ 
++	if (id->device == SDIO_DEVICE_ID_MARVELL_8787_BT_AMP) {
++		BT_INFO("skip BT-AMP, not supported by firmware");
++		return -ENXIO;
++	};
++
+ 	card = devm_kzalloc(&func->dev, sizeof(*card), GFP_KERNEL);
+ 	if (!card)
+ 		return -ENOMEM;
+-- 
+2.40.1
+

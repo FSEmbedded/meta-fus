@@ -1,0 +1,72 @@
+From cd52d252a43a583dc3047c1cd89f91ef75f81966 Mon Sep 17 00:00:00 2001
+Message-Id: <cd52d252a43a583dc3047c1cd89f91ef75f81966.1778077871.git.gerbach@fs-net.de>
+In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Fri, 18 Jul 2025 12:43:43 +0200
+Subject: [PATCH 5/7] Add support for BGR666 format to IPU
+
+Add BGR666 pixelmode to i.MX6 IPU, this is required for F&S efusA9.
+---
+ drivers/gpu/drm/imx/ipuv3/parallel-display.c | 3 +++
+ drivers/gpu/ipu-v3/ipu-dc.c                  | 9 +++++++++
+ 2 files changed, 12 insertions(+)
+
+diff --git a/drivers/gpu/drm/imx/ipuv3/parallel-display.c b/drivers/gpu/drm/imx/ipuv3/parallel-display.c
+index 91d7808a2..ebb61fe67 100644
+--- a/drivers/gpu/drm/imx/ipuv3/parallel-display.c
++++ b/drivers/gpu/drm/imx/ipuv3/parallel-display.c
+@@ -112,6 +112,7 @@ static const u32 imx_pd_bus_fmts[] = {
+ 	MEDIA_BUS_FMT_BGR888_1X24,
+ 	MEDIA_BUS_FMT_GBR888_1X24,
+ 	MEDIA_BUS_FMT_RGB666_1X18,
++	MEDIA_BUS_FMT_BGR666_1X18,
+ 	MEDIA_BUS_FMT_RGB666_1X24_CPADHI,
+ 	MEDIA_BUS_FMT_RGB565_1X16,
+ };
+@@ -341,6 +342,8 @@ static int imx_pd_probe(struct platform_device *pdev)
+ 			bus_format = MEDIA_BUS_FMT_RGB565_1X16;
+ 		else if (!strcmp(fmt, "bgr666"))
+ 			bus_format = MEDIA_BUS_FMT_RGB666_1X18;
++		else if (!strcmp(fmt, "rgb666"))
++			bus_format = MEDIA_BUS_FMT_BGR666_1X18;
+ 		else if (!strcmp(fmt, "lvds666"))
+ 			bus_format = MEDIA_BUS_FMT_RGB666_1X24_CPADHI;
+ 	}
+diff --git a/drivers/gpu/ipu-v3/ipu-dc.c b/drivers/gpu/ipu-v3/ipu-dc.c
+index b038a6d73..c77a7de7d 100644
+--- a/drivers/gpu/ipu-v3/ipu-dc.c
++++ b/drivers/gpu/ipu-v3/ipu-dc.c
+@@ -84,6 +84,7 @@ enum ipu_dc_map {
+ 	IPU_DC_MAP_BGR666,
+ 	IPU_DC_MAP_LVDS666,
+ 	IPU_DC_MAP_BGR24,
++	IPU_DC_MAP_RGB666,
+ };
+ 
+ struct ipu_dc {
+@@ -150,6 +151,8 @@ static int ipu_bus_format_to_map(u32 fmt)
+ 		return IPU_DC_MAP_GBR24;
+ 	case MEDIA_BUS_FMT_RGB666_1X18:
+ 		return IPU_DC_MAP_BGR666;
++	case MEDIA_BUS_FMT_BGR666_1X18:
++		return IPU_DC_MAP_RGB666;
+ 	case MEDIA_BUS_FMT_RGB666_1X24_CPADHI:
+ 		return IPU_DC_MAP_LVDS666;
+ 	case MEDIA_BUS_FMT_BGR888_1X24:
+@@ -406,6 +409,12 @@ int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 1, 11, 0xfc); /* green */
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_BGR666, 2, 17, 0xfc); /* red */
+ 
++	/* rgb666 */
++	ipu_dc_map_clear(priv, IPU_DC_MAP_RGB666);
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 0, 17, 0xfc); /* blue */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 1, 11, 0xfc); /* green */
++	ipu_dc_map_config(priv, IPU_DC_MAP_RGB666, 2, 5, 0xfc); /* red */
++
+ 	/* lvds666 */
+ 	ipu_dc_map_clear(priv, IPU_DC_MAP_LVDS666);
+ 	ipu_dc_map_config(priv, IPU_DC_MAP_LVDS666, 0, 5, 0xfc); /* blue */
+-- 
+2.40.1
+

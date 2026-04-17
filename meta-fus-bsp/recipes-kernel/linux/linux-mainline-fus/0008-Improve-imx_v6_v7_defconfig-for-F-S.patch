@@ -1,0 +1,56 @@
+From fe7b43ca58191ff715f05645cc69852f63c167fd Mon Sep 17 00:00:00 2001
+Message-Id: <fe7b43ca58191ff715f05645cc69852f63c167fd.1752836791.git.gerbach@fs-net.de>
+In-Reply-To: <c4ef2100dd61d9bbf2c6d2ce4484d018ba8ced76.1752836791.git.gerbach@fs-net.de>
+References: <c4ef2100dd61d9bbf2c6d2ce4484d018ba8ced76.1752836791.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Fri, 18 Jul 2025 12:48:39 +0200
+Subject: [PATCH 8/8] Improve imx_v6_v7_defconfig for F&S
+
+- Activate F&S nand driver
+- Use F&S version of PCA963x for PWM support
+- Activate MRVL bluetooth driver for armstoneA9r2
+- Build touchscreendriver as modules to keep zImage small
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 29 ++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 333ef5547..240b5041c 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -492,3 +492,32 @@ CONFIG_DEBUG_FS=y
+ # CONFIG_SLUB_DEBUG is not set
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_FTRACE is not set
++
++CONFIG_MTD_NAND_GPMI_NAND_FUS=y
++CONFIG_MXS_DMA_EXT=y
++CONFIG_MTD_UBI_FASTMAP=n
++CONFIG_LEDS_PCA963X_FUS=y
++CONFIG_BT_MRVL_SDIO=m
++CONFIG_BT_MRVL=m
++CONFIG_TOUCHSCREEN_ILITEK=m
++CONFIG_TOUCHSCREEN_EDT_FT5X06=m
++CONFIG_TOUCHSCREEN_ADS7846=m
++CONFIG_TOUCHSCREEN_AD7879=m
++CONFIG_TOUCHSCREEN_AD7879_I2C=m
++CONFIG_TOUCHSCREEN_ATMEL_MXT=m
++CONFIG_TOUCHSCREEN_CYTTSP5=m
++CONFIG_TOUCHSCREEN_DA9052=m
++CONFIG_TOUCHSCREEN_EGALAX=m
++CONFIG_TOUCHSCREEN_GOODIX=m
++CONFIG_TOUCHSCREEN_ILI210X=m
++CONFIG_TOUCHSCREEN_MAX11801=m
++CONFIG_TOUCHSCREEN_IMX6UL_TSC=m
++CONFIG_TOUCHSCREEN_EDT_FT5X06=m
++CONFIG_TOUCHSCREEN_MC13783=m
++CONFIG_TOUCHSCREEN_TSC2004=m
++CONFIG_TOUCHSCREEN_TSC2007=m
++CONFIG_TOUCHSCREEN_STMPE=m
++CONFIG_TOUCHSCREEN_SX8654=m
++CONFIG_TOUCHSCREEN_COLIBRI_VF50=m
++
++
+-- 
+2.40.1
+

@@ -1,0 +1,4872 @@
+From cdf9c9e06e70210bd53105e3c43ef8f1275160d9 Mon Sep 17 00:00:00 2001
+Message-Id: <cdf9c9e06e70210bd53105e3c43ef8f1275160d9.1778077871.git.gerbach@fs-net.de>
+In-Reply-To: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+References: <7e6ae2fd2e8637521a3eb42efcd4e7051b853b9a.1778077871.git.gerbach@fs-net.de>
+From: Philipp Gerbach <gerbach@fs-net.de>
+Date: Fri, 18 Jul 2025 12:37:11 +0200
+Subject: [PATCH 2/7] Add the F&S gpmi-nand driver
+
+i.MX6 F&S Boards use the gpmi-fus driver, which introduces a own NAND
+layout. To be able compliant with older U-boots we have to stick to this
+layout. For this we also need a F&S specific dma driver.
+---
+ drivers/dma/Kconfig                           |    9 +
+ drivers/dma/Makefile                          |    1 +
+ drivers/dma/mxs-dma-ext.c                     |  895 ++++++
+ drivers/mtd/nand/raw/Kconfig                  |    7 +
+ drivers/mtd/nand/raw/gpmi-nand/Makefile       |    2 +
+ drivers/mtd/nand/raw/gpmi-nand/bch-regs.h     |   20 +-
+ .../mtd/nand/raw/gpmi-nand/gpmi-nand-fus.c    | 2843 +++++++++++++++++
+ drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.h    |    7 +-
+ drivers/mtd/nand/raw/nand_base.c              |  389 +--
+ drivers/mtd/nand/raw/nand_bbt.c               |    4 +-
+ include/linux/mtd/mtd.h                       |    3 +-
+ include/linux/mtd/rawnand.h                   |    5 +
+ include/linux/mxs-dma-ext.h                   |   60 +
+ 13 files changed, 4046 insertions(+), 199 deletions(-)
+
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index d9ec1e69e..fa4af20c2 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -506,6 +506,15 @@ config MXS_DMA
+ 	  Support the MXS DMA engine. This engine including APBH-DMA
+ 	  and APBX-DMA is integrated into some Freescale chips.
+ 
++config MXS_DMA_EXT
++	bool "Extended MXS DMA support"
++	depends on SOC_IMX23 || SOC_IMX28 || SOC_IMX6
++	select STMP_DEVICE
++	select DMA_ENGINE
++	help
++	  Use the extended version of the MXS DMA engine to have better
++	  GPMI NAND support on i.MX6.
++
+ config NBPFAXI_DMA
+ 	tristate "Renesas Type-AXI NBPF DMA support"
+ 	select DMA_ENGINE
+diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
+index ad6a03c05..4e7331368 100644
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -62,6 +62,7 @@ obj-$(CONFIG_MPC512X_DMA) += mpc512x_dma.o
+ obj-$(CONFIG_MV_XOR) += mv_xor.o
+ obj-$(CONFIG_MV_XOR_V2) += mv_xor_v2.o
+ obj-$(CONFIG_MXS_DMA) += mxs-dma.o
++obj-$(CONFIG_MXS_DMA_EXT) += mxs-dma-ext.o
+ obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
+ obj-$(CONFIG_OWL_DMA) += owl-dma.o
+ obj-$(CONFIG_PCH_DMA) += pch_dma.o
+diff --git a/drivers/dma/mxs-dma-ext.c b/drivers/dma/mxs-dma-ext.c
+new file mode 100644
+index 000000000..b44c0500e
+--- /dev/null
++++ b/drivers/dma/mxs-dma-ext.c
+@@ -0,0 +1,895 @@
++/*
++ * Copyright 2011-2015 Freescale Semiconductor, Inc. All Rights Reserved.
++ * Copyright 2015-2016 F&S Elektronik Systeme GmbH
++ *
++ * Refer to drivers/dma/imx-sdma.c
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/types.h>
++#include <linux/mm.h>
++#include <linux/interrupt.h>
++#include <linux/clk.h>
++#include <linux/wait.h>
++#include <linux/sched.h>
++#include <linux/semaphore.h>
++#include <linux/device.h>
++#include <linux/genalloc.h>
++#include <linux/dma-mapping.h>
++#include <linux/slab.h>
++#include <linux/platform_device.h>
++#include <linux/dmaengine.h>
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/mxs-dma-ext.h>
++#include <linux/stmp_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/of_dma.h>
++#include <linux/pm_runtime.h>
++#include <linux/dmapool.h>
++#include <asm/irq.h>
++
++#include "dmaengine.h"			/* Cookie stuff */
++
++/*
++ * NOTE: The term "PIO" throughout the mxs-dma implementation means
++ * PIO mode of mxs apbh-dma and apbx-dma.  With this working mode,
++ * dma can program the controller registers of peripheral devices.
++ */
++
++#define dma_is_apbh(mxs_dma)	((mxs_dma)->type == MXS_DMA_APBH)
++#define apbh_is_old(mxs_dma)	((mxs_dma)->dev_id == IMX23_DMA)
++
++#define MXS_DMA_RPM_TIMEOUT 50 /* ms */
++
++#define HW_APBHX_CTRL0				0x000
++#define BM_APBH_CTRL0_APB_BURST8_EN		(1 << 29)
++#define BM_APBH_CTRL0_APB_BURST_EN		(1 << 28)
++#define BP_APBH_CTRL0_RESET_CHANNEL		16
++#define HW_APBHX_CTRL1				0x010
++#define HW_APBHX_CTRL2				0x020
++#define HW_APBHX_CHANNEL_CTRL			0x030
++#define BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL	16
++/*
++ * The offset of NXTCMDAR register is different per both dma type and version,
++ * while stride for each channel is all the same 0x70.
++ */
++#define HW_APBHX_CHn_NXTCMDAR(d, n) \
++	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x050 : 0x110) + (n) * 0x70)
++#define HW_APBHX_CHn_SEMA(d, n) \
++	(((dma_is_apbh(d) && apbh_is_old(d)) ? 0x080 : 0x140) + (n) * 0x70)
++#define HW_APBX_CHn_DEBUG1(d, n) (0x150 + (n) * 0x70)
++
++#define CCW_BLOCK_SIZE	(PAGE_SIZE)
++#define NUM_CCW	(int)(CCW_BLOCK_SIZE / sizeof(struct mxs_dma_ccw))
++
++struct mxs_dma_chan {
++	struct mxs_dma_engine		*mxs_dma;
++	struct dma_chan			chan;
++	struct dma_async_tx_descriptor	desc;
++	struct tasklet_struct		tasklet;
++	unsigned int			chan_irq;
++	struct mxs_dma_ccw		*ccw;
++	dma_addr_t			ccw_phys;
++	unsigned int			desc_index;
++	unsigned int			desc_count;
++	enum dma_status			status;
++	struct dma_pool			*ccw_pool;
++};
++
++#define MXS_DMA_CHANNELS		16
++#define MXS_DMA_CHANNELS_MASK		0xffff
++
++enum mxs_dma_devtype {
++	MXS_DMA_APBH,
++	MXS_DMA_APBX,
++};
++
++enum mxs_dma_id {
++	IMX23_DMA,
++	IMX28_DMA,
++	IMX7D_DMA,
++};
++
++struct mxs_dma_engine {
++	enum mxs_dma_id			dev_id;
++	enum mxs_dma_devtype		type;
++	void __iomem			*base;
++	struct clk			*clk;
++	struct clk			*clk_io;
++	struct dma_device		dma_device;
++	struct device_dma_parameters	dma_parms;
++	struct mxs_dma_chan		mxs_chans[MXS_DMA_CHANNELS];
++	struct platform_device		*pdev;
++	unsigned int			nr_channels;
++	bool				use_iram;
++	struct gen_pool 		*iram_pool;
++};
++
++struct mxs_dma_type {
++	enum mxs_dma_id id;
++	enum mxs_dma_devtype type;
++};
++
++static struct mxs_dma_type mxs_dma_types[] = {
++	{
++		.id = IMX23_DMA,
++		.type = MXS_DMA_APBH,
++	}, {
++		.id = IMX23_DMA,
++		.type = MXS_DMA_APBX,
++	}, {
++		.id = IMX28_DMA,
++		.type = MXS_DMA_APBH,
++	}, {
++		.id = IMX28_DMA,
++		.type = MXS_DMA_APBX,
++	}, {
++		.id = IMX7D_DMA,
++		.type = MXS_DMA_APBH,
++	}
++};
++
++static const struct platform_device_id mxs_dma_ext_ids[] = {
++	{
++		.name = "imx23-dma-ext-apbh",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[0],
++	}, {
++		.name = "imx23-dma-ext-apbx",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[1],
++	}, {
++		.name = "imx28-dma-ext-apbh",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[2],
++	}, {
++		.name = "imx28-dma-ext-apbx",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[3],
++	}, {
++		.name = "imx7d-dma-ext-apbh",
++		.driver_data = (kernel_ulong_t) &mxs_dma_types[4],
++	}, {
++		/* end of list */
++	}
++};
++
++static const struct of_device_id mxs_dma_ext_dt_ids[] = {
++	{ .compatible = "fus,imx23-dma-apbh", .data = &mxs_dma_ext_ids[0], },
++	{ .compatible = "fus,imx23-dma-apbx", .data = &mxs_dma_ext_ids[1], },
++	{ .compatible = "fus,imx28-dma-apbh", .data = &mxs_dma_ext_ids[2], },
++	{ .compatible = "fus,imx28-dma-apbx", .data = &mxs_dma_ext_ids[3], },
++	{ .compatible = "fus,imx7d-dma-apbh", .data = &mxs_dma_ext_ids[4], },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, mxs_dma_ext_dt_ids);
++
++static struct mxs_dma_chan *to_mxs_dma_ext_chan(struct dma_chan *chan)
++{
++	return container_of(chan, struct mxs_dma_chan, chan);
++}
++
++static void mxs_dma_ext_start_new_chain(struct mxs_dma_chan *mxs_chan)
++{
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_id = mxs_chan->chan.chan_id;
++	u32 current_pos;
++
++	/* The NEXTCMDAR points to the next desc that will be executed */
++	current_pos = readl(mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(mxs_dma,
++								  chan_id));
++	mxs_chan->desc_index =	(struct mxs_dma_ccw *)current_pos
++				- (struct mxs_dma_ccw *)mxs_chan->ccw_phys;
++	mxs_chan->desc_count = 0;
++
++//	printk("### DMA %d: next chain starting @ 0x%08x\n", chan_id, current_pos);
++}
++
++static void mxs_dma_ext_reset_chan(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_id = mxs_chan->chan.chan_id;
++
++//	printk("### DMA %d: resetting channel\n", chan_id);
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma)) {
++		writel(1 << (chan_id + BP_APBH_CTRL0_RESET_CHANNEL),
++			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
++	} else {
++		unsigned long elapsed = 0;
++		const unsigned long max_wait = 50000; /* 50ms */
++		void __iomem *reg_dbg1 = mxs_dma->base +
++				HW_APBX_CHn_DEBUG1(mxs_dma, chan_id);
++
++		/*
++		 * On i.MX28 APBX, the DMA channel can stop working if we reset
++		 * the channel while it is in READ_FLUSH (0x08) state.
++		 * We wait here until we leave the state. Then we trigger the
++		 * reset. Waiting a maximum of 50ms, the kernel shouldn't crash
++		 * because of this.
++		 */
++		while ((readl(reg_dbg1) & 0xf) == 0x8 && elapsed < max_wait) {
++			udelay(100);
++			elapsed += 100;
++		}
++
++		if (elapsed >= max_wait)
++			dev_err(&mxs_chan->mxs_dma->pdev->dev,
++					"Failed waiting for the DMA channel %d to leave state READ_FLUSH, trying to reset channel in READ_FLUSH state now\n",
++					chan_id);
++
++		writel(1 << (chan_id + BP_APBHX_CHANNEL_CTRL_RESET_CHANNEL),
++			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
++	}
++
++	mxs_chan->status = DMA_COMPLETE;
++
++	/* Set cmd_addr for first descriptor */
++	writel(mxs_chan->ccw_phys,
++		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(mxs_dma, chan_id));
++
++	mxs_dma_ext_start_new_chain(mxs_chan);
++}
++
++static void mxs_dma_ext_enable_chan(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_id = mxs_chan->chan.chan_id;
++
++#if 0
++	/* set cmd_addr up */
++	writel(mxs_chan->ccw_phys,
++		mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(mxs_dma, chan_id));
++#endif
++//	printk("### DMA %d go: 0x%08x\n", chan_id,
++//	       readl(mxs_dma->base + HW_APBHX_CHn_NXTCMDAR(chan_id)));
++
++	/* write 1 to SEMA to kick off the channel */
++	writel(1, mxs_dma->base + HW_APBHX_CHn_SEMA(mxs_dma, chan_id));
++}
++
++static void mxs_dma_ext_disable_chan(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++
++	mxs_chan->status = DMA_COMPLETE;
++}
++
++static int mxs_dma_ext_pause_chan(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_id = mxs_chan->chan.chan_id;
++
++	/* freeze the channel */
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
++		writel(1 << chan_id,
++			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
++	else
++		writel(1 << chan_id,
++			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_SET);
++
++	mxs_chan->status = DMA_PAUSED;
++	return 0;
++}
++
++static int mxs_dma_ext_resume_chan(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_id = mxs_chan->chan.chan_id;
++
++	/* unfreeze the channel */
++	if (dma_is_apbh(mxs_dma) && apbh_is_old(mxs_dma))
++		writel(1 << chan_id,
++			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_CLR);
++	else
++		writel(1 << chan_id,
++			mxs_dma->base + HW_APBHX_CHANNEL_CTRL + STMP_OFFSET_REG_CLR);
++
++	mxs_chan->status = DMA_IN_PROGRESS;
++	return 0;
++}
++
++static dma_cookie_t mxs_dma_ext_tx_submit(struct dma_async_tx_descriptor *tx)
++{
++	return dma_cookie_assign(tx);
++}
++
++static void mxs_dma_ext_tasklet(unsigned long data)
++{
++	struct mxs_dma_chan *mxs_chan = (struct mxs_dma_chan *)data;
++
++	dmaengine_desc_get_callback_invoke(&mxs_chan->desc, NULL);
++}
++
++static int mxs_dma_ext_irq_to_chan(struct mxs_dma_engine *mxs_dma, int irq)
++{
++	int i;
++
++	for (i = 0; i != mxs_dma->nr_channels; ++i)
++		if (mxs_dma->mxs_chans[i].chan_irq == irq)
++			return i;
++
++	return -EINVAL;
++}
++
++static irqreturn_t mxs_dma_ext_int_handler(int irq, void *dev_id)
++{
++	struct mxs_dma_engine *mxs_dma = dev_id;
++	struct mxs_dma_chan *mxs_chan;
++	u32 completed;
++	u32 err;
++	int chan = mxs_dma_ext_irq_to_chan(mxs_dma, irq);
++
++	if (chan < 0)
++		return IRQ_NONE;
++
++	/* completion status */
++	completed = readl(mxs_dma->base + HW_APBHX_CTRL1);
++	completed = (completed >> chan) & 0x1;
++
++	/* Clear interrupt */
++	writel((1 << chan),
++			mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_CLR);
++
++	/* error status */
++	err = readl(mxs_dma->base + HW_APBHX_CTRL2) >> chan;
++
++	/*
++	 * error status bit is in the upper 16 bits, error irq bit in the lower
++	 * 16 bits. We transform it into a simpler error code:
++	 * err: 0x00 = no error, 0x01 = TERMINATION, 0x02 = BUS_ERROR
++	 */
++	err = ((err >> MXS_DMA_CHANNELS) & 1) + (err & 1);
++
++	/* Clear error irq */
++	writel((1 << chan),
++			mxs_dma->base + HW_APBHX_CTRL2 + STMP_OFFSET_REG_CLR);
++
++	/*
++	 * When both completion and error of termination bits set at the
++	 * same time, we do not take it as an error.  IOW, it only becomes
++	 * an error we need to handle here in case of either it's a bus
++	 * error or a termination error with no completion. 0x01 is termination
++	 * error, so we can subtract err & completed to get the real error case.
++	 */
++	err -= err & completed;
++
++	mxs_chan = &mxs_dma->mxs_chans[chan];
++
++	if (err) {
++		dev_dbg(mxs_dma->dma_device.dev,
++			"%s: error in channel %d\n", __func__,
++			chan);
++		mxs_chan->status = DMA_ERROR;
++		mxs_dma_ext_reset_chan(&mxs_chan->chan);
++	} else if (mxs_chan->status != DMA_COMPLETE) {
++		mxs_chan->status = DMA_COMPLETE;
++		mxs_dma_ext_start_new_chain(mxs_chan);
++	}
++
++	if (mxs_chan->status == DMA_COMPLETE)
++		dma_cookie_complete(&mxs_chan->desc);
++
++	/* schedule tasklet on this channel */
++	tasklet_schedule(&mxs_chan->tasklet);
++
++	return IRQ_HANDLED;
++}
++
++static int mxs_dma_ext_alloc_chan_resources(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	struct mxs_dma_ccw *ccw_phys;
++	struct device *dev = &mxs_dma->pdev->dev;
++	int ret;
++	int i, n;
++
++	if (mxs_dma->use_iram) {
++		mxs_chan->ccw = gen_pool_dma_alloc(mxs_dma->iram_pool,
++						   CCW_BLOCK_SIZE,
++						   &mxs_chan->ccw_phys);
++	} else {
++		mxs_chan->ccw = dma_pool_zalloc(mxs_chan->ccw_pool,
++					       GFP_ATOMIC,
++					       &mxs_chan->ccw_phys);
++	}
++	if (!mxs_chan->ccw) {
++		ret = -ENOMEM;
++		goto err_alloc;
++	}
++
++	memset(mxs_chan->ccw, 0, CCW_BLOCK_SIZE);
++
++	/* Set the next pointer of all descriptors to build a ring buffer */
++	ccw_phys = (struct mxs_dma_ccw *)mxs_chan->ccw_phys;
++//	printk("### DMA %d: ring buffer @ 0x%p, %d descriptors of size 0x%x\n",
++//	       mxs_chan->chan.chan_id, ccw_phys, NUM_CCW,
++//	       sizeof(struct mxs_dma_ccw));
++	for (i = 0; i < NUM_CCW; i++)
++	{
++		n = i + 1;
++		if (n >= NUM_CCW)
++			n = 0;
++		mxs_chan->ccw[i].next = (u32)(ccw_phys + n);
++	}
++
++	ret = request_irq(mxs_chan->chan_irq, mxs_dma_ext_int_handler,
++			  0, "mxs-dma", mxs_dma);
++	if (ret)
++		goto err_irq;
++
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enable clock\n");
++		goto err_clk;
++	}
++
++	mxs_dma_ext_reset_chan(chan);
++
++	dma_async_tx_descriptor_init(&mxs_chan->desc, chan);
++	mxs_chan->desc.tx_submit = mxs_dma_ext_tx_submit;
++
++	/* the descriptor is ready */
++	async_tx_ack(&mxs_chan->desc);
++
++	return 0;
++
++err_clk:
++	free_irq(mxs_chan->chan_irq, mxs_dma);
++err_irq:
++	if (mxs_dma->use_iram) {
++		gen_pool_free(mxs_dma->iram_pool, (unsigned long)mxs_chan->ccw,
++			      CCW_BLOCK_SIZE);
++	} else {
++		dma_pool_free(mxs_chan->ccw_pool, mxs_chan->ccw,
++			      mxs_chan->ccw_phys);
++	}
++err_alloc:
++	return ret;
++}
++
++static void mxs_dma_ext_free_chan_resources(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	struct device *dev = &mxs_dma->pdev->dev;
++
++	mxs_dma_ext_disable_chan(chan);
++
++	free_irq(mxs_chan->chan_irq, mxs_dma);
++
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
++
++	if (mxs_dma->use_iram) {
++		gen_pool_free(mxs_dma->iram_pool, (unsigned long)mxs_chan->ccw,
++			      CCW_BLOCK_SIZE);
++	} else {
++		dma_pool_free(mxs_chan->ccw_pool, mxs_chan->ccw,
++			      mxs_chan->ccw_phys);
++	}
++}
++
++/*
++ * Add further DMA descriptors. We misuse the sgl pointer for this purpose.
++ */
++static struct dma_async_tx_descriptor *mxs_dma_ext_prep_slave_sg(
++		struct dma_chan *chan, struct scatterlist *sgl,
++		unsigned int sg_len, enum dma_transfer_direction direction,
++		unsigned long flags, void *context)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	struct mxs_dma_ccw *ccw;
++	struct mxs_dma_ccw *ccw_in;
++	unsigned int index;
++	unsigned int i;
++	u32 cmd;
++
++	/* An empty descriptor array can be used to cancel the DMA chain */
++	if (!sg_len || !sgl) {
++		mxs_chan->status = DMA_ERROR;
++		mxs_dma_ext_start_new_chain(mxs_chan);
++
++		return NULL;
++	}
++
++	/* Check if there is room for the new descriptors */
++	if (mxs_chan->desc_count + sg_len > NUM_CCW) {
++		dev_err(mxs_dma->dma_device.dev,
++			"%d descriptors exceeded, canceling whole DMA chain\n",
++			NUM_CCW);
++
++		mxs_chan->status = DMA_ERROR;
++		mxs_dma_ext_start_new_chain(mxs_chan);
++
++		return NULL;
++	}
++
++	/* Remove end-of-chain signalling from the previous descriptor */
++	index = mxs_chan->desc_index;
++	if (mxs_chan->desc_count) {
++		unsigned int last = index;
++
++		if (!last)
++			last = NUM_CCW;
++		last--;
++		mxs_chan->ccw[last].cmd &= ~(CCW_IRQ | CCW_DEC_SEM);
++	}
++
++	/* Copy the passed descriptors to the ring buffer */
++	mxs_chan->desc_count += sg_len;
++	ccw_in = (struct mxs_dma_ccw *)sgl;
++	do {
++		/*
++		 * Copy main part of descriptor. Ignore "next" entries, they
++		 * are already set to build the ring buffer. Add end-of-chain
++		 * signalling to the last descriptor.
++		 */
++		ccw = &mxs_chan->ccw[index];
++		cmd = ccw_in->cmd | CCW_CHAIN;
++		if (sg_len > 1)
++			cmd &= ~(CCW_IRQ | CCW_DEC_SEM);
++		else
++			cmd |= CCW_IRQ | CCW_DEC_SEM;
++		ccw->cmd = cmd;
++		ccw->bufaddr = ccw_in->bufaddr;
++
++		/* Copy PIO words. No need to use memcpy() for these few. */
++		cmd = (cmd & CCW_PIO_NUM_MASK) >> CCW_PIO_NUM_SHIFT;
++		for (i = 0; i < cmd; i++)
++			ccw->pio[i] = ccw_in->pio[i];
++
++		/* Go to next descriptor */
++		ccw_in++;
++		if (++index >= NUM_CCW)
++			index = 0;
++	} while (--sg_len);
++
++	mxs_chan->desc_index = index;
++	mxs_chan->status = DMA_IN_PROGRESS;
++
++	return &mxs_chan->desc;
++}
++
++static int mxs_dma_ext_terminate_all(struct dma_chan *chan)
++{
++	mxs_dma_ext_reset_chan(chan);
++	mxs_dma_ext_disable_chan(chan);
++
++	return 0;
++}
++
++static enum dma_status mxs_dma_ext_tx_status(struct dma_chan *chan,
++			dma_cookie_t cookie, struct dma_tx_state *txstate)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++
++	dma_set_tx_state(txstate, chan->completed_cookie, chan->cookie, 0);
++
++	return mxs_chan->status;
++}
++
++static void mxs_dma_ext_issue_pending(struct dma_chan *chan)
++{
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++
++	if (mxs_chan->desc_count) {
++//		printk("### DMA: executing chain with %d entries\n", mxs_chan->desc_count);
++		mxs_dma_ext_enable_chan(chan);
++	} else {
++//		printk("### DMA: Empty chain, nothing to do\n");
++		mxs_chan->status = DMA_COMPLETE;
++
++		/* schedule tasklet for callback on this channel */
++		tasklet_schedule(&mxs_chan->tasklet);
++	}
++}
++static int mxs_dma_ext_init_rpm(struct mxs_dma_engine *mxs_dma)
++{
++	struct device *dev = &mxs_dma->pdev->dev;
++
++	pm_runtime_enable(dev);
++	pm_runtime_set_autosuspend_delay(dev, MXS_DMA_RPM_TIMEOUT);
++	pm_runtime_use_autosuspend(dev);
++
++	return 0;
++}
++static int mxs_dma_ext_init(struct mxs_dma_engine *mxs_dma)
++{
++	struct device *dev = &mxs_dma->pdev->dev;
++	int ret;
++	ret = mxs_dma_ext_init_rpm(mxs_dma);
++	if (ret)
++		return ret;
++
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0) {
++		dev_err(dev, "Failed to enable clock\n");
++		return ret;
++	}
++
++	ret = stmp_reset_block(mxs_dma->base);
++	if (ret)
++		goto err_clk;
++
++	/* enable apbh burst */
++	if (dma_is_apbh(mxs_dma)) {
++		writel(BM_APBH_CTRL0_APB_BURST_EN,
++			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
++		writel(BM_APBH_CTRL0_APB_BURST8_EN,
++			mxs_dma->base + HW_APBHX_CTRL0 + STMP_OFFSET_REG_SET);
++	}
++
++	/* enable irq for all the channels */
++	writel(MXS_DMA_CHANNELS_MASK << MXS_DMA_CHANNELS,
++		mxs_dma->base + HW_APBHX_CTRL1 + STMP_OFFSET_REG_SET);
++
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
++err_clk:
++	return ret;
++}
++
++struct mxs_dma_filter_param {
++	struct device_node *of_node;
++	unsigned int chan_id;
++};
++
++static bool mxs_dma_filter_fn(struct dma_chan *chan, void *fn_param)
++{
++	struct mxs_dma_filter_param *param = fn_param;
++	struct mxs_dma_chan *mxs_chan = to_mxs_dma_ext_chan(chan);
++	struct mxs_dma_engine *mxs_dma = mxs_chan->mxs_dma;
++	int chan_irq;
++
++	if (strcmp(chan->device->dev->driver->name, "mxs-dma-ext"))
++		return false;
++
++	if (!mxs_dma)
++		return false;
++
++	if (mxs_dma->dma_device.dev->of_node != param->of_node)
++		return false;
++
++	if (chan->chan_id != param->chan_id)
++		return false;
++
++	chan_irq = platform_get_irq(mxs_dma->pdev, param->chan_id);
++	if (chan_irq < 0)
++		return false;
++
++	mxs_chan->chan_irq = chan_irq;
++
++	return true;
++}
++
++static struct dma_chan *mxs_dma_xlate(struct of_phandle_args *dma_spec,
++			       struct of_dma *ofdma)
++{
++	struct mxs_dma_engine *mxs_dma = ofdma->of_dma_data;
++	dma_cap_mask_t mask = mxs_dma->dma_device.cap_mask;
++	struct mxs_dma_filter_param param;
++
++	if (dma_spec->args_count != 1)
++		return NULL;
++
++	param.of_node = ofdma->of_node;
++	param.chan_id = dma_spec->args[0];
++
++	if (param.chan_id >= mxs_dma->nr_channels)
++		return NULL;
++
++	return dma_request_channel(mask, mxs_dma_filter_fn, &param);
++}
++
++static int mxs_dma_ext_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const struct platform_device_id *id_entry;
++	const struct of_device_id *of_id;
++	const struct mxs_dma_type *dma_type;
++	struct mxs_dma_engine *mxs_dma;
++	struct resource *iores;
++	struct dma_pool *ccw_pool;
++	int ret, i;
++
++	mxs_dma = devm_kzalloc(&pdev->dev, sizeof(*mxs_dma), GFP_KERNEL);
++	if (!mxs_dma)
++		return -ENOMEM;
++
++	ret = of_property_read_u32(np, "dma-channels", &mxs_dma->nr_channels);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to read dma-channels\n");
++		return ret;
++	}
++
++	mxs_dma->iram_pool = of_gen_pool_get(np, "iram", 0);
++	if (!mxs_dma->iram_pool)
++		dev_warn(&pdev->dev, "no iram assigned, using external mem\n");
++	else
++		mxs_dma->use_iram = true;
++
++	of_id = of_match_device(mxs_dma_ext_dt_ids, &pdev->dev);
++	if (of_id)
++		id_entry = of_id->data;
++	else
++		id_entry = platform_get_device_id(pdev);
++
++	dma_type = (struct mxs_dma_type *)id_entry->driver_data;
++	mxs_dma->type = dma_type->type;
++	mxs_dma->dev_id = dma_type->id;
++
++	iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	mxs_dma->base = devm_ioremap_resource(&pdev->dev, iores);
++	if (IS_ERR(mxs_dma->base))
++		return PTR_ERR(mxs_dma->base);
++	mxs_dma->clk = devm_clk_get(&pdev->dev, NULL);
++	if (IS_ERR(mxs_dma->clk))
++		return PTR_ERR(mxs_dma->clk);
++	dma_cap_set(DMA_SLAVE, mxs_dma->dma_device.cap_mask);
++
++	INIT_LIST_HEAD(&mxs_dma->dma_device.channels);
++
++	/* Initialize channel parameters */
++	for (i = 0; i < MXS_DMA_CHANNELS; i++) {
++		struct mxs_dma_chan *mxs_chan = &mxs_dma->mxs_chans[i];
++
++		mxs_chan->mxs_dma = mxs_dma;
++		mxs_chan->chan.device = &mxs_dma->dma_device;
++		dma_cookie_init(&mxs_chan->chan);
++
++		tasklet_init(&mxs_chan->tasklet, mxs_dma_ext_tasklet,
++			     (unsigned long) mxs_chan);
++
++		/* Add the channel to mxs_chan list */
++		list_add_tail(&mxs_chan->chan.device_node,
++			&mxs_dma->dma_device.channels);
++	}
++
++	platform_set_drvdata(pdev, mxs_dma);
++	mxs_dma->pdev = pdev;
++	ret = mxs_dma_ext_init(mxs_dma);
++	if (ret)
++		return ret;
++
++	mxs_dma->dma_device.dev = &pdev->dev;
++	dev_set_drvdata(&pdev->dev, mxs_dma);
++
++	/* create the dma pool */
++	ccw_pool = dma_pool_create("ccw_pool",
++					     mxs_dma->dma_device.dev,
++					     CCW_BLOCK_SIZE, 32, 0);
++
++	for (i = 0; i < MXS_DMA_CHANNELS; i++) {
++		struct mxs_dma_chan *mxs_chan = &mxs_dma->mxs_chans[i];
++		mxs_chan->ccw_pool = ccw_pool;
++	}
++
++	/* mxs_dma gets 65535 bytes maximum sg size */
++	mxs_dma->dma_device.dev->dma_parms = &mxs_dma->dma_parms;
++	dma_set_max_seg_size(mxs_dma->dma_device.dev, MAX_XFER_BYTES);
++
++	mxs_dma->dma_device.device_alloc_chan_resources =
++					mxs_dma_ext_alloc_chan_resources;
++	mxs_dma->dma_device.device_free_chan_resources =
++					mxs_dma_ext_free_chan_resources;
++	mxs_dma->dma_device.device_tx_status = mxs_dma_ext_tx_status;
++	mxs_dma->dma_device.device_prep_slave_sg = mxs_dma_ext_prep_slave_sg;
++	mxs_dma->dma_device.device_pause = mxs_dma_ext_pause_chan;
++	mxs_dma->dma_device.device_resume = mxs_dma_ext_resume_chan;
++	mxs_dma->dma_device.device_terminate_all = mxs_dma_ext_terminate_all;
++	mxs_dma->dma_device.src_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	mxs_dma->dma_device.dst_addr_widths = BIT(DMA_SLAVE_BUSWIDTH_4_BYTES);
++	mxs_dma->dma_device.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	mxs_dma->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++	mxs_dma->dma_device.device_issue_pending = mxs_dma_ext_issue_pending;
++
++	ret = dma_async_device_register(&mxs_dma->dma_device);
++	if (ret) {
++		dev_err(mxs_dma->dma_device.dev, "unable to register\n");
++		return ret;
++	}
++
++	ret = of_dma_controller_register(np, mxs_dma_xlate, mxs_dma);
++	if (ret) {
++		dev_err(mxs_dma->dma_device.dev,
++			"failed to register controller\n");
++		dma_async_device_unregister(&mxs_dma->dma_device);
++	}
++
++	dev_info(mxs_dma->dma_device.dev, "initialized\n");
++
++	return 0;
++}
++
++static void mxs_dma_ext_remove(struct platform_device *pdev)
++{
++	struct mxs_dma_engine *mxs_dma = platform_get_drvdata(pdev);
++	int i;
++
++	dma_async_device_unregister(&mxs_dma->dma_device);
++
++	if (mxs_dma->use_iram) {
++		gen_pool_free(mxs_dma->iram_pool, (unsigned long)mxs_dma->mxs_chans->ccw,
++			      CCW_BLOCK_SIZE);
++	} else {
++
++		dma_pool_destroy(mxs_dma->mxs_chans[0].ccw_pool);
++
++		for (i = 0; i < MXS_DMA_CHANNELS; i++) {
++			struct mxs_dma_chan *mxs_chan = &mxs_dma->mxs_chans[i];
++			tasklet_kill(&mxs_chan->tasklet);
++			mxs_chan->ccw_pool = NULL;
++		}
++	}
++}
++
++#ifdef CONFIG_PM_SLEEP
++static int mxs_dma_ext_pm_suspend(struct device *dev)
++{
++	int ret;
++
++	ret = pm_runtime_force_suspend(dev);
++
++	return ret;
++}
++
++static int mxs_dma_ext_pm_resume(struct device *dev)
++{
++	struct mxs_dma_engine *mxs_dma = dev_get_drvdata(dev);
++	int ret;
++
++	ret = mxs_dma_ext_init(mxs_dma);
++	if (ret)
++		return ret;
++	return 0;
++}
++#endif
++
++static int mxs_dma_ext_runtime_suspend(struct device *dev)
++{
++	struct mxs_dma_engine *mxs_dma = dev_get_drvdata(dev);
++
++	clk_disable_unprepare(mxs_dma->clk);
++
++	return 0;
++}
++
++static int mxs_dma_ext_runtime_resume(struct device *dev)
++{
++	struct mxs_dma_engine *mxs_dma = dev_get_drvdata(dev);
++	int ret;
++
++	ret = clk_prepare_enable(mxs_dma->clk);
++	if (ret) {
++		dev_err(&mxs_dma->pdev->dev, "failed to enable the clock\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct dev_pm_ops mxs_dma_ext_pm_ops = {
++	SET_RUNTIME_PM_OPS(mxs_dma_ext_runtime_suspend, mxs_dma_ext_runtime_resume, NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(mxs_dma_ext_pm_suspend, mxs_dma_ext_pm_resume)
++};
++
++static struct platform_driver mxs_dma_ext_driver = {
++	.driver		= {
++		.name	= "mxs-dma-ext",
++		.pm = &mxs_dma_ext_pm_ops,
++		.of_match_table = mxs_dma_ext_dt_ids,
++	},
++	.id_table	= mxs_dma_ext_ids,
++	.remove		= mxs_dma_ext_remove,
++	.probe		= mxs_dma_ext_probe,
++};
++
++module_platform_driver(mxs_dma_ext_driver);
+diff --git a/drivers/mtd/nand/raw/Kconfig b/drivers/mtd/nand/raw/Kconfig
+index d0aaccf72..5f37ef635 100644
+--- a/drivers/mtd/nand/raw/Kconfig
++++ b/drivers/mtd/nand/raw/Kconfig
+@@ -220,6 +220,13 @@ config MTD_NAND_GPMI_NAND
+ 	  module, it can do the hardware ECC. The GPMI supports several
+ 	  NAND flashs at the same time.
+ 
++config MTD_NAND_GPMI_NAND_FUS
++	tristate "GPMI NAND Flash Controller driver (F&S version)"
++	depends on MTD_RAW_NAND && MXS_DMA_EXT
++	help
++	  Enables NAND Flash support for i.MX6 on F&S boards and modules.
++	  It uses the new and extended version of the APBH DMA driver.
++
+ config MTD_NAND_FSL_ELBC
+ 	tristate "Freescale eLBC NAND controller"
+ 	depends on FSL_SOC
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/Makefile b/drivers/mtd/nand/raw/gpmi-nand/Makefile
+index 247cbfcea..74228a085 100644
+--- a/drivers/mtd/nand/raw/gpmi-nand/Makefile
++++ b/drivers/mtd/nand/raw/gpmi-nand/Makefile
+@@ -1,2 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ obj-$(CONFIG_MTD_NAND_GPMI_NAND) += gpmi-nand.o
++obj-$(CONFIG_MTD_NAND_GPMI_NAND_FUS) += gpmi_nand_fus.o
++gpmi_nand_fus-objs += gpmi-nand-fus.o
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/bch-regs.h b/drivers/mtd/nand/raw/gpmi-nand/bch-regs.h
+index a22b8a506..593739c2f 100644
+--- a/drivers/mtd/nand/raw/gpmi-nand/bch-regs.h
++++ b/drivers/mtd/nand/raw/gpmi-nand/bch-regs.h
+@@ -24,6 +24,9 @@
+ #define HW_BCH_LAYOUTSELECT			0x00000070
+ 
+ #define HW_BCH_FLASH0LAYOUT0			0x00000080
++#define HW_BCH_FLASH1LAYOUT0			0x000000A0
++#define HW_BCH_FLASH2LAYOUT0			0x000000C0
++#define HW_BCH_FLASH3LAYOUT0			0x000000E0
+ 
+ #define BP_BCH_FLASH0LAYOUT0_NBLOCKS		24
+ #define BM_BCH_FLASH0LAYOUT0_NBLOCKS	(0xff << BP_BCH_FLASH0LAYOUT0_NBLOCKS)
+@@ -41,7 +44,7 @@
+ #define MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0		11
+ #define MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)
+ #define BF_BCH_FLASH0LAYOUT0_ECC0(v, x)				\
+-	(GPMI_IS_MX6(x)					\
++	((GPMI_IS_MX6(x) || GPMI_IS_MX8(x))			\
+ 		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT0_ECC0)	\
+ 			& MX6Q_BM_BCH_FLASH0LAYOUT0_ECC0)	\
+ 		: (((v) << BP_BCH_FLASH0LAYOUT0_ECC0)		\
+@@ -52,7 +55,7 @@
+ #define MX6Q_BM_BCH_FLASH0LAYOUT0_GF_13_14			\
+ 				(0x1 << MX6Q_BP_BCH_FLASH0LAYOUT0_GF_13_14)
+ #define BF_BCH_FLASH0LAYOUT0_GF(v, x)				\
+-	((GPMI_IS_MX6(x) && ((v) == 14))			\
++	(((GPMI_IS_MX6(x) || GPMI_IS_MX8(x)) && ((v) == 14))	\
+ 		? (((1) << MX6Q_BP_BCH_FLASH0LAYOUT0_GF_13_14)	\
+ 			& MX6Q_BM_BCH_FLASH0LAYOUT0_GF_13_14)	\
+ 		: 0						\
+@@ -64,12 +67,16 @@
+ #define MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE	\
+ 			(0x3ff << BP_BCH_FLASH0LAYOUT0_DATA0_SIZE)
+ #define BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(v, x)				\
+-	(GPMI_IS_MX6(x)						\
++	((GPMI_IS_MX6(x) || GPMI_IS_MX8(x))				\
+ 		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)	\
+ 		: ((v) & BM_BCH_FLASH0LAYOUT0_DATA0_SIZE)		\
+ 	)
++#define BM_BCH_FLASH0LAYOUT0_GF13_0_GF14_1 0x00000400
+ 
+ #define HW_BCH_FLASH0LAYOUT1			0x00000090
++#define HW_BCH_FLASH1LAYOUT1			0x000000B0
++#define HW_BCH_FLASH2LAYOUT1			0x000000D0
++#define HW_BCH_FLASH3LAYOUT1			0x000000F0
+ 
+ #define BP_BCH_FLASH0LAYOUT1_PAGE_SIZE		16
+ #define BM_BCH_FLASH0LAYOUT1_PAGE_SIZE		\
+@@ -83,7 +90,7 @@
+ #define MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN		11
+ #define MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN	(0x1f << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)
+ #define BF_BCH_FLASH0LAYOUT1_ECCN(v, x)				\
+-	(GPMI_IS_MX6(x)					\
++	((GPMI_IS_MX6(x) || GPMI_IS_MX8(x))			\
+ 		? (((v) << MX6Q_BP_BCH_FLASH0LAYOUT1_ECCN)	\
+ 			& MX6Q_BM_BCH_FLASH0LAYOUT1_ECCN)	\
+ 		: (((v) << BP_BCH_FLASH0LAYOUT1_ECCN)		\
+@@ -94,7 +101,7 @@
+ #define MX6Q_BM_BCH_FLASH0LAYOUT1_GF_13_14			\
+ 				(0x1 << MX6Q_BP_BCH_FLASH0LAYOUT1_GF_13_14)
+ #define BF_BCH_FLASH0LAYOUT1_GF(v, x)				\
+-	((GPMI_IS_MX6(x) && ((v) == 14))			\
++	(((GPMI_IS_MX6(x) || GPMI_IS_MX8(x)) && ((v) == 14))	\
+ 		? (((1) << MX6Q_BP_BCH_FLASH0LAYOUT1_GF_13_14)	\
+ 			& MX6Q_BM_BCH_FLASH0LAYOUT1_GF_13_14)	\
+ 		: 0						\
+@@ -106,10 +113,11 @@
+ #define MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE	\
+ 			(0x3ff << BP_BCH_FLASH0LAYOUT1_DATAN_SIZE)
+ #define BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(v, x)				\
+-	(GPMI_IS_MX6(x)						\
++	((GPMI_IS_MX6(x) || GPMI_IS_MX8(x))				\
+ 		? (((v) >> 2) & MX6Q_BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)	\
+ 		: ((v) & BM_BCH_FLASH0LAYOUT1_DATAN_SIZE)		\
+ 	)
++#define BM_BCH_FLASH0LAYOUT1_GF13_0_GF14_1 0x00000400
+ 
+ #define HW_BCH_VERSION				0x00000160
+ #endif
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand-fus.c b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand-fus.c
+new file mode 100644
+index 000000000..4b29cb4f0
+--- /dev/null
++++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand-fus.c
+@@ -0,0 +1,2843 @@
++/*
++ * F&S i.MX6 GPMI NAND flash driver
++ *
++ * Copyright (C) 2015 F&S Elektronik Systeme GmbH
++ *
++ * This driver uses parts of the code of the Freescale GPMI NAND flash driver
++ * (see gpmi-nand.c and gpmi-lib.c).
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program; if not, write to the Free Software Foundation, Inc.,
++ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
++ */
++
++/*
++ * ### TODO-List:
++ * - Set correct timeout values in TIMING1 for WAIT4READY descriptors
++ * - Set clock to be compatible to NBoot/U-Boot.
++ * - Check all gpmi-lib calls (duplicated here) if they can be removed.
++ * - Probably make gpmi-regs.h and bch-regs.h easier.
++ */
++
++#include <linux/clk.h>
++#include <linux/slab.h>
++#include <linux/sched/task_stack.h>
++#include <linux/interrupt.h>
++#include <linux/module.h>
++#include <linux/mtd/partitions.h>
++#include <linux/mtd/rawnand.h>
++#include <linux/mxs-dma-ext.h>		/* struct mxs_dma_ccw, CCW_*, ... */
++#include <linux/platform_device.h>	/* GPMI_ */
++#include <linux/dma-mapping.h>		/* dma_alloc_coherent(), ... */
++#include <linux/delay.h>		/* udelay() */
++#include <linux/pm_runtime.h>
++//#include <linux/busfreq-imx.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/consumer.h>
++#include "gpmi-regs.h"
++#include "bch-regs.h"
++
++/* Resource names for the GPMI NAND driver. */
++#define GPMI_NAND_GPMI_REGS_ADDR_RES_NAME  "gpmi-nand"
++#define GPMI_NAND_BCH_REGS_ADDR_RES_NAME   "bch"
++#define GPMI_NAND_BCH_INTERRUPT_RES_NAME   "bch"
++
++/* Default metadata size if no ecc_strength is given in platform data */
++#define GPMI_NAND_METADATA_SIZE	32
++
++/* Part of buffer that is used for commands */
++#define GPMI_FUS_CMD_BUF_SIZE	64
++
++/* Timeout values (in ms) */
++#define GPMI_FUS_TIMEOUT_RESET	10
++#define GPMI_FUS_TIMEOUT_DATA	100
++#define GPMI_FUS_TIMEOUT_WRITE	100
++#define GPMI_FUS_TIMEOUT_ERASE	400
++#define GPMI_FUS_TIMEOUT_RPM	50
++
++/* BCH : Status Block Completion Codes */
++#define STATUS_GOOD		0x00
++#define STATUS_ERASED		0xff
++#define STATUS_UNCORRECTABLE	0xfe
++
++/* Use the type to distinguish different Archs. */
++#define GPMI_IS_MX23(x)		((x)->devdata->type == IS_MX23)
++#define GPMI_IS_MX28(x)		((x)->devdata->type == IS_MX28)
++#define GPMI_IS_MX6Q(x)		((x)->devdata->type == IS_MX6Q)
++#define GPMI_IS_MX6QP(x)	((x)->devdata->type == IS_MX6QP)
++#define GPMI_IS_MX6SX(x)	((x)->devdata->type == IS_MX6SX)
++#define GPMI_IS_MX7D(x)		((x)->devdata->type == IS_MX7D)
++#define GPMI_IS_MX6UL(x)	((x)->devdata->type == IS_MX6UL)
++#define GPMI_IS_MX8QXP(x)	((x)->devdata->type == IS_MX8QXP)
++/* i.MX6UL version also works for i.MX6ULL */
++
++#define GPMI_IS_MX6(x)		(GPMI_IS_MX6Q(x) || GPMI_IS_MX6QP(x)\
++	   || GPMI_IS_MX6SX(x) || GPMI_IS_MX6UL(x))
++#define GPMI_IS_MX7(x)		(GPMI_IS_MX7D(x))
++#define GPMI_IS_MX8(x)		(GPMI_IS_MX8QXP(x))
++
++
++#define GPMI_CLK_MAX 5 /* MX6Q needs five clocks */
++struct resources {
++	void __iomem  *gpmi_regs;
++	void __iomem  *bch_regs;
++	unsigned int  dma_low_channel;
++	unsigned int  dma_high_channel;
++	struct clk    *clock[GPMI_CLK_MAX];
++};
++
++/* DMA operations types */
++enum dma_ops_type {
++	DMA_FOR_COMMAND = 1,
++	DMA_FOR_READ_DATA,
++	DMA_FOR_WRITE_DATA,
++	DMA_FOR_READ_ECC_PAGE,
++	DMA_FOR_WRITE_ECC_PAGE
++};
++
++/**
++ * struct nand_timing - Fundamental timing attributes for NAND.
++ * @data_setup_in_ns:         The data setup time, in nanoseconds. Usually the
++ *                            maximum of tDS and tWP. A negative value
++ *                            indicates this characteristic isn't known.
++ * @data_hold_in_ns:          The data hold time, in nanoseconds. Usually the
++ *                            maximum of tDH, tWH and tREH. A negative value
++ *                            indicates this characteristic isn't known.
++ * @address_setup_in_ns:      The address setup time, in nanoseconds. Usually
++ *                            the maximum of tCLS, tCS and tALS. A negative
++ *                            value indicates this characteristic isn't known.
++ * @gpmi_sample_delay_in_ns:  A GPMI-specific timing parameter. A negative value
++ *                            indicates this characteristic isn't known.
++ * @tREA_in_ns:               tREA, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ * @tRLOH_in_ns:              tRLOH, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ * @tRHOH_in_ns:              tRHOH, in nanoseconds, from the data sheet. A
++ *                            negative value indicates this characteristic isn't
++ *                            known.
++ */
++struct nand_timing {
++	int8_t  data_setup_in_ns;
++	int8_t  data_hold_in_ns;
++	int8_t  address_setup_in_ns;
++	int8_t  gpmi_sample_delay_in_ns;
++	int8_t  tREA_in_ns;
++	int8_t  tRLOH_in_ns;
++	int8_t  tRHOH_in_ns;
++};
++
++enum gpmi_type {
++	IS_MX23,
++	IS_MX28,
++	IS_MX6Q,
++	IS_MX6QP,
++	IS_MX6SX,
++	IS_MX7D,
++	IS_MX6UL,
++	IS_MX8QXP
++};
++
++struct gpmi_devdata {
++	enum gpmi_type type;
++	int bch_max_ecc_strength;
++	int max_chain_delay; /* See the async EDO mode */
++	const char * const *clks;
++	const int clks_count;
++};
++
++/**
++ * struct gpmi_nfc_hardware_timing - GPMI hardware timing parameters.
++ * @must_apply_timings:        Whether controller timings have already been
++ *                             applied or not (useful only while there is
++ *                             support for only one chip select)
++ * @clk_rate:                  The clock rate that must be used to derive the
++ *                             following parameters
++ * @timing0:                   HW_GPMI_TIMING0 register
++ * @timing1:                   HW_GPMI_TIMING1 register
++ * @ctrl1n:                    HW_GPMI_CTRL1n register
++ */
++struct gpmi_nfc_hardware_timing {
++	bool must_apply_timings;
++	unsigned long int clk_rate;
++	u32 timing0;
++	u32 timing1;
++	u32 ctrl1n;
++};
++
++#define ASYNC_EDO_ENABLED		1
++#define ASYNC_EDO_TIMING_CONFIGED	2
++struct gpmi_nand_data {
++	/* Flags */
++#define GPMI_ASYNC_EDO_ENABLED	(1 << 0)
++#define GPMI_TIMING_INIT_OK	(1 << 1)
++	int			flags;
++	const struct gpmi_devdata *devdata;
++
++	/* System Interface */
++	struct device		*dev;
++	struct platform_device	*pdev;
++
++	/* Resources */
++	struct resources	resources;
++
++	/* Flash Hardware */
++	struct gpmi_nfc_hardware_timing hw;
++
++	/* BCH */
++	struct completion	bch_done;
++
++	/* NAND Boot issue */
++	bool			swap_block_mark;
++
++	/* MTD / NAND */
++	struct nand_controller	base;
++	struct nand_chip	nand;
++
++	/* General-use Variables */
++	int			current_chip;
++	unsigned int		command_length;
++
++	/* for DMA operations */
++	bool			direct_dma_map_ok;
++
++	uint8_t			*cmd_buffer_virt; /* cmd/data/status */
++	dma_addr_t		cmd_buffer_phys;
++
++	uint8_t			*data_buffer_virt;
++	dma_addr_t		data_buffer_phys;
++
++	uint8_t			*page_buffer_virt; /* full page data */
++	dma_addr_t		page_buffer_phys;
++
++	uint8_t			*auxiliary_virt;
++	dma_addr_t		auxiliary_phys;
++
++	uint8_t			*status_virt;
++
++	/* DMA channels */
++#define DMA_CHANS		8
++	struct dma_chan		*dma_chans[DMA_CHANS];
++	struct completion	dma_done;
++
++	/* private */
++	void			*private;
++	unsigned int		gf_len;
++	unsigned int		bch_layout;
++	uint8_t			column_cycles;
++	uint8_t			row_cycles;
++};
++
++/**
++ * struct timing_threshod - Timing threshold
++ * @max_data_setup_cycles:       The maximum number of data setup cycles that
++ *                               can be expressed in the hardware.
++ * @internal_data_setup_in_ns:   The time, in ns, that the NFC hardware requires
++ *                               for data read internal setup. In the Reference
++ *                               Manual, see the chapter "High-Speed NAND
++ *                               Timing" for more details.
++ * @max_sample_delay_factor:     The maximum sample delay factor that can be
++ *                               expressed in the hardware.
++ * @max_dll_clock_period_in_ns:  The maximum period of the GPMI clock that the
++ *                               sample delay DLL hardware can possibly work
++ *                               with (the DLL is unusable with longer periods).
++ *                               If the full-cycle period is greater than HALF
++ *                               this value, the DLL must be configured to use
++ *                               half-periods.
++ * @max_dll_delay_in_ns:         The maximum amount of delay, in ns, that the
++ *                               DLL can implement.
++ * @clock_frequency_in_hz:       The clock frequency, in Hz, during the current
++ *                               I/O transaction. If no I/O transaction is in
++ *                               progress, this is the clock frequency during
++ *                               the most recent I/O transaction.
++ */
++struct timing_threshod {
++	const unsigned int      max_chip_count;
++	const unsigned int      max_data_setup_cycles;
++	const unsigned int      internal_data_setup_in_ns;
++	const unsigned int      max_sample_delay_factor;
++	const unsigned int      max_dll_clock_period_in_ns;
++	const unsigned int      max_dll_delay_in_ns;
++	unsigned long           clock_frequency_in_hz;
++
++};
++
++/*
++ * F&S NAND page layout for i.MX6. The layout is heavily influenced by data
++ * flow requirements of the BCH error correction engine.
++ *
++ * The OOB area is put first in the page. Then the main page data follows in
++ * chunks of 512 or 1024 bytes, interleaved with ECC. For 1024 bytes chunk
++ * size, GF14 is needed, which means 14 bits of ECC data per ECC step. For 512
++ * bytes chunk size, GF13 is sufficient, which means 13 bits per ECC step. If
++ * CONFIG_SYS_NAND_MXS_CHUNK_1K is set, the driver uses 1024 bytes chunks,
++ * otherwise 512 bytes chunks.
++ *
++ * The bad block marker will also be located at byte 0 of the (main) page, NOT
++ * on the first byte of the spare area anymore! We need at least 4 bytes of
++ * OOB data for the bad block marker and the backup block number.
++ *
++ * |                  NAND flash main area                      | Spare area |
++ * +-----+----------+--------+-------+--------+-------+-----+--------+-------+
++ * | BBM | User OOB | Main 0 | ECC 0 | Main 1 | ECC 1 | ... | Main n | ECC n |
++ * +-----+----------+--------+-------+--------+-------+-----+--------+-------+
++ *    4    oobavail  512/1024         512/1024               512/1024
++ *
++ * The ECC size depends on the ECC strength and the chunk size. It is not
++ * necessarily a multiple of 8 bits, which means that subsequent sections may
++ * not be byte aligned anymore! But as long as we use NAND flashes with at
++ * least 2K page sizes, the final ECC section will always end byte aligned, no
++ * matter how odd the intermediate section crossings may be. This is even true
++ * for GF13.
++ *
++ * Example 1
++ * ---------
++ * NAND page size is 2048 + 64 = 2112 bytes. Chunk size is set to 512 bytes
++ * which means we can use GF13 and have four chunks. NBoot reports ECC2, which
++ * means 13 bits * 2 = 26 bits ECC data (3.25 bytes). So the main data will
++ * take 4x (512 + 3.25) = 2061 bytes. So we will have 2112 - 2061 = 51 bytes
++ * free space for OOB, from which we need 4 bytes for internal purposes. The
++ * remaining free space is 47 bytes for the User OOB data (mtd->oobavail).
++ *
++ * This results in the following rather complicated layout. Please note that
++ * the ECC data is not byte aligned and therefore all subsequent sections will
++ * also not be aligned to byte boundaries. However the final ECC section will
++ * end byte aligned again.
++ *
++ *                       Raw Page Data
++ *                      _______________
++ *                     |               | 4 Bytes
++ *                     | BBM           |
++ *                     |_______________|
++ *                     |               | 47 Bytes (oobavail)
++ *                     | User-OOB      |
++ *                     |_______________|
++ *                     |               | 512 Bytes
++ *                     | Main 0        |
++ *                     |_______________|
++ *                     |               | 26 Bits
++ *                     | ECC 0         |
++ *                     |___________    |
++ *                     |           |___|
++ *                     | Main 1        | 512 Bytes
++ *                     |___________    |
++ *                     |           |___|
++ *                     | ECC 1         | 26 Bits
++ *                     |_______        |
++ *                     |       |_______|
++ *                     |               | 512 Bytes
++ *                     |_______ Main 2 |
++ *                     |       |_______|
++ *                     |               | 26 Bits
++ *                     |___      ECC 2 |
++ *                     |   |___________|
++ *                     |               | 512 Bytes
++ *                     |___     Main 3 |
++ *                     |   |___________|
++ *                     |               | 26 Bits
++ *                     |         ECC 3 |
++ *                     |_______________|
++ *                      7 6 5 4 3 2 1 0
++ *                            Bit        2112 Bytes total
++ *
++ * Example 2
++ * ---------
++ * NAND page size is 2048 + 64 = 2112 bytes. Chunk size is set to 1024 bytes
++ * which means we must use GF14 and have two chunks. NBoot reports ECC8, which
++ * means 14 bits * 8 = 112 bits ECC data (14 bytes). So the main data will
++ * take 2x (1024 + 14) = 2076 bytes. So we will have 2112 - 2076 = 36 bytes
++ * free space for OOB, from which we need 4 bytes for internal purposes. The
++ * remaining free space is 32 bytes for the User OOB data (mtd->oobavail).
++ *
++ * This results in the following, significantly simpler layout where all
++ * sections are byte aligned. This is the default layout for F&S usages.
++ *
++ *                       Raw Page Data
++ *                      _______________
++ *                     |               | 4 Bytes
++ *                     | BBM           |
++ *                     |_______________|
++ *                     |               | 32 Bytes (oobavail)
++ *                     | User-OOB      |
++ *                     |_______________|
++ *                     |               | 1024 Bytes
++ *                     | Main 0        |
++ *                     |_______________|
++ *                     |               | 14 Bytes
++ *                     | ECC 0         |
++ *                     |_______________|
++ *                     |               | 1024 Bytes
++ *                     | Main 1        |
++ *                     |_______________|
++ *                     |               | 14 Bytes
++ *                     | ECC 1         |
++ *                     |_______________|
++ *                      7 6 5 4 3 2 1 0
++ *                            Bit        2112 Bytes total
++ */
++
++static int gpmi_ooblayout_fus_ecc(struct mtd_info *mtd, int section,
++			      struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section)
++		return -ERANGE;
++
++	oobregion->offset = mtd->oobsize - chip->ecc.total;
++	oobregion->length = chip->ecc.total;
++
++	return 0;
++}
++
++static int gpmi_ooblayout_fus_free(struct mtd_info *mtd, int section,
++			       struct mtd_oob_region *oobregion)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++
++	if (section)
++		return -ERANGE;
++
++	/* The available oob size we have. */
++	oobregion->offset = 4;
++	oobregion->length = mtd->oobsize - chip->ecc.total - 4;
++
++	return 0;
++}
++
++static const struct mtd_ooblayout_ops gpmi_ooblayout_fus_ops = {
++	.ecc = gpmi_ooblayout_fus_ecc,
++	.free = gpmi_ooblayout_fus_free,
++};
++
++static const char * const gpmi_clks_for_mx6[] = {
++	"gpmi_io", "gpmi_apb", "gpmi_bch", "gpmi_bch_apb", "per1_bch",
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx6q = {
++	.type = IS_MX6Q,
++	.bch_max_ecc_strength = 40,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx6qp = {
++	.type = IS_MX6QP,
++	.bch_max_ecc_strength = 40,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx6sx = {
++	.type = IS_MX6SX,
++	.bch_max_ecc_strength = 62,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx6ul = {
++	.type = IS_MX6UL,
++	.bch_max_ecc_strength = 40,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx6,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx6),
++};
++
++static const char * const gpmi_clks_for_mx7d[] = {
++	"gpmi_io", "gpmi_bch_apb",
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx7d = {
++	.type = IS_MX7D,
++	.bch_max_ecc_strength = 62,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx7d,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx7d),
++};
++
++static const char * gpmi_clks_for_mx8qxp[GPMI_CLK_MAX] = {
++	"gpmi_apb", "gpmi_bch", "gpmi_apb_bch",
++};
++
++static const struct gpmi_devdata gpmi_devdata_imx8qxp = {
++	.type = IS_MX8QXP,
++	.bch_max_ecc_strength = 62,
++	.max_chain_delay = 12000,
++	.clks = gpmi_clks_for_mx8qxp,
++	.clks_count = ARRAY_SIZE(gpmi_clks_for_mx8qxp),
++};
++
++static int showdesc; //###
++
++static struct dma_chan *get_dma_chan(struct gpmi_nand_data *priv);
++
++ 
++/* This function is very useful. It is called only when the bug occur. */
++static void gpmi_dump_info(struct gpmi_nand_data *this)
++{
++	struct resources *r = &this->resources;
++	struct nand_chip *chip = &this->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	u32 reg;
++	int i;
++
++	dev_err(this->dev, "Show GPMI registers :\n");
++	for (i = 0; i <= HW_GPMI_DEBUG / 0x10 + 1; i++) {
++		reg = readl(r->gpmi_regs + i * 0x10);
++		dev_err(this->dev, "offset 0x%.3x : 0x%.8x\n", i * 0x10, reg);
++	}
++
++	/* start to print out the BCH info */
++	dev_err(this->dev, "BCH Geometry :\n");
++	dev_err(this->dev, "GF length              : %u\n", this->gf_len);
++	dev_err(this->dev, "ECC Strength           : %u\n", chip->ecc.strength);
++	dev_err(this->dev, "Page Size in Bytes     : %u\n", mtd->writesize);
++	dev_err(this->dev, "Metadata Size in Bytes : %u\n", mtd->oobavail);
++	dev_err(this->dev, "ECC Chunk Size in Bytes: %u\n", chip->ecc.size);
++	dev_err(this->dev, "ECC Chunk Count        : %u\n", chip->ecc.steps);
++}
++
++#if 0
++static void gpmi_fus_show_regs(struct gpmi_nand_data *this)
++{
++	struct resources *r = &this->resources;
++	u32 reg;
++	int i;
++	int n;
++
++	n = 0xc0 / 0x10 + 1;
++
++	pr_info("-------------- Show GPMI registers ----------\n");
++	for (i = 0; i <= n; i++) {
++		reg = __raw_readl(r->gpmi_regs + i * 0x10);
++		pr_info("offset 0x%.3x : 0x%.8x\n", i * 0x10, reg);
++	}
++	pr_info("-------------- Show GPMI registers end ----------\n");
++	pr_info("-------------- Show BCH registers ----------\n");
++	for (i = 0; i <= n; i++) {
++		reg = __raw_readl(r->bch_regs + i * 0x10);
++		pr_info("offset 0x%.3x : 0x%.8x\n", i * 0x10, reg);
++	}
++	pr_info("-------------- Show BCH registers end ----------\n");
++}
++#endif
++
++/* -------------------- IRQ ------------------------------------------------ */
++
++static irqreturn_t bch_irq(int irq, void *cookie)
++{
++	struct gpmi_nand_data *this = cookie;
++	struct resources *r = &this->resources;
++
++	/* Clear BCH interrupt */
++	writel(BM_BCH_CTRL_COMPLETE_IRQ, r->bch_regs + HW_BCH_CTRL_CLR);
++	complete(&this->bch_done);
++
++	return IRQ_HANDLED;
++}
++
++/* This will be called after the DMA operation is finished. */
++static void dma_irq_callback(void *param)
++{
++	struct gpmi_nand_data *this = param;
++
++	complete(&this->dma_done);
++}
++
++static int start_dma_without_bch_irq(struct gpmi_nand_data *this,
++				     struct dma_async_tx_descriptor *desc)
++{
++	struct completion *dma_c = &this->dma_done;
++	int err;
++	dma_cookie_t cookie;
++
++	init_completion(dma_c);
++
++	desc->callback		= dma_irq_callback;
++	desc->callback_param	= this;
++	cookie = dmaengine_submit(desc);
++	dma_async_issue_pending(get_dma_chan(this));
++
++	this->command_length = 0;
++
++	/* Wait for the interrupt from the DMA block. */
++	err = wait_for_completion_timeout(dma_c, msecs_to_jiffies(1000));
++	if (!err) {
++		dev_err(this->dev, "DMA timeout\n");
++		gpmi_dump_info(this);
++		return -ETIMEDOUT;
++	}
++
++	/* Check if the DMA was successful */
++	if (desc->chan->device->device_tx_status(desc->chan, cookie, NULL)
++	    != DMA_COMPLETE) {
++		dev_err(this->dev, "DMA chain execution failed\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++/*
++ * This function is used when reading pages with BCH. First the DMA will
++ * trigger an interrupt when done, but we will ignore this. We will only wait
++ * for the COMPLETE_IRQ of the BCH which happens later.
++ */
++static int start_dma_with_bch_irq(struct gpmi_nand_data *priv,
++				  struct dma_async_tx_descriptor *desc)
++{
++	struct completion *bch_c = &priv->bch_done;
++	struct completion *dma_c = &priv->dma_done;
++	struct resources *r = &priv->resources;
++	unsigned long remain;
++	dma_cookie_t cookie;
++
++	/* Prepare to receive an interrupt from the BCH block. */
++	init_completion(bch_c);
++	init_completion(dma_c);
++
++	/* Remove any COMPLETE_IRQ states from previous writes (we only check
++	   COMPLETE_IRQ when reading); BCH has a pending state, too, so we may
++	   have to clear it twice. We simply clear until it remains zero. */
++	while (readl(r->bch_regs + HW_BCH_CTRL) & BM_BCH_CTRL_COMPLETE_IRQ)
++		writel(BM_BCH_CTRL_COMPLETE_IRQ, r->bch_regs + HW_BCH_CTRL_CLR);
++
++	/* Enable BCH complete interrupt */
++	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN, r->bch_regs + HW_BCH_CTRL_SET);
++
++	/* Start the DMA */
++	desc->callback		= dma_irq_callback;
++	desc->callback_param	= priv;
++	cookie = dmaengine_submit(desc);
++	dma_async_issue_pending(get_dma_chan(priv));
++
++	/* Wait for the interrupt from the DMA block. */
++	remain = wait_for_completion_timeout(dma_c, msecs_to_jiffies(1000));
++	if (!remain) {
++		dev_err(priv->dev, "DMA (+BCH) timeout\n");
++		gpmi_dump_info(priv);
++		return -ETIMEDOUT;
++	}
++
++	/* Wait for the interrupt from the BCH block. */
++	remain = wait_for_completion_timeout(bch_c, msecs_to_jiffies(1000));
++
++	/* Disable BCH complete interrupt */
++	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN, r->bch_regs + HW_BCH_CTRL_CLR);
++
++	if (!remain) {
++		dev_err(priv->dev, "BCH timeout\n");
++		gpmi_dump_info(priv);
++		return -ETIMEDOUT;
++	}
++
++	/* Check if the DMA was successful */
++	if (desc->chan->device->device_tx_status(desc->chan, cookie, NULL)
++	    != DMA_COMPLETE) {
++		dev_err(priv->dev,
++			"DMA chain execution failed while waiting for BCH\n");
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int acquire_bch_irq(struct gpmi_nand_data *this, irq_handler_t irq_h)
++{
++	struct platform_device *pdev = this->pdev;
++	const char *res_name = GPMI_NAND_BCH_INTERRUPT_RES_NAME;
++	int err;
++
++	err = platform_get_irq_byname(pdev, res_name);
++	if (err < 0)
++		return err;
++
++	err = devm_request_irq(this->dev, err, irq_h, 0, res_name, this);
++	if (err)
++		dev_err(this->dev, "error requesting BCH IRQ\n");
++
++	return err;
++}
++
++/* -------------------- DMA ------------------------------------------------ */
++
++static struct dma_chan *get_dma_chan(struct gpmi_nand_data *priv)
++{
++	int chipnr = priv->current_chip;
++
++	return priv->dma_chans[chipnr];
++}
++
++/*
++ * Wait until chip is ready.
++ */
++static int gpmi_fus_wait_ready(struct mtd_info *mtd, unsigned long timeout)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct resources *r = &priv->resources;
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct dma_async_tx_descriptor *desc;
++	struct mxs_dma_ccw ccw;
++	uint32_t tmp;
++	int ret;
++
++	/* ### TODO: Convert timeout value to GPMI ticks and set in
++	   gpmi_regs->hw_gpmi_timing1 */
++
++	/* Prepare DMA descriptor to wait for ready */
++	ccw.next = 0;
++	ccw.cmd = CCW_CMD_DMA_NO_XFER
++		| CCW_NAND_WAIT4READY
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(1);
++	ccw.bufaddr = 0;
++	ccw.pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
++		| BF_GPMI_CTRL0_XFER_COUNT(0);
++
++	if (showdesc) //###
++		printk("### WAIT4READY-DESC\n");
++	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&ccw,
++				       1, 0, 0);
++	if (!desc)
++		ret = -EINVAL;
++	else
++		ret = start_dma_without_bch_irq(priv, desc);
++	if (ret)
++		return ret;
++
++	/* Check for NAND timeout */
++	tmp = readl(r->gpmi_regs + HW_GPMI_STAT);
++	if (tmp & (1 << (priv->current_chip + 16))) {
++		printk("### NAND timeout waiting for Ready\n");
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
++/*
++ * Add a DMA descriptor for a command byte with optional arguments (row,
++ * column or a one byte argument)
++ */
++static struct dma_async_tx_descriptor *gpmi_fus_add_cmd_desc(
++				struct gpmi_nand_data *priv, uint command,
++				int column, int row, int param)
++{
++	uint8_t *cmd_virt = priv->cmd_buffer_virt + priv->command_length;
++	dma_addr_t cmd_phys = priv->cmd_buffer_phys + priv->command_length;
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct mxs_dma_ccw ccw;
++	int temp;
++	unsigned i;
++	uint32_t this_cmd_len = 0;
++
++	/* Prepare the data to send in cmd_virt[] */
++	cmd_virt[this_cmd_len++] = command;
++	if (column != -1) {
++		temp = column;
++		for (i = 0; i < priv->column_cycles; i++) {
++			cmd_virt[this_cmd_len++] = temp & 0xFF;
++			temp >>= 8;
++		}
++	}
++	if (row != -1) {
++		temp = row;
++		for (i = 0; i < priv->row_cycles; i++) {
++			cmd_virt[this_cmd_len++] = temp & 0xFF;
++			temp >>= 8;
++		}
++	}
++	if (param != -1)
++		cmd_virt[this_cmd_len++] = param & 0xFF;
++
++	{ //###
++		int i;
++		if (showdesc) {
++			printk("### CMD-DESC:");
++			for (i = 0; i < this_cmd_len; i ++)
++				printk(" %02X", cmd_virt[i]);
++			printk("\n");
++		}
++	}
++	priv->command_length += this_cmd_len;
++
++	/* Prepare DMA descriptor that sends the command byte (and address) */
++	ccw.next = 0;
++	ccw.cmd = CCW_CMD_DMA_READ
++		| CCW_NAND_LOCK
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(3)
++		| CCW_XFER_COUNT(this_cmd_len);
++	ccw.bufaddr = cmd_phys;
++	ccw.pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_LOCK_CS(LOCK_CS_ENABLE, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WRITE)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_CLE)
++		| BF_GPMI_CTRL0_XFER_COUNT(this_cmd_len);
++	if ((column != -1) || (row != -1) || (param != -1))
++		ccw.pio[0] |= BM_GPMI_CTRL0_ADDRESS_INCREMENT;
++	ccw.pio[1] = 0;
++	ccw.pio[2] = 0;
++
++	/* Add descriptor to DMA chain */
++	return dmaengine_prep_slave_sg(channel, (struct scatterlist *)&ccw,
++				       1, 0, 0);
++}
++
++/*
++ * Add DMA descriptor to read data from flash to local buffer
++ */
++static struct dma_async_tx_descriptor *gpmi_fus_read_data_buf(
++			struct mtd_info *mtd, dma_addr_t phys, uint32_t length)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct mxs_dma_ccw ccw;
++
++	/* Prepare DMA descriptor to read data */
++	ccw.next = 0;
++	ccw.cmd = CCW_CMD_DMA_WRITE
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(1)
++		| CCW_XFER_COUNT(length);
++	ccw.bufaddr = phys;
++	ccw.pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__READ)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
++		| BF_GPMI_CTRL0_XFER_COUNT(length);
++
++	if (showdesc) //###
++		printk("### READ-DATA-DESC: phys=0x%08x, len=%d\n", phys, length);
++
++	/* Add descriptor to DMA chain */
++	return dmaengine_prep_slave_sg(channel, (struct scatterlist *)&ccw,
++				       1, 0, 0);
++}
++
++/*
++ * Add DMA descriptor to write data from local buffer to flash. This does
++ * *not* execute the DMA chain right away, it will be executed later when the
++ * command waits for ready.
++ */
++static struct dma_async_tx_descriptor *gpmi_fus_write_data_buf(
++			struct mtd_info *mtd, dma_addr_t phys, uint32_t length)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct mxs_dma_ccw ccw;
++
++	/* Prepare DMA descriptor to write data */
++	ccw.next = 0;
++	ccw.cmd = CCW_CMD_DMA_READ
++		| CCW_NAND_LOCK
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(1)
++		| CCW_XFER_COUNT(length);
++	ccw.bufaddr = phys;
++	ccw.pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_LOCK_CS(LOCK_CS_ENABLE, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WRITE)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
++		| BF_GPMI_CTRL0_XFER_COUNT(length);
++
++	if (showdesc) //###
++		printk("### WRITE-DATA-DESC: phys=0x%08x, len=%d\n", phys, length);
++
++	/* Add descriptor to DMA chain */
++	return dmaengine_prep_slave_sg(channel, (struct scatterlist *)&ccw,
++				       1, 0, 0);
++}
++
++static void release_dma_channels(struct gpmi_nand_data *this)
++{
++	unsigned int i;
++	for (i = 0; i < DMA_CHANS; i++)
++		if (this->dma_chans[i]) {
++			dma_release_channel(this->dma_chans[i]);
++			this->dma_chans[i] = NULL;
++		}
++}
++
++static int acquire_dma_channels(struct gpmi_nand_data *this)
++{
++	struct platform_device *pdev = this->pdev;
++	struct dma_chan *dma_chan;
++	int ret = 0;
++
++	/* request dma channel */
++	dma_chan = dma_request_chan(&pdev->dev, "rx-tx");
++	if (IS_ERR(dma_chan)) {
++		ret = dev_err_probe(this->dev, PTR_ERR(dma_chan),
++				    "DMA channel request failed\n");
++		release_dma_channels(this);
++	} else {
++		this->dma_chans[0] = dma_chan;
++	}
++
++	return ret;
++}
++
++/* -------------------- GPMI-LIB STUFF ------------------------------------- */
++
++#define MXS_SET_ADDR		0x4
++#define MXS_CLR_ADDR		0x8
++/*
++ * Clear the bit and poll it cleared.  This is usually called with
++ * a reset address and mask being either SFTRST(bit 31) or CLKGATE
++ * (bit 30).
++ */
++static int clear_poll_bit(void __iomem *addr, u32 mask)
++{
++	int timeout = 0x400;
++
++	/* clear the bit */
++	writel(mask, addr + MXS_CLR_ADDR);
++
++	/*
++	 * SFTRST needs 3 GPMI clocks to settle, the reference manual
++	 * recommends to wait 1us.
++	 */
++	udelay(1);
++
++	/* poll the bit becoming clear */
++	while ((readl(addr) & mask) && --timeout)
++		/* nothing */;
++
++	return !timeout;
++}
++
++#define MODULE_CLKGATE		(1 << 30)
++#define MODULE_SFTRST		(1 << 31)
++/*
++ * The current mxs_reset_block() will do two things:
++ *  [1] enable the module.
++ *  [2] reset the module.
++ */
++static int gpmi_reset_block(struct gpmi_nand_data *priv,
++			    void __iomem *reset_addr)
++{
++	int ret;
++	int timeout = 0x400;
++
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
++
++	/* clear CLKGATE */
++	writel(MODULE_CLKGATE, reset_addr + MXS_CLR_ADDR);
++
++	/* set SFTRST to reset the block */
++	writel(MODULE_SFTRST, reset_addr + MXS_SET_ADDR);
++	udelay(1);
++
++	/* poll CLKGATE becoming set */
++	while ((!(readl(reset_addr) & MODULE_CLKGATE)) && --timeout)
++		/* nothing */;
++	if (unlikely(!timeout))
++		goto error;
++
++	/* clear and poll SFTRST */
++	ret = clear_poll_bit(reset_addr, MODULE_SFTRST);
++	if (unlikely(ret))
++		goto error;
++
++	/* clear and poll CLKGATE */
++	ret = clear_poll_bit(reset_addr, MODULE_CLKGATE);
++	if (unlikely(ret))
++		goto error;
++
++	return 0;
++
++error:
++	dev_err(priv->dev, "Module reset timeout for %p\n", reset_addr);
++	return -ETIMEDOUT;
++}
++
++static int gpmi_enable_clk(struct gpmi_nand_data *this, bool v)
++{
++	struct clk *clk;
++	int ret;
++	int i;
++
++	for (i = 0; i < GPMI_CLK_MAX; i++) {
++		clk = this->resources.clock[i];
++		if (!clk)
++			break;
++
++		if (v) {
++			ret = clk_prepare_enable(clk);
++			if (ret)
++				goto err_clk;
++		} else {
++			clk_disable_unprepare(clk);
++		}
++	}
++	return 0;
++
++err_clk:
++	for (; i > 0; i--)
++		clk_disable_unprepare(this->resources.clock[i - 1]);
++	return ret;
++}
++
++/* Configures the geometry for BCH.  */
++static int bch_set_geometry(struct gpmi_nand_data *priv, unsigned int oobavail,
++			    unsigned int index)
++{
++	struct resources *r = &priv->resources;
++	struct nand_chip *chip = &priv->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	unsigned int layout0, layout1;
++	int ret;
++
++	ret = pm_runtime_get_sync(priv->dev);
++	if (ret < 0) {
++		dev_err(priv->dev, "Failed to enable clock\n");
++		goto err_out;
++	}
++
++	ret = gpmi_reset_block(priv, r->bch_regs);
++	if (ret)
++		goto err_out;
++
++	/* Chunk #0 consists only of the metadata without any ECC */
++	layout0 = BF_BCH_FLASH0LAYOUT0_NBLOCKS(chip->ecc.steps)
++		| BF_BCH_FLASH0LAYOUT0_META_SIZE(oobavail + 4)
++		| BF_BCH_FLASH0LAYOUT0_ECC0(0, priv)
++		| BF_BCH_FLASH0LAYOUT0_DATA0_SIZE(0, priv);
++
++	/* All other chunks have chunk size and use ECC */
++	layout1 = BF_BCH_FLASH0LAYOUT1_PAGE_SIZE(mtd->writesize + mtd->oobsize)
++		| BF_BCH_FLASH0LAYOUT1_ECCN(chip->ecc.strength >> 1, priv)
++		| BF_BCH_FLASH0LAYOUT1_DATAN_SIZE(chip->ecc.size, priv);
++	if (priv->gf_len == 14)
++		layout1 |= BM_BCH_FLASH0LAYOUT1_GF13_0_GF14_1;
++
++	/* Configure the appropriate layout */
++	switch (index) {
++	case 0:
++		writel(layout0, r->bch_regs + HW_BCH_FLASH0LAYOUT0);
++		writel(layout1, r->bch_regs + HW_BCH_FLASH0LAYOUT1);
++		break;
++
++	case 1:
++		writel(layout0, r->bch_regs + HW_BCH_FLASH1LAYOUT0);
++		writel(layout1, r->bch_regs + HW_BCH_FLASH1LAYOUT1);
++		break;
++
++	case 2:
++		writel(layout0, r->bch_regs + HW_BCH_FLASH2LAYOUT0);
++		writel(layout1, r->bch_regs + HW_BCH_FLASH2LAYOUT1);
++		break;
++
++	case 3:
++		writel(layout0, r->bch_regs + HW_BCH_FLASH3LAYOUT0);
++		writel(layout1, r->bch_regs + HW_BCH_FLASH3LAYOUT1);
++		break;
++	}
++
++	/* Use index as layout number for all chip selects */
++	index |= index << 2;
++	index |= index << 4;
++	priv->bch_layout = index;
++
++	/* For now set *all* chip selects to use layout 0; we will change this
++	   to the desired layout number when reading/writing pages with ECC */
++	writel(0, r->bch_regs + HW_BCH_LAYOUTSELECT);
++
++	/* Allow these many zero-bits in an empty page */
++	writel(mtd->bitflip_threshold, r->bch_regs + HW_BCH_MODE);
++
++	/* Enable BCH complete interrupt */
++//###	writel(BM_BCH_CTRL_COMPLETE_IRQ_EN, r->bch_regs + HW_BCH_CTRL_SET);
++
++err_out:
++	pm_runtime_mark_last_busy(priv->dev);
++	pm_runtime_put_autosuspend(priv->dev);
++
++	return ret;
++}
++
++/* Converts time to clock cycles */
++#define TO_CYCLES(duration, period) DIV_ROUND_UP_ULL(duration, period)
++
++#define DEF_MIN_PROP_DELAY	5
++#define DEF_MAX_PROP_DELAY	9
++
++static void gpmi_nfc_compute_timings(struct gpmi_nand_data *this,
++				     const struct nand_sdr_timings *sdr)
++{
++	struct gpmi_nfc_hardware_timing *hw = &this->hw;
++	unsigned int dll_threshold_ps = this->devdata->max_chain_delay;
++	unsigned int period_ps, reference_period_ps;
++	unsigned int data_setup_cycles, data_hold_cycles, addr_setup_cycles;
++	unsigned int tRP_ps;
++	bool use_half_period;
++	int sample_delay_ps, sample_delay_factor;
++	u16 busy_timeout_cycles;
++	u8 wrn_dly_sel;
++
++	if (sdr->tRC_min >= 30000) {
++		/* ONFI non-EDO modes [0-3] */
++		hw->clk_rate = 22000000;
++		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_4_TO_8NS;
++	} else if (sdr->tRC_min >= 25000) {
++		/* ONFI EDO mode 4 */
++		hw->clk_rate = 80000000;
++		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY;
++	} else {
++		/* ONFI EDO mode 5 */
++		hw->clk_rate = 100000000;
++		wrn_dly_sel = BV_GPMI_CTRL1_WRN_DLY_SEL_NO_DELAY;
++	}
++
++	/* SDR core timings are given in picoseconds */
++	period_ps = div_u64((u64)NSEC_PER_SEC * 1000, hw->clk_rate);
++
++	addr_setup_cycles = TO_CYCLES(sdr->tALS_min, period_ps);
++	data_setup_cycles = TO_CYCLES(sdr->tDS_min, period_ps);
++	data_hold_cycles = TO_CYCLES(sdr->tDH_min, period_ps);
++	busy_timeout_cycles = TO_CYCLES(sdr->tWB_max + sdr->tR_max, period_ps);
++
++	hw->timing0 = BF_GPMI_TIMING0_ADDRESS_SETUP(addr_setup_cycles) |
++		      BF_GPMI_TIMING0_DATA_HOLD(data_hold_cycles) |
++		      BF_GPMI_TIMING0_DATA_SETUP(data_setup_cycles);
++	hw->timing1 = BF_GPMI_TIMING1_BUSY_TIMEOUT(busy_timeout_cycles * 4096);
++
++	/*
++	 * Derive NFC ideal delay from {3}:
++	 *
++	 *                     (tREA + 4000 - tRP) * 8
++	 *         RDN_DELAY = -----------------------
++	 *                                RP
++	 */
++	if (period_ps > dll_threshold_ps) {
++		use_half_period = true;
++		reference_period_ps = period_ps / 2;
++	} else {
++		use_half_period = false;
++		reference_period_ps = period_ps;
++	}
++
++	tRP_ps = data_setup_cycles * period_ps;
++	sample_delay_ps = (sdr->tREA_max + 4000 - tRP_ps) * 8;
++	if (sample_delay_ps > 0)
++		sample_delay_factor = sample_delay_ps / reference_period_ps;
++	else
++		sample_delay_factor = 0;
++
++	hw->ctrl1n = BF_GPMI_CTRL1_WRN_DLY_SEL(wrn_dly_sel);
++	if (sample_delay_factor)
++		hw->ctrl1n |= BF_GPMI_CTRL1_RDN_DELAY(sample_delay_factor) |
++			      BM_GPMI_CTRL1_DLL_ENABLE |
++			      (use_half_period ? BM_GPMI_CTRL1_HALF_PERIOD : 0);
++}
++
++static void gpmi_nfc_apply_timings(struct gpmi_nand_data *this)
++{
++	struct gpmi_nfc_hardware_timing *hw = &this->hw;
++	struct resources *r = &this->resources;
++	void __iomem *gpmi_regs = r->gpmi_regs;
++	unsigned int dll_wait_time_us;
++
++	clk_set_rate(r->clock[0], hw->clk_rate);
++
++	writel(hw->timing0, gpmi_regs + HW_GPMI_TIMING0);
++	writel(hw->timing1, gpmi_regs + HW_GPMI_TIMING1);
++
++	/*
++	 * Clear several CTRL1 fields, DLL must be disabled when setting
++	 * RDN_DELAY or HALF_PERIOD.
++	 */
++	writel(BM_GPMI_CTRL1_CLEAR_MASK, gpmi_regs + HW_GPMI_CTRL1_CLR);
++	writel(hw->ctrl1n, gpmi_regs + HW_GPMI_CTRL1_SET);
++
++	/* Wait 64 clock cycles before using the GPMI after enabling the DLL */
++	dll_wait_time_us = USEC_PER_SEC / hw->clk_rate * 64;
++	if (!dll_wait_time_us)
++		dll_wait_time_us = 1;
++
++	/* Wait for the DLL to settle. */
++	udelay(dll_wait_time_us);
++}
++
++/* -------------------- LOCAL HELPER FUNCTIONS ----------------------------- */
++
++
++static inline int gpmi_fus_get_ecc_strength(struct mtd_info *mtd,
++					    unsigned int chunk_shift)
++{
++	unsigned int oob_ecc;
++	unsigned int ecc_steps;
++	unsigned int gf = (chunk_shift > 9) ? 14 : 13;
++
++	/* Get chunk count */
++	ecc_steps = mtd->writesize >> chunk_shift;
++
++	/* Get available space for ECC, in bits */
++	oob_ecc = mtd->oobsize - GPMI_NAND_METADATA_SIZE - 4;
++	oob_ecc <<= 3;
++
++	/* We need an even number for the ECC strength, therefore divide by
++	   twice the value and multiply by two again */
++	oob_ecc /= gf * 2 * ecc_steps;
++	oob_ecc <<= 1;
++
++	return oob_ecc;
++}
++
++/*
++ * Copy the main data from the raw page data in the DMA page buffer to buf[].
++ * The main data is interleaved with the ECC data and ECC data is not
++ * necessarily aligned to bytes. So for some chunks we might need to shift
++ * bits.
++ *
++ * The following example shows a rather complicated case on a NAND flash with
++ * 2048+64 = 2112 bytes pages. The layout uses ECC2 on 512 bytes chunks (i.e.
++ * 13 bits ECC data needed per ECC step = 26 bits). This requires four data
++ * chunks, and we have 51 free bytes for the Bad Block Marker and User OOB.
++ * The markings show the section boundaries and the number of bits in each
++ * section at the transitions.
++ *
++ *   Raw Page Data   page_buffer_virt[]
++ *  _______________
++ * |               | 4 Bytes
++ * | BBM           |
++ * |_______________|
++ * |               | 47 Bytes (oobavail)
++ * | User-OOB      |
++ * |_______________|
++ * |               | 512 Bytes
++ * | Main 0        |<-----------+
++ * |_______________|            |             Main Data     buf[]
++ * |               | 26 Bits    |          _______________
++ * | ECC 0         |            |     1:1 |               | 512 Bytes
++ * |___________    |            +-------->| Main 0        |
++ * |           |___|                      |_______________|
++ * | Main 1        | 512 Bytes      shift |               | 512 Bytes
++ * |___________    |--------------------->| Main 1        |
++ * |           |___|                      |_______________|
++ * | ECC 1         | 26 Bits        shift |               | 512 Bytes
++ * |_______        |            +-------->| Main 2        |
++ * |       |_______|            |         |_______________|
++ * |               | 512 Bytes  |   shift |               | 512 Bytes
++ * |_______ Main 2 |<-----------+    +--->| Main 3        |
++ * |       |_______|                 |    |_______________|
++ * |               | 26 Bits         |     7 6 5 4 3 2 1 0
++ * |___      ECC 2 |                 |           Bit        2048 Bytes total
++ * |   |___________|                 |
++ * |               | 512 Bytes       |
++ * |___     Main 3 |<----------------+
++ * |   |___________|
++ * |               | 26 Bits
++ * |         ECC 3 |
++ * |_______________|
++ *  7 6 5 4 3 2 1 0
++ *        Bit        2112 Bytes total
++ *
++ * The standard F&S layout with 1024 bytes chunks and ECC8 is far less
++ * complicated as the ECC data will always match byte boundaries. However we
++ * want the code to work in all possible cases.
++ */
++static void gpmi_fus_read_main_data(struct mtd_info *mtd, uint8_t *buf)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	uint val;
++	uint bit = 0;
++	int chunk, remaining;
++	int chunk_size = chip->ecc.size;
++	uint8_t *raw_data = priv->page_buffer_virt + mtd->oobavail + 4;
++	unsigned int ecc_bits;
++
++	ecc_bits = priv->gf_len * chip->ecc.strength;
++	for (chunk = 0; chunk < chip->ecc.steps; chunk++) {
++		if (bit) {
++			/* Copy split bytes with shifting */
++			val = *raw_data >> bit;
++			remaining = chunk_size;
++			do {
++				val |= *(++raw_data) << (8 - bit);
++				*buf++ = (uint8_t)val;
++				val >>= 8;
++			} while (--remaining);
++		} else {
++			/* Copy whole bytes */
++			memcpy(buf, raw_data, chunk_size);
++			buf += chunk_size;
++			raw_data += chunk_size;
++		}
++		bit += ecc_bits;
++		raw_data += bit >> 3;
++		bit &= 7;
++	}
++}
++
++/*
++ * Copy the main data from buf[] to the raw page data in the DMA page buffer.
++ * The main data is interleaved with the ECC data and ECC data is not
++ * necessarily aligned to bytes. So for some chunks we might need to shift
++ * bits.
++ *
++ * See gpmi_fus_read_main_data() for a detailed explanation and an example.
++ */
++static void gpmi_fus_write_main_data(struct mtd_info *mtd, const uint8_t *buf)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	uint val, tmp, mask;
++	uint bit = 0;
++	int chunk, remaining;
++	int chunk_size = chip->ecc.size;
++	uint8_t *raw_data = priv->page_buffer_virt + mtd->oobavail + 4;
++	unsigned int ecc_bits;
++
++	ecc_bits = priv->gf_len * chip->ecc.strength;
++	for (chunk = 0; chunk < chip->ecc.steps; chunk++) {
++		if (bit) {
++			/* Copy split bytes with shifting */
++			mask = (1 << bit) - 1;
++			val = *raw_data & mask;
++			remaining = chunk_size;
++			do {
++				tmp = *buf++;
++				val |= tmp << bit;
++				*raw_data++ = (uint8_t)val;
++				val = tmp >> (8 - bit);
++			} while (--remaining);
++			val |= *raw_data & ~mask;
++			*raw_data = (uint8_t)val;
++		} else {
++			/* Copy whole bytes */
++			memcpy(raw_data, buf, chunk_size);
++			buf += chunk_size;
++			raw_data += chunk_size;
++		}
++		bit += ecc_bits;
++		raw_data += bit >> 3;
++		bit &= 7;
++	}
++}
++
++/*
++ * Copy the ECC data from raw page data in the DMA page buffer to oob[]. The
++ * BBM and user part of the OOB area are not touched!
++ *
++ * The complicated part is the ECC data. It is interleaved with the main data
++ * and ECC data is not necessarily aligned to bytes. But because the main data
++ * chunks always consist of full bytes, the ECC parts will always fit together
++ * without the need for bit shifting.
++ *
++ * The following example shows a layout with ECC2 on 512 bytes chunks (13 bits
++ * ECC data per ECC step = 26 bits). This requires four data chunks on a NAND
++ * flash with 2048+64 bytes pages, and we have 51 free bytes for the Bad Block
++ * Marker and User OOB. The markings show the section boundaries and the
++ * number of bits in each section at the transitions.
++ *
++ *   Raw Page Data   page_buffer_virt[]
++ *  _______________
++ * |               | 4 Bytes
++ * | BBM           |
++ * |_______________|
++ * |               | 47 Bytes (oobavail)
++ * | User-OOB      |
++ * |_______________|                          OOB Data      oob[]
++ * |               | 512 Bytes             _______________
++ * | Main 0        |                      |               | 4 Bytes
++ * |_______________|                      | BBM           |
++ * |               | 26 Bits              |_______________|
++ * | ECC 0         |<-------------+       |               | 47 Bytes (oobavail)
++ * |___________    |              |       | User-OOB      |
++ * |           |___|              |       |_______________|
++ * | Main 1        | 512 Bytes    |       |               | 26 Bits
++ * |___________    |              +------>| ECC 0         |
++ * |           |___|                      |___________    |
++ * | ECC 1         | 26 Bits              |           |___|
++ * |_______        |<-------------------->| ECC 1         | 26 Bits
++ * |       |_______|                      |_______        |
++ * |               | 512 Bytes            |       |_______|
++ * |_______ Main 2 |              +------>|               | 26 Bits
++ * |       |_______|              |       |___      ECC 2 |
++ * |               | 26 Bits      |       |   |___________|
++ * |___      ECC 2 |<-------------+       |               | 26 Bits
++ * |   |___________|                 +--->|         ECC 3 |
++ * |               | 512 Bytes       |    |_______________|
++ * |___     Main 3 |                 |     7 6 5 4 3 2 1 0
++ * |   |___________|                 |           Bit        64 Bytes total
++ * |               | 26 Bits         |
++ * |         ECC 3 |<----------------+
++ * |_______________|
++ *  7 6 5 4 3 2 1 0
++ *        Bit        2112 Bytes total
++ *
++ * The standard F&S layout with 1024 bytes chunks and ECC8 is far less
++ * complicated as the ECC data will always match byte boundaries. However we
++ * want the code to work in all possible cases.
++ */
++static void gpmi_fus_read_ecc_data(struct mtd_info *mtd, uint8_t *oob)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	int chunk, remaining = 0;
++	int chunk_size = chip->ecc.size;
++	uint8_t val, mask;
++	uint headersize = mtd->oobavail + 4;
++	uint8_t *raw_data = priv->page_buffer_virt;
++	unsigned int ecc_bits;
++
++	/* Adjust pointers to first ECC section */
++	oob += headersize;
++	raw_data += headersize + chunk_size;
++
++	/* Copy ECC sections of all chunks */
++	ecc_bits = priv->gf_len * chip->ecc.strength;
++	for (chunk = 0; chunk < chip->ecc.steps; chunk++) {
++		remaining += ecc_bits;
++		while (remaining >= 8) {
++			/* Copy whole bytes; the sections are only a few bytes
++			   long, so don't bother to use memcpy() */
++			*oob++ = *raw_data++;
++			remaining -= 8;
++		}
++		if (remaining) {
++			/* The transition to the next section of ECC bytes is
++			   within a byte. Get part of the byte from the
++			   previous section and part of the byte from the next
++			   section. These will always fit together without
++			   shifting, we just need to mask the non-ECC bits. */
++			mask = (1 << remaining) - 1;
++			val = *raw_data & mask;
++			raw_data += chunk_size;
++			val |= *raw_data++ & ~mask;
++			*oob++ = val;
++			remaining -= 8;
++			/* Now remaining is negative because we have borrowed
++			   a few bits from the next chunk already. The next
++			   chunk always has more than 8 bits of ECC data, so
++			   we do not have to care about special cases.*/
++		} else
++			raw_data += chunk_size;
++	}
++}
++
++/*
++ * Copy the ECC data from oob[] to raw page data in the DMA page buffer. The
++ * BBM and user part of the OOB area are not touched!
++ *
++ * The complicated part is the ECC data. It is interleaved with the main data
++ * and ECC data is not necessarily aligned to bytes. But because the main data
++ * chunks always consist of full bytes, the ECC parts will always fit together
++ * without the need for bit shifting.
++ *
++ * See gpmi_fus_read_ecc_data() for a detailed explanation and an example.
++ */
++static void gpmi_fus_write_ecc_data(struct mtd_info *mtd, const uint8_t *oob)
++{
++	struct nand_chip *chip = mtd_to_nand(mtd);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	int chunk, remaining = 0;
++	int chunk_size = chip->ecc.size;
++	uint8_t val, mask;
++	uint headersize = mtd->oobavail + 4;
++	uint8_t *raw_data = priv->page_buffer_virt;
++	unsigned int ecc_bits;
++
++	/* Adjust pointers to first ECC section */
++	oob += headersize;
++	raw_data += headersize + chunk_size;
++
++	/* Copy ECC sections of all chunks */
++	ecc_bits = priv->gf_len * chip->ecc.strength;
++	for (chunk = 0; chunk < chip->ecc.steps; chunk++) {
++		remaining += ecc_bits;
++		while (remaining >= 8) {
++			/* Copy whole bytes; the sections are only a few bytes
++			   long, so don't bother to use memcpy() */
++			*raw_data++ = *oob++;
++			remaining -= 8;
++		}
++		if (remaining) {
++			/* The transition to the next section of ECC bytes is
++			   within a byte. This goes without shifting, we just
++			   need to split the byte in a part that goes to the
++			   previous section and a part that goes to the next
++			   section. Remark: we fill unused bits with 1 to
++			   make it possible to store the OOB only, where we
++			   only write the ECC and not the main data. 1-bits
++			   should keep the old content. */
++			val = *oob++;
++			mask = (1 << remaining) - 1;
++			*raw_data = ~mask | (val & mask);
++			raw_data += chunk_size;
++			*raw_data++ = mask | (val & ~mask);
++			remaining -= 8;
++			/* Now remaining is negative because we have borrowed
++			   a few bits from the next chunk already. The next
++			   chunk always has more than 8 bits of ECC data, so
++			   we do not have to care about special cases.*/
++		} else
++			raw_data += chunk_size;
++	}
++}
++
++/*
++ * Read OOB and create virtual OOB area. If column is set, skip a part at the
++ * beginning.
++ *
++ * See gpmi_fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_do_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
++				int page, int raw)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_async_tx_descriptor *desc;
++	uint32_t boffs;
++	int column = raw ? 0 : 4;
++	int length = mtd->oobavail + 4 - column;
++	uint32_t from, to;
++	int i, ret;
++	dma_addr_t phys;
++	unsigned int ecc_bits;
++
++	/* Issue read command for the page */
++	chip->legacy.cmdfunc(chip, NAND_CMD_READ0, column, page);
++	chip->legacy.cmdfunc(chip, NAND_CMD_READSTART, -1, -1);
++	ret = gpmi_fus_wait_ready(mtd, GPMI_FUS_TIMEOUT_DATA);
++	if (ret)
++		return ret;
++
++	/* Read the BBM (optional) and the user part of the OOB area */
++	phys = priv->page_buffer_phys;
++	desc = gpmi_fus_read_data_buf(mtd, phys, length);
++	if (!desc)
++		return -EINVAL;
++	if (raw) {
++		/* Now read all the ECC bytes, section by section. The data is
++		   still in the NAND page buffer, so we can use RNDOUT */
++		ecc_bits = priv->gf_len	* chip->ecc.strength;
++		boffs = (mtd->oobavail + 4) << 3;
++		i = chip->ecc.steps;
++		do {
++			/* Add DMA descriptor to read only a few bytes */
++			boffs += chip->ecc.size << 3;
++			from = boffs >> 3;
++			boffs += ecc_bits;
++			to = (boffs - 1) >> 3;
++			chip->legacy.cmdfunc(chip, NAND_CMD_RNDOUT, from, -1);
++			chip->legacy.cmdfunc(chip, NAND_CMD_RNDOUTSTART, -1, -1);
++			desc = gpmi_fus_read_data_buf(mtd, phys + from,
++						      to - from + 1);
++			if (!desc)
++				return -EINVAL;
++		} while (--i);
++	}
++
++	/* Run the DMA chain that reads all in one go */
++	ret = start_dma_without_bch_irq(priv, desc);
++	if (ret)
++		return ret;
++
++	/* Read BBM (optional) and user part of the OOB area */
++	memcpy(chip->oob_poi + column, priv->page_buffer_virt, length);
++
++	if (raw) {
++		/* Compile the ECC data at the end of the OOB area */
++		gpmi_fus_read_ecc_data(mtd, chip->oob_poi);
++	}
++
++	return 0;
++}
++
++/*
++ * Write the virtual OOB area to NAND flash.
++ *
++ * See gpmi_fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_do_write_oob(struct mtd_info *mtd, struct nand_chip *chip,
++				 int page, int raw)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_async_tx_descriptor *desc;
++	uint32_t boffs;
++	int column = raw ? 0 : 4;
++	int length = mtd->oobavail + 4 - column;
++	uint32_t from, to;
++	int i;
++	dma_addr_t phys;
++	unsigned int ecc_bits;
++
++	/* Write the BBM (optional) and the user part of the OOB area */
++	chip->legacy.cmdfunc(chip, NAND_CMD_SEQIN, column, page);
++	memcpy(priv->page_buffer_virt, chip->oob_poi + column, length);
++	gpmi_fus_write_data_buf(mtd, 0, length);
++
++	phys = priv->page_buffer_phys;
++	if (raw) {
++		/* Store ECC data in data_buf at the appropriate positions */
++		gpmi_fus_write_ecc_data(mtd, chip->oob_poi);
++
++		/* Write all the ECC bytes to the page, section by section */
++		ecc_bits = priv->gf_len	* chip->ecc.strength;
++		boffs = (mtd->oobavail + 4) << 3;
++		i = chip->ecc.steps;
++		do {
++			/* We actually only write a few bytes */
++			boffs += chip->ecc.size << 3;
++			from = boffs >> 3;
++			boffs += ecc_bits;
++			to = (boffs - 1) >> 3;
++			chip->legacy.cmdfunc(chip, NAND_CMD_RNDIN, from, -1);
++			desc = gpmi_fus_write_data_buf(mtd, phys + from,
++						       to - from + 1);
++			if (!desc)
++				return -EINVAL;
++		} while (--i);
++	}
++
++	/* Now actually do the programming */
++	chip->legacy.cmdfunc(chip, NAND_CMD_PAGEPROG, -1, -1);
++
++	/* Check if it worked */
++	if (chip->legacy.waitfunc(chip) & NAND_STATUS_FAIL)
++		return -EIO;
++
++	return 0;
++}
++
++static int
++acquire_register_block(struct gpmi_nand_data *this, const char *res_name)
++{
++	struct platform_device *pdev = this->pdev;
++	struct resources *res = &this->resources;
++	struct resource *r;
++	void __iomem *p;
++
++	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, res_name);
++	p = devm_ioremap_resource(&pdev->dev, r);
++	if (IS_ERR(p))
++		return PTR_ERR(p);
++
++	if (!strcmp(res_name, GPMI_NAND_GPMI_REGS_ADDR_RES_NAME))
++		res->gpmi_regs = p;
++	else if (!strcmp(res_name, GPMI_NAND_BCH_REGS_ADDR_RES_NAME))
++		res->bch_regs = p;
++	else
++		dev_err(this->dev, "unknown resource name : %s\n", res_name);
++
++	return 0;
++}
++
++static int gpmi_get_clks(struct gpmi_nand_data *this)
++{
++	struct resources *r = &this->resources;
++	struct clk *clk;
++	int err, i;
++
++	for (i = 0; i < this->devdata->clks_count; i++) {
++		clk = devm_clk_get(this->dev, this->devdata->clks[i]);
++		if (IS_ERR(clk)) {
++			err = PTR_ERR(clk);
++			goto err_clock;
++		}
++
++		r->clock[i] = clk;
++	}
++
++	if (GPMI_IS_MX6(this) || GPMI_IS_MX7(this) || GPMI_IS_MX8(this))
++		/*
++		 * Set the default value for the gpmi clock in mx6q:
++		 *
++		 * If you want to use the ONFI nand which is in the
++		 * Synchronous Mode, you should change the clock as you need.
++		 */
++		clk_set_rate(r->clock[0], 22000000);
++
++	return 0;
++
++err_clock:
++	dev_dbg(this->dev, "failed in finding the clocks.\n");
++	return err;
++}
++
++static int init_rpm(struct gpmi_nand_data *this)
++{
++
++	pm_runtime_enable(this->dev);
++	pm_runtime_set_autosuspend_delay(this->dev, GPMI_FUS_TIMEOUT_RPM);
++	pm_runtime_use_autosuspend(this->dev);
++
++
++	return 0;
++}
++
++static int acquire_resources(struct gpmi_nand_data *this)
++{
++	int ret;
++
++	ret = acquire_register_block(this, GPMI_NAND_GPMI_REGS_ADDR_RES_NAME);
++	if (ret)
++		goto exit_regs;
++
++	ret = acquire_register_block(this, GPMI_NAND_BCH_REGS_ADDR_RES_NAME);
++	if (ret)
++		goto exit_regs;
++
++	ret = acquire_bch_irq(this, bch_irq);
++	if (ret)
++		goto exit_regs;
++
++	ret = gpmi_get_clks(this);
++	if (ret)
++		goto exit_clock;
++
++	return 0;
++
++exit_clock:
++	release_dma_channels(this);
++exit_regs:
++	return ret;
++}
++
++static void release_resources(struct gpmi_nand_data *this)
++{
++	release_dma_channels(this);
++}
++
++
++static int gpmi_init(struct gpmi_nand_data *this)
++{
++	struct resources *r = &this->resources;
++	int ret;
++
++	ret = pm_runtime_resume_and_get(this->dev);
++	if (ret < 0)
++		return ret;
++
++	ret = gpmi_reset_block(this, r->gpmi_regs);
++
++	if (!ret) {
++		u32 ctrl1 = readl(r->gpmi_regs + HW_GPMI_CTRL1);
++
++		/* Choose NAND mode. */
++		ctrl1 &= ~BM_GPMI_CTRL1_GPMI_MODE;
++
++		/* Set IRQ polarity, disable Write-Protection, select BCH ECC */
++		ctrl1 |= BM_GPMI_CTRL1_ATA_IRQRDY_POLARITY
++			| BM_GPMI_CTRL1_DEV_RESET
++			| BM_GPMI_CTRL1_DECOUPLE_CS
++			| BM_GPMI_CTRL1_BCH_MODE;
++
++		writel(ctrl1, r->gpmi_regs + HW_GPMI_CTRL1);
++	}
++
++	/*
++	 * Decouple the chip select from dma channel. We use dma0 for all
++	 * the chips.
++	 */
++//###??	writel(BM_GPMI_CTRL1_DECOUPLE_CS, r->gpmi_regs + HW_GPMI_CTRL1_SET);
++
++	pm_runtime_mark_last_busy(this->dev);
++
++	pm_runtime_put_autosuspend(this->dev);
++
++	return ret;
++}
++
++/* -------------------- INTERFACE FUNCTIONS -------------------------------- */
++
++/*
++ * Select, change or deselect the NAND chip, activate or deactivate hardware
++ */
++static void gpmi_fus_select_chip(struct nand_chip *chip, int chipnr)
++{
++	struct gpmi_nand_data *this = nand_get_controller_data(chip);
++	int ret;
++
++	/*
++	 * For power consumption matters, disable/enable the clock each time a
++	 * die is selected/unselected.
++	 */
++	if (this->current_chip < 0 && chipnr >= 0) {
++		ret = pm_runtime_get_sync(this->dev);
++		if (ret < 0)
++			dev_err(this->dev, "Failed to enable the clock\n");
++	} else if (this->current_chip >= 0 && chipnr < 0) {
++		pm_runtime_mark_last_busy(this->dev);
++		pm_runtime_use_autosuspend(this->dev);
++	}
++
++	/*
++	 * This driver currently supports only one NAND chip. Plus, dies share
++	 * the same configuration. So once timings have been applied on the
++	 * controller side, they will not change anymore. When the time will
++	 * come, the check on must_apply_timings will have to be dropped.
++	 */
++	if (chipnr >= 0 && this->hw.must_apply_timings) {
++		this->hw.must_apply_timings = false;
++		gpmi_nfc_apply_timings(this);
++	}
++
++	this->current_chip = chipnr;
++}
++
++/*
++ * Test if the NAND flash is ready.
++ */
++static int gpmi_fus_dev_ready(struct nand_chip *chip)
++{
++	/* We have called gpmi_fus_wait_ready() before, so we can be sure that
++	   our command is already completed. So just return "done". */
++	return 1;
++}
++
++/*
++ * Read a single byte from NAND.
++ */
++static uint8_t gpmi_fus_read_byte(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_async_tx_descriptor *desc;
++
++	desc = gpmi_fus_read_data_buf(mtd, priv->data_buffer_phys, 1);
++	if (desc) {
++		if (!start_dma_without_bch_irq(priv, desc))
++			return priv->data_buffer_virt[0];
++	}
++
++	return 0xFF;
++}
++
++/*
++ * Read arbitrary data from NAND.
++ */
++static void gpmi_fus_read_buf(struct nand_chip *chip, uint8_t *buf, int length)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct dma_async_tx_descriptor *desc;
++
++	desc = gpmi_fus_read_data_buf(mtd, priv->data_buffer_phys, length);
++	if (desc) {
++		if (!start_dma_without_bch_irq(priv, desc))
++			memcpy(buf, priv->data_buffer_virt, length);
++	}
++}
++
++/*
++ * Write arbitrary data to NAND.
++ */
++static void gpmi_fus_write_buf(struct nand_chip *chip, const uint8_t *buf,
++			       int length)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++
++	memcpy(priv->data_buffer_virt, buf, length);
++	gpmi_fus_write_data_buf(mtd, priv->data_buffer_phys, length);
++}
++
++/*
++ * Wait until chip is ready, then read status.
++ */
++static int gpmi_fus_waitfunc(struct nand_chip *chip)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	unsigned long timeout = GPMI_FUS_TIMEOUT_ERASE;
++#if 0
++	if (chip->state == FL_ERASING)
++		timeout = GPMI_FUS_TIMEOUT_ERASE;
++	else
++		timeout = GPMI_FUS_TIMEOUT_WRITE;
++#endif
++	/* Add DMA descriptor to wait for ready and execute the DMA chain */
++	if (gpmi_fus_wait_ready(mtd, timeout))
++		return NAND_STATUS_FAIL;
++
++	/* Issue NAND_CMD_STATUS command to read status */
++	chip->legacy.cmdfunc(chip, NAND_CMD_STATUS, -1, -1);
++
++	/* Read and return status byte */
++	return gpmi_fus_read_byte(chip);
++}
++
++/* Write command to NAND flash. This usually results in creating a chain of
++   DMA descriptors which is executed at the end. */
++static void gpmi_fus_command(struct nand_chip *chip, uint command, int column,
++			     int page)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++
++	/* Simulate NAND_CMD_READOOB with NAND_CMD_READ0; NAND_CMD_READOOB is
++	   only used in nand_block_bad() to read the BBM. So simply use the
++	   command that will load the BBM correctly. */
++	if (command == NAND_CMD_READOOB)
++		command = NAND_CMD_READ0;
++	/*
++	 * The command sequence should be:
++	 *   NAND_CMD_READ0 Col+Row -> NAND_CMD_READSTART -> Ready -> Read data
++	 *	  {-> NAND_CMD_RNDOUT col -> NAND_CMD_RNDOUTSTART -> Read data}
++	 *   NAND_CMD_SEQIN Col+Row -> Write data
++	 *	  {-> NAND_CMD_RNDIN Col -> Write Data}
++	 *	  -> NAND_CMD_PAGEPROG -> Ready
++	 *   NAND_CMD_ERASE1 Row -> NAND_CMD_ERASE2 -> Ready
++	 *   NAND_CMD_STATUS -> Read 1 data byte
++	 *   NAND_CMD_READID 0x00/0x20 -> Read ID/Read ONFI ID
++	 *   NAND_CMD_PARAM 0x00 -> Ready -> Read ONFI parameters
++	 *   NAND_CMD_SET_FEATURES addr -> Write 4 data bytes -> Ready
++	 *   NAND_CMD_GET_FEATURES addr -> Ready -> Read 4 data bytes
++	 *   NAND_CMD_RESET -> Ready
++	 */
++	switch (command) {
++	case NAND_CMD_RNDIN:
++	case NAND_CMD_READ0:
++	case NAND_CMD_READSTART:
++	case NAND_CMD_RNDOUT:
++	case NAND_CMD_SEQIN:
++	case NAND_CMD_PAGEPROG:
++	case NAND_CMD_ERASE1:
++	case NAND_CMD_ERASE2:
++		/* Add DMA descriptor with command + column and/or row */
++		gpmi_fus_add_cmd_desc(priv, command, column, page, -1);
++		/* In case of NAND_CMD_PAGEPROG andNAND_CMD_ERASE2,
++		   chip->waitfunc() is called later, so we need not wait now.
++		   FIXME: In case of NAND_CMD_RNDIN we should have a delay of
++		   t_CCS here so that the chip can switch columns */
++		break;
++
++	case NAND_CMD_PARAM:
++	case NAND_CMD_GET_FEATURES:
++		/* Add DMA descriptor with command and one address byte */
++		gpmi_fus_add_cmd_desc(priv, command, -1, -1, column);
++		/* Add DMA descriptor to wait for ready and run DMA chain */
++		gpmi_fus_wait_ready(mtd, GPMI_FUS_TIMEOUT_DATA);
++		break;
++
++	case NAND_CMD_RESET:
++		/* Add DMA descriptor with command byte */
++		gpmi_fus_add_cmd_desc(priv, command, -1, -1, -1);
++		/* Add DMA descriptor to wait for ready and run DMA chain */
++		gpmi_fus_wait_ready(mtd, GPMI_FUS_TIMEOUT_RESET);
++		break;
++
++	case NAND_CMD_RNDOUTSTART:
++	case NAND_CMD_STATUS:
++		column = -1;
++		fallthrough;
++	case NAND_CMD_READID:
++	case NAND_CMD_SET_FEATURES:
++		/* Add DMA descriptor with command and up to one byte */
++		gpmi_fus_add_cmd_desc(priv, command, -1, -1, column);
++		/* According to the ONFI specification these commands never
++		   set the busy signal so we need not wait for ready here.
++		   FIXME: But in case of NAND_CMD_RNDOUTSTART we should have a
++		   delay of t_CCS here so that the chip can switch columns.
++		   FIXME: In case of NAND_CMD_SET_FEATURES we should have a
++		   delay of t_ADL here so that the chip can switch mode. */
++		break;
++
++	default:
++		printk("### NAND_CMD 0x%02x not supported\n", command);
++		break;
++	}
++}
++
++/*
++ * Read a page from NAND without ECC
++ */
++static int gpmi_fus_read_page_raw(struct nand_chip *chip,
++				  uint8_t *buf, int oob_required, int page)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct dma_async_tx_descriptor *desc;
++	int ret;
++
++	/*
++	 * In kernel < 4.19 a DMA descriptor for the first command byte
++	 * NAND_CMD_READ0 and the column/row bytes was already created in
++	 * nand_do_read_ops(). In kernel >= 4.19 we have to call the command
++	 * NAND_CMD_READ0 here, because now you can handle this specifically.
++	 * Now add a DMA descriptor for the second command byte
++	 * NAND_CMD_READSTART and a DMA descriptor to wait for ready. Execute
++	 * this DMA chain and check for timeout.
++	 */
++	ret = nand_read_page_op(chip, page, 0, NULL, 0);
++	if (ret)
++		return ret;
++
++	chip->legacy.cmdfunc(chip, NAND_CMD_READSTART, -1, -1);
++	ret = gpmi_fus_wait_ready(mtd, GPMI_FUS_TIMEOUT_DATA);
++	if (ret)
++		return ret;
++
++	/* Add DMA descriptor to read the whole page and execute DMA chain */
++	desc = gpmi_fus_read_data_buf(mtd, priv->page_buffer_phys,
++				      mtd->writesize + mtd->oobsize);
++	if (!desc)
++		return -EINVAL;
++	ret = start_dma_without_bch_irq(priv, desc);
++	if (ret)
++		return ret;
++
++	/* Copy the main data to buf */
++	gpmi_fus_read_main_data(mtd, buf);
++
++	if (oob_required) {
++		/* Copy Bad Block Marker and User OOB section */
++		memcpy(chip->oob_poi, priv->page_buffer_virt,
++		       mtd->oobavail + 4);
++
++		/* Copy the ECC data */
++		gpmi_fus_read_ecc_data(mtd, chip->oob_poi);
++	} else {
++		/* Simply clear OOB area */
++		memset(chip->oob_poi, 0xFF, mtd->oobsize);
++	}
++
++	return 0;
++}
++
++/*
++ * Write a page to NAND without ECC
++ */
++static int gpmi_fus_write_page_raw(struct nand_chip *chip,
++				   const uint8_t *buf, int oob_required, int page)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	int ret;
++
++	/*
++	 * In kernel < 4.19 NAND_CMD_SEQIN for column 0 was already issued by the
++	 * caller. In kernel >= 4.19 we have to call the command NAND_CMD_SEQIN
++	 * here, because now you can handle this specifically.
++	 */
++	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
++	if (ret)
++		return ret;
++
++	/* We must write OOB data as it is interleaved with main data. But if
++	   no OOB data is available, use 0xFF instead. This does not modify
++	   the existing values. */
++	if (!oob_required)
++		memset(chip->oob_poi, 0xFF, mtd->oobsize);
++
++	/* Copy the OOB data to data_buf[]. Please note that this has to be
++	   done before the main data, because gpmi_fus_write_ecc_data() will
++	   use 1-bits in unused positions that must be overwritten by the
++	   main data later. */
++	gpmi_fus_write_ecc_data(mtd, chip->oob_poi);
++
++	/* Copy the main data to data_buf[] */
++	gpmi_fus_write_main_data(mtd, buf);
++
++	/* Copy Bad Block Marker and User OOB section */
++	memcpy(priv->page_buffer_virt, chip->oob_poi, mtd->oobavail + 4);
++
++	/* Add DMA descriptor to write DMA page buffer to NAND flash */
++	if (!gpmi_fus_write_data_buf(mtd, priv->page_buffer_phys,
++				     mtd->writesize + mtd->oobsize))
++		return -EINVAL;
++
++	/* In kernel < 4.19 NAND_CMD_PAGEPROG is sent by the caller.
++	 * In kernel >= 4.19 we have to call the command NAND_CMD_PAGEPROG
++	 * here, because now you can handle this specifically.
++	 */
++	return nand_prog_page_end_op(chip);
++}
++
++/*
++ * Read a page from NAND with ECC
++ */
++static int gpmi_fus_read_page(struct nand_chip *chip,
++			      uint8_t *buf, int oob_required, int page)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct resources *r = &priv->resources;
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct dma_async_tx_descriptor *desc;
++	struct mxs_dma_ccw ccw[3];
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	uint32_t corrected = 0;
++	unsigned char *status;
++	int i, ret;
++	bool direct_dma_map_ok;
++	dma_addr_t try_phys;
++	dma_addr_t payload_phys;
++	uint8_t *payload_virt;
++	int chunk_size;
++	uint8_t *chunk_virt;
++
++//	showdesc = 1;//###
++
++	/* Select the desired flash layout */
++	writel(priv->bch_layout, r->bch_regs + HW_BCH_LAYOUTSELECT);
++
++	/*
++	 * In kernel < 4.19 a DMA descriptor for the first command byte
++	 * NAND_CMD_READ0 and the column/row bytes was already created in
++	 * nand_do_read_ops(). In kernel >= 4.19 we have to call the command
++	 * NAND_CMD_READ0 here, because now you can handle this specifically.
++	 * Now add a DMA descriptor for the second command byte
++	 * NAND_CMD_READSTART and a DMA descriptor to wait for ready. Execute
++	 * this DMA chain and check for timeout.
++	 */
++	ret = nand_read_page_op(chip, page, 0, NULL, 0);
++	if (ret)
++		return ret;
++
++	chip->legacy.cmdfunc(chip, NAND_CMD_READSTART, -1, -1);
++	ret = gpmi_fus_wait_ready(mtd, GPMI_FUS_TIMEOUT_DATA);
++	if (ret)
++		return ret;
++
++	/* Try to map buf directly for DMA. If this fails, use the local page
++	   buffer. */
++	direct_dma_map_ok = 0;
++	payload_phys = priv->page_buffer_phys;
++	payload_virt = priv->page_buffer_virt;
++	if (virt_addr_valid(buf)) {
++		try_phys = dma_map_single(priv->dev, buf, mtd->writesize,
++					  DMA_FROM_DEVICE);
++		if (!dma_mapping_error(priv->dev, try_phys)) {
++			direct_dma_map_ok = 1;
++			payload_phys = try_phys;
++			payload_virt = buf;
++		}
++	}
++
++	/* Prepare DMA descriptor to enable the BCH block and read */
++	ccw[0].next = 0;
++	ccw[0].cmd = CCW_CMD_DMA_NO_XFER
++		| CCW_NAND_LOCK
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(6);
++	ccw[0].bufaddr = 0;
++	ccw[0].pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_LOCK_CS(LOCK_CS_ENABLE, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__READ)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
++		| BF_GPMI_CTRL0_XFER_COUNT(mtd->writesize + mtd->oobsize);
++	ccw[0].pio[1] = 0;
++	ccw[0].pio[2] = BM_GPMI_ECCCTRL_ENABLE_ECC
++		| BF_GPMI_ECCCTRL_ECC_CMD(BV_GPMI_ECCCTRL_ECC_CMD__BCH_DECODE)
++		| BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE;
++	ccw[0].pio[3] = mtd->writesize + mtd->oobsize;
++	ccw[0].pio[4] = payload_phys;
++	ccw[0].pio[5] = priv->auxiliary_phys;
++
++	/* Prepare DMA descriptor to disable the BCH block (wait-for-ready is
++	   a NOP here) */
++	ccw[1].next = 0;
++	ccw[1].cmd = CCW_CMD_DMA_NO_XFER
++		| CCW_NAND_LOCK
++		| CCW_NAND_WAIT4READY
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(3);
++	ccw[1].bufaddr = 0;
++	ccw[1].pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WAIT_FOR_READY)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA);
++	ccw[1].pio[1] = 0;
++	ccw[1].pio[2] = 0;
++
++	/* Prepare DMA descriptor to deassert NAND lock and issue interrupt */
++	ccw[2].next = 0;
++	ccw[2].cmd = CCW_CMD_DMA_NO_XFER
++		| CCW_PIO_NUM(0);
++	ccw[2].bufaddr = 0;
++
++	if (showdesc) //###
++		printk("### READ-PAGE-DESC: phys=0x%08x\n", payload_phys);
++
++	/* Add all three DMA descriptors to DMA chain */
++	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)ccw,
++				       3, 0, 0);
++	if (!desc)
++		return -EINVAL;
++
++	/* Execute DMA chain */
++	ret = start_dma_with_bch_irq(priv, desc);
++
++	/* Before handling any errors, unmap buf again if it was mapped */
++	if (direct_dma_map_ok)
++		dma_unmap_single(priv->dev, payload_phys, mtd->writesize,
++				 DMA_FROM_DEVICE);
++	if (ret)
++		return ret;
++
++	/*
++	 * Loop over status bytes, accumulating ECC status. The status bytes
++	 * are located at the first 32 bit boundary behind the auxiliary data.
++	 *   0x00:  no errors
++	 *   0xFF:  empty (all bytes 0xFF)
++	 *   0xFE:  uncorrectable
++	 *   other: number of bitflips
++	 * Save the maximum number of bitflips of all chunks in variable ret.
++	 *
++	 * Remark: Please note that from the point of view of the BCH engine
++	 * the OOB area at the beginning of the page is a separate chunk. So
++	 * it will have its own status byte, even if ECC is set to ECC0. So we
++	 * have to check one more status byte than we have main chunks or we
++	 * would miss bitflips in the last main chunk. Hence the +1 in the
++	 * loop below.
++	 */
++	status = priv->status_virt;
++
++	{ //###
++		if (showdesc) {
++			printk("### Status bytes:");
++			for (i = 0; i < chip->ecc.steps + 1; i++)
++				printk(" %02X", status[i]);
++			printk("\n");
++		}
++	} //###
++	ret = 0;
++	for (i = 0; i < chip->ecc.steps + 1; i++) {
++		switch (status[i]) {
++		case STATUS_GOOD:
++			break;
++
++		case STATUS_ERASED:
++			/*
++			 * In an erased chunk, a few 0-bits are tolerated, but
++			 * not fixed by BCH engine; manually "correct" them by
++			 * using all 0xff; status[0] is for oob data.
++			 */
++			if (i == 0) {
++				chunk_size = mtd->oobavail;
++				chunk_virt = priv->page_buffer_virt
++						+ mtd->writesize + 4;
++			} else {
++				chunk_size = chip->ecc.size;
++				chunk_virt = payload_virt + (i-1) * chunk_size;
++			}
++			memset(chunk_virt, 0xff, chunk_size);
++			break;
++
++		case STATUS_UNCORRECTABLE:
++			mtd->ecc_stats.failed++;
++
++			/* Note: buf may be changed if it was mapped directly;
++			   otherwise it is unchanged. chip->oob_poi is
++			   unchanged in any case. */
++			return 0;
++
++		default:
++			/* Remember maximum bitflips of a chunk in ret; don't
++			   modify mtd->ecc_stats.corrected directly as this
++			   would be wrong in case a later chunk fails. */
++			corrected += status[i];
++			if (status[i] > ret)
++				ret = status[i];
++			break;
++		}
++	}
++	mtd->ecc_stats.corrected += corrected;
++
++	/* Copy the main data if DMA did not write directly to buf already */
++	if (!direct_dma_map_ok)
++		memcpy(buf, priv->page_buffer_virt, mtd->writesize);
++
++	/* Copy the user OOB data if requested */
++	if (oob_required) {
++		memset(chip->oob_poi, 0xff, mtd->oobsize);
++		memcpy(chip->oob_poi + 4,
++		       priv->page_buffer_virt + mtd->writesize + 4,
++		       mtd->oobavail);
++	}
++
++	/* Return maximum number of bitflips across all chunks */
++	return ret;
++}
++
++/*
++ * Write a page to NAND with ECC.
++ */
++static int gpmi_fus_write_page(struct nand_chip *chip,
++			       const uint8_t *buf, int oob_required, int page)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct resources *r = &priv->resources;
++	struct dma_async_tx_descriptor *desc;
++	struct dma_chan *channel = get_dma_chan(priv);
++	struct mxs_dma_ccw ccw;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	bool direct_dma_map_ok;
++	dma_addr_t try_phys;
++	dma_addr_t payload_phys;
++	int ret;
++
++	/* Select the desired flash layout */
++	writel(priv->bch_layout, r->bch_regs + HW_BCH_LAYOUTSELECT);
++
++	/*
++	 * In kernel < 4.19 NAND_CMD_SEQIN for column 0 was already issued by the
++	 * caller. In kernel >= 4.19 we have to call the command NAND_CMD_SEQIN
++	 * here, because now you can handle this specifically.
++	 */
++	ret = nand_prog_page_begin_op(chip, page, 0, NULL, 0);
++	if (ret)
++		return ret;
++
++	/* Try to map buf directly for DMA. If this fails, use the local page
++	   buffer and copy the data to it. */
++	payload_phys = priv->page_buffer_phys;
++	direct_dma_map_ok = 0;
++	if (virt_addr_valid(buf)) {
++		try_phys = dma_map_single(priv->dev, (void *)buf,
++					  mtd->writesize, DMA_TO_DEVICE);
++		if (!dma_mapping_error(priv->dev, try_phys)) {
++			payload_phys = try_phys;
++			direct_dma_map_ok = 1;
++		}
++	}
++	if (!direct_dma_map_ok)
++		memcpy(priv->page_buffer_virt, buf, mtd->writesize);
++
++	/* We must provide OOB data because it is written in one go with the
++	   main data. If no OOB data is available, use 0xFF instead. This
++	   does not modify the existing values. */
++	memset(priv->auxiliary_virt, 0xFF, mtd->oobavail + 4);
++	if (oob_required)
++		memcpy(priv->auxiliary_virt + 4, chip->oob_poi + 4,
++		       mtd->oobavail);
++
++	/* Prepare DMA descriptor to enable BCH and write data */
++	ccw.next = 0;
++	ccw.cmd = CCW_CMD_DMA_NO_XFER
++		| CCW_NAND_LOCK
++		| CCW_WAIT4END
++		| CCW_PIO_NUM(6);
++	ccw.bufaddr = 0;
++	ccw.pio[0] = BF_GPMI_CTRL0_CS(priv->current_chip, priv)
++		| BF_GPMI_CTRL0_LOCK_CS(LOCK_CS_ENABLE, priv)
++		| BF_GPMI_CTRL0_COMMAND_MODE(BV_GPMI_CTRL0_COMMAND_MODE__WRITE)
++		| BM_GPMI_CTRL0_WORD_LENGTH
++		| BF_GPMI_CTRL0_ADDRESS(BV_GPMI_CTRL0_ADDRESS__NAND_DATA)
++		| BF_GPMI_CTRL0_XFER_COUNT(0);
++	ccw.pio[1] = 0;
++	ccw.pio[2] = BM_GPMI_ECCCTRL_ENABLE_ECC
++		| BF_GPMI_ECCCTRL_ECC_CMD(BV_GPMI_ECCCTRL_ECC_CMD__BCH_ENCODE)
++		| BV_GPMI_ECCCTRL_BUFFER_MASK__BCH_PAGE;
++	ccw.pio[3] = mtd->writesize + mtd->oobsize;
++	ccw.pio[4] = payload_phys;
++	ccw.pio[5] = priv->auxiliary_phys;
++
++	/*
++	 * Add the DMA descriptor to DMA chain and execute DMA chain.
++	 *
++	 * Remark:
++	 * Theoretically we could wait with the DMA until NAND_CMD_PAGEPROG,
++	 * but this would be complicated as we still need to unmap buf and
++	 * have to use BCH when running the chain. So let's do it right here.
++	 */
++	if (showdesc) //###
++		printk("### WRITE-PAGE-DESC: phys=0x%08x\n", payload_phys);
++	desc = dmaengine_prep_slave_sg(channel, (struct scatterlist *)&ccw,
++				       1, 0, 0);
++	if (!desc)
++		ret = -EINVAL;
++	else
++		ret = start_dma_with_bch_irq(priv, desc);
++
++	if (direct_dma_map_ok)
++		dma_unmap_single(priv->dev, payload_phys,
++				 mtd->writesize, DMA_TO_DEVICE);
++
++	/* In kernel < 4.19 NAND_CMD_PAGEPROG is sent by the caller.
++	 * In kernel >= 4.19 we have to call the command NAND_CMD_PAGEPROG
++	 * here, because now you can handle this specifically.
++	 */
++	return nand_prog_page_end_op(chip);
++}
++
++
++/*
++ * Read the OOB area, including the BBM and ECC info. Unfortunately the ECC
++ * system of the i.MX6 CPU does not match the common view of NAND chips. So we
++ * must compile a virtual OOB area by reading different parts of the page.
++ *
++ * See gpmi_fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_read_oob_raw(struct nand_chip *chip, int page)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	return gpmi_fus_do_read_oob(mtd, chip, page, 1);
++}
++
++/*
++ * Read the user part of the OOB area (behind the BBM, before the ECC data)
++ *
++ * See gpmi-fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_read_oob(struct nand_chip *chip,
++			     int page)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	return gpmi_fus_do_read_oob(mtd, chip, page, 0);
++}
++
++/*
++ * Write the OOB area, including the BBM and ECC info. Unfortunately the ECC
++ * system of the i.MX6 CPU does not match the common view of NAND chips. So we
++ * must store the (virtual) OOB area to different parts of the page.
++ *
++ * See gpmi_fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_write_oob_raw(struct nand_chip *chip, int page)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	return gpmi_fus_do_write_oob(mtd, chip, page, 1);
++}
++
++/*
++ * Write the user part of the OOB area (behind the BBM, before the ECC data)
++ *
++ * See gpmi_fus_read_ecc_data() for a description of the OOB area layout.
++ */
++static int gpmi_fus_write_oob(struct nand_chip *chip,
++			      int page)
++{
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	return gpmi_fus_do_write_oob(mtd, chip, page, 0);
++}
++
++static void gpmi_fus_exit(struct gpmi_nand_data *priv)
++{
++	struct mtd_info *mtd = nand_to_mtd(&priv->nand);
++
++	mtd_device_unregister(nand_to_mtd(&priv->nand));
++	nand_cleanup(&priv->nand);
++
++	/* Free the DMA buffers */
++	if (priv->cmd_buffer_virt && virt_addr_valid(priv->cmd_buffer_virt))
++		dma_free_coherent(priv->dev, PAGE_SIZE, priv->cmd_buffer_virt,
++				  priv->cmd_buffer_phys);
++	if (priv->page_buffer_virt && virt_addr_valid(priv->page_buffer_virt))
++		dma_free_coherent(priv->dev, mtd->writesize + mtd->oobsize,
++			       priv->page_buffer_virt, priv->page_buffer_phys);
++
++	priv->cmd_buffer_virt	= NULL;
++	priv->page_buffer_virt	= NULL;
++}
++
++static int gpmi_setup_data_interface(struct nand_chip *chip, int chipnr,
++			      const struct nand_interface_config *conf)
++{
++	struct gpmi_nand_data *this = nand_get_controller_data(chip);
++	const struct nand_sdr_timings *sdr;
++
++	/* Retrieve required NAND timings */
++	sdr = nand_get_sdr_timings(conf);
++	if (IS_ERR(sdr))
++		return PTR_ERR(sdr);
++
++	/* Only MX6 GPMI controller can reach EDO timings */
++	if (sdr->tRC_min <= 25000 && !GPMI_IS_MX6(this))
++		return -ENOTSUPP;
++
++	/* Stop here if this call was just a check */
++	if (chipnr < 0)
++		return 0;
++
++	/* Do the actual derivation of the controller timings */
++	gpmi_nfc_compute_timings(this, sdr);
++
++	this->hw.must_apply_timings = true;
++
++	return 0;
++}
++
++static int gpmi_fus_nand_attach_chip(struct nand_chip *chip)
++{
++	struct gpmi_nand_data *priv = nand_get_controller_data(chip);
++	struct mtd_info *mtd = nand_to_mtd(&priv->nand);
++	unsigned int chunk_shift;
++	unsigned int ecc_strength;
++	unsigned int skipblocks;
++	unsigned int oobavail;
++	int ret;
++
++	chunk_shift = 9;
++	ecc_strength = 0;
++	if (of_property_read_u32(priv->dev->of_node, "fus,skipblocks",
++				 &skipblocks))
++		skipblocks = 0;
++	mtd->skip = skipblocks * mtd->erasesize;
++	if (of_property_read_bool(priv->dev->of_node, "fus,skip_inverse")) {
++		mtd->size = mtd->skip;
++		mtd->skip = 0;
++	}
++	if (of_property_read_bool(priv->dev->of_node, "fus,chunk1k"))
++		chunk_shift = 10;
++
++	if (of_property_read_u32(priv->dev->of_node, "fus,ecc_strength",
++				 &ecc_strength))
++		ecc_strength = 0;
++	if (!ecc_strength
++	    || (ecc_strength > priv->devdata->bch_max_ecc_strength))
++		ecc_strength = gpmi_fus_get_ecc_strength(mtd, chunk_shift);
++
++	chip->ecc.strength = ecc_strength;
++	priv->gf_len = (chunk_shift > 9) ? 14 : 13;
++
++	/* Please note that mtd->oobavail is not yet set here */
++	chip->ecc.engine_type = NAND_ECC_ENGINE_TYPE_ON_HOST;
++	chip->ecc.size = 1 << chunk_shift;
++	chip->ecc.steps = mtd->writesize >> chunk_shift;
++	chip->ecc.total = ecc_strength * chip->ecc.steps * priv->gf_len / 8;
++	/* Attention! ecc.total/ecc.steps may not be an integer, do not use! */
++	chip->ecc.bytes = chip->ecc.total / chip->ecc.steps;
++	mtd_set_ooblayout(mtd, &gpmi_ooblayout_fus_ops);
++
++	oobavail = mtd->oobsize - chip->ecc.total - 4;
++	mtd->oobavail = oobavail;
++	mtd->ecc_strength = ecc_strength;
++
++	/* Set ECC access functions */
++	chip->ecc.read_page = gpmi_fus_read_page;
++	chip->ecc.write_page = gpmi_fus_write_page;
++	chip->ecc.read_oob = gpmi_fus_read_oob;
++	chip->ecc.write_oob = gpmi_fus_write_oob;
++	chip->ecc.read_page_raw = gpmi_fus_read_page_raw;
++	chip->ecc.write_page_raw = gpmi_fus_write_page_raw;
++	chip->ecc.read_oob_raw = gpmi_fus_read_oob_raw;
++	chip->ecc.write_oob_raw = gpmi_fus_write_oob_raw;
++
++	if (ecc_strength >= 20)
++		mtd->bitflip_threshold = ecc_strength - 2;
++	else
++		mtd->bitflip_threshold = ecc_strength - 1;
++
++	if (mtd->writesize <= 512)
++		priv->column_cycles = 1;
++	else
++		priv->column_cycles = 2;
++
++	if (chip->options & NAND_ROW_ADDR_3)
++		priv->row_cycles = 3;
++	else
++		priv->row_cycles = 2;
++
++	/* Set up the NFC geometry which is used by BCH. */
++	ret = bch_set_geometry(priv, oobavail, 0); /* ### TODO: set MTD device index */
++	if (ret) {
++		dev_err(priv->dev, "Set geometry failed with %d\n", ret);
++		return ret;
++	}
++
++	/*
++	 * Allocate the page buffer.
++	 *
++	 * Both the payload buffer and the auxiliary buffer must appear on
++	 * 32-bit boundaries. We presume the size of the payload buffer is a
++	 * power of two and is much larger than four, which guarantees the
++	 * auxiliary buffer will appear on a 32-bit boundary.
++	 *
++	 * The status bytes are located at the first 32 bit boundary behind
++	 * the auxiliary data.
++	 */
++	priv->page_buffer_virt =
++		dma_alloc_coherent(priv->dev, mtd->writesize + mtd->oobsize,
++				   &priv->page_buffer_phys, GFP_DMA);
++	if (!priv->page_buffer_virt) {
++		ret = -ENOMEM;
++		goto err_out;
++	}
++	priv->auxiliary_virt = priv->page_buffer_virt + mtd->writesize;
++	priv->auxiliary_phys = priv->page_buffer_phys + mtd->writesize;
++	priv->status_virt = priv->auxiliary_virt + ((oobavail + 4 + 3) & ~3);
++
++err_out:
++
++	return ret;
++}
++
++static const struct nand_controller_ops gpmi_fus_nand_controller_ops = {
++	.attach_chip = gpmi_fus_nand_attach_chip,
++	.setup_interface = gpmi_setup_data_interface,
++};
++
++static int gpmi_fus_init(struct gpmi_nand_data *priv)
++{
++	struct nand_chip *chip = &priv->nand;
++	struct mtd_info *mtd = nand_to_mtd(chip);
++	int ret;
++	struct mtd_part_parser_data ppdata = {};
++
++	/* init current chip */
++	priv->current_chip	= -1;
++
++	/* init the MTD data structures */
++	mtd->priv		= chip;
++	mtd->name		= "gpmi-nand";
++	mtd->owner		= THIS_MODULE;
++
++	/* init the nand_chip{}, we don't support a 16-bit NAND Flash bus. */
++	chip->priv		= priv;
++	chip->legacy.select_chip	= gpmi_fus_select_chip;
++	chip->legacy.dev_ready		= gpmi_fus_dev_ready;
++	chip->legacy.cmdfunc		= gpmi_fus_command;
++	chip->legacy.read_byte		= gpmi_fus_read_byte;
++	chip->legacy.read_buf		= gpmi_fus_read_buf;
++	chip->legacy.write_buf		= gpmi_fus_write_buf;
++	chip->legacy.waitfunc		= gpmi_fus_waitfunc;
++	chip->options		= NAND_BBM_FIRSTPAGE | NAND_BBM_SECONDPAGE | NAND_NO_SUBPAGE_WRITE;
++
++	/* Allocate a combined comman/data/status buffer. This is used for
++	   reading the NAND ID and ONFI data. PAGE_SIZE is enough. */
++	priv->cmd_buffer_virt =
++		dma_alloc_coherent(priv->dev, PAGE_SIZE,
++				   &priv->cmd_buffer_phys, GFP_DMA);
++	if (!priv->cmd_buffer_virt) {
++		ret = -ENOMEM;
++		goto err_out;
++	}
++	priv->data_buffer_virt = priv->cmd_buffer_virt + GPMI_FUS_CMD_BUF_SIZE;
++	priv->data_buffer_phys = priv->cmd_buffer_phys + GPMI_FUS_CMD_BUF_SIZE;
++
++	/* Read NAND ID and ONFI parameters, set basic MTD geometry info */
++	nand_controller_init(&priv->base);
++	priv->base.ops = &gpmi_fus_nand_controller_ops;
++	chip->controller = &priv->base;
++
++	ret = nand_scan(chip, GPMI_IS_MX6(priv) ? 2 : 1);
++	//ret = nand_scan(chip, 1 /*### OF->max_chips */);
++	if (ret) {
++		mtd->name = NULL;
++		goto err_out;
++	}
++
++	/* Parse MTD partition table and register MTD device */
++	ret = mtd_device_parse_register(mtd, NULL, &ppdata, NULL, 0);
++	if (!ret)
++		return 0;
++
++err_out:
++	gpmi_fus_exit(priv);
++	return ret;
++}
++
++static const struct platform_device_id gpmi_fus_ids[] = {
++	{ .name = "imx6q-gpmi-nand", .driver_data = IS_MX6Q, },
++	{}
++};
++
++static const struct of_device_id gpmi_nand_fus_id_table[] = {
++	{
++		.compatible = "fus,imx6q-gpmi-nand",
++		.data = (void *)&gpmi_devdata_imx6q,
++	}, {
++		.compatible = "fus,imx6qp-gpmi-nand",
++		.data = (void *)&gpmi_devdata_imx6qp,
++	}, {
++		.compatible = "fus,imx6sx-gpmi-nand",
++		.data = (void *)&gpmi_devdata_imx6sx,
++	}, {
++		.compatible = "fus,imx6ul-gpmi-nand",
++		.data = (void *)&gpmi_devdata_imx6ul,
++	}, {
++		.compatible = "fus,imx7d-gpmi-nand",
++		.data = (void *)&gpmi_devdata_imx7d,
++	}, {
++		.compatible = "fsl,imx8qxp-gpmi-nand",
++		.data = &gpmi_devdata_imx8qxp,
++	}, { /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, gpmi_nand_fus_id_table);
++
++static int gpmi_nand_fus_probe(struct platform_device *pdev)
++{
++	struct gpmi_nand_data *this;
++	const struct of_device_id *of_id;
++	int ret;
++
++	this = devm_kzalloc(&pdev->dev, sizeof(*this), GFP_KERNEL);
++	if (!this) {
++		dev_err(&pdev->dev, "Failed to allocate per-device memory\n");
++		return -ENOMEM;
++	}
++
++	of_id = of_match_device(gpmi_nand_fus_id_table, &pdev->dev);
++	if (of_id) {
++		this->devdata = of_id->data;
++	} else {
++		dev_err(&pdev->dev, "Failed to find the right device id\n");
++		return -ENODEV;
++	}
++
++	platform_set_drvdata(pdev, this);
++	this->pdev  = pdev;
++	this->dev   = &pdev->dev;
++
++	ret = acquire_resources(this);
++	if (ret)
++		goto exit_acquire_resources;
++	ret = gpmi_enable_clk(this, true);
++	if (ret)
++		goto exit_nfc_init;
++
++	ret = init_rpm(this);
++	if (ret)
++		goto exit_nfc_init;
++
++	ret = gpmi_init(this);
++	if (ret)
++		goto exit_rpm;
++
++	ret = gpmi_fus_init(this);
++	if (ret)
++		goto exit_rpm;
++
++	dev_info(this->dev, "driver registered.\n");
++
++	return 0;
++
++exit_rpm:
++	pm_runtime_dont_use_autosuspend(this->dev);
++	pm_runtime_disable(this->dev);
++exit_nfc_init:
++	release_resources(this);
++exit_acquire_resources:
++	dev_err(this->dev, "driver registration failed: %d\n", ret);
++
++	return ret;
++}
++
++static void gpmi_nand_fus_remove(struct platform_device *pdev)
++{
++	struct gpmi_nand_data *this = platform_get_drvdata(pdev);
++
++	gpmi_fus_exit(this);
++	pm_runtime_disable(this->dev);
++	release_resources(this);
++}
++
++static int gpmi_nand_fus_pm_suspend(struct device *dev)
++{
++	int ret;
++	pinctrl_pm_select_sleep_state(dev);
++	ret = pm_runtime_force_suspend(dev);
++
++	return ret;
++}
++
++static int gpmi_nand_fus_pm_resume(struct device *dev)
++{
++	struct gpmi_nand_data *this = dev_get_drvdata(dev);
++	struct mtd_info *mtd = nand_to_mtd(&this->nand);
++
++	int ret;
++	/* enable clock, acquire dma */
++	ret = pm_runtime_force_resume(dev);
++	if (ret) {
++		dev_err(this->dev, "Error in resume: %d\n", ret);
++		return ret;
++	}
++
++	pinctrl_pm_select_default_state(dev);
++
++	/* re-init the GPMI registers */
++	this->flags &= ~GPMI_TIMING_INIT_OK;
++	ret = gpmi_init(this);
++	if (ret) {
++		dev_err(this->dev, "Error setting GPMI : %d\n", ret);
++		return ret;
++	}
++
++	/* Set flag to get timing setup restored for next exec_op */
++	if (this->hw.clk_rate)
++		this->hw.must_apply_timings = true;
++
++	/* re-init the BCH registers */
++	ret = bch_set_geometry(this, mtd->oobavail, 0);
++	if (ret) {
++		dev_err(this->dev, "Error setting BCH : %d\n", ret);
++		return ret;
++	}
++
++	/* re-apply the timing setting */
++	this->hw.must_apply_timings = true;
++
++	return 0;
++}
++
++static int gpmi_nand_fus_runtime_suspend(struct device *dev)
++{
++	struct gpmi_nand_data *this = dev_get_drvdata(dev);
++
++	gpmi_enable_clk(this, false);
++	release_dma_channels(this);
++
++	return 0;
++}
++
++static int gpmi_nand_fus_runtime_resume(struct device *dev)
++{
++	struct gpmi_nand_data *this = dev_get_drvdata(dev);
++	int ret;
++
++	ret = gpmi_enable_clk(this, true);
++	if (ret)
++		return ret;
++
++	ret = acquire_dma_channels(this);
++	if (ret < 0)
++		return ret;
++
++	return 0;
++}
++
++static const struct dev_pm_ops gpmi_nand_fus_pm_ops = {
++	SET_RUNTIME_PM_OPS(gpmi_nand_fus_runtime_suspend,
++			   gpmi_nand_fus_runtime_resume, NULL)
++	SET_SYSTEM_SLEEP_PM_OPS(gpmi_nand_fus_pm_suspend,
++				gpmi_nand_fus_pm_resume)
++};
++
++static struct platform_driver gpmi_nand_fus_driver = {
++	.driver = {
++		.name = "gpmi-nand-fus",
++		.pm = &gpmi_nand_fus_pm_ops,
++		.of_match_table = gpmi_nand_fus_id_table,
++	},
++	.probe   = gpmi_nand_fus_probe,
++	.remove  = gpmi_nand_fus_remove,
++	.id_table = gpmi_fus_ids,
++};
++
++module_platform_driver(gpmi_nand_fus_driver);
++
++MODULE_AUTHOR("F&S Elektronik Systeme GmbH");
++MODULE_DESCRIPTION("F&S i.MX GPMI NAND Flash Controller Driver");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.h b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.h
+index 3e9bc985e..2f0e7df4d 100644
+--- a/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.h
++++ b/drivers/mtd/nand/raw/gpmi-nand/gpmi-nand.h
+@@ -76,8 +76,11 @@ enum gpmi_type {
+ 	IS_MX23,
+ 	IS_MX28,
+ 	IS_MX6Q,
++	IS_MX6QP,
+ 	IS_MX6SX,
+ 	IS_MX7D,
++	IS_MX6UL,
++	IS_MX6ULL,
+ 	IS_MX8QXP,
+ };
+ 
+@@ -172,12 +175,14 @@ struct gpmi_nand_data {
+ #define GPMI_IS_MX23(x)		((x)->devdata->type == IS_MX23)
+ #define GPMI_IS_MX28(x)		((x)->devdata->type == IS_MX28)
+ #define GPMI_IS_MX6Q(x)		((x)->devdata->type == IS_MX6Q)
++#define GPMI_IS_MX6QP(x)	((x)->devdata->type == IS_MX6QP)
+ #define GPMI_IS_MX6SX(x)	((x)->devdata->type == IS_MX6SX)
+ #define GPMI_IS_MX7D(x)		((x)->devdata->type == IS_MX7D)
+ #define GPMI_IS_MX8QXP(x)	((x)->devdata->type == IS_MX8QXP)
+ 
+ #define GPMI_IS_MX6(x)		(GPMI_IS_MX6Q(x) || GPMI_IS_MX6SX(x) || \
+-				 GPMI_IS_MX7D(x) || GPMI_IS_MX8QXP(x))
++				 GPMI_IS_MX7D(x) || GPMI_IS_MX6QP(x))
++#define GPMI_IS_MX8(x)		(GPMI_IS_MX8QXP(x))
+ 
+ #define GPMI_IS_MXS(x)		(GPMI_IS_MX23(x) || GPMI_IS_MX28(x))
+ #endif
+diff --git a/drivers/mtd/nand/raw/nand_base.c b/drivers/mtd/nand/raw/nand_base.c
+index 53e16d39a..378b6c072 100644
+--- a/drivers/mtd/nand/raw/nand_base.c
++++ b/drivers/mtd/nand/raw/nand_base.c
+@@ -369,7 +369,6 @@ static int nand_check_wp(struct nand_chip *chip)
+ 	/* controller responsible for NAND write protect */
+ 	if (chip->controller->controller_wp)
+ 		return 0;
+-
+ 	/* Check the WP bit */
+ 	ret = nand_status_op(chip, &status);
+ 	if (ret)
+@@ -446,7 +445,10 @@ static int nand_do_write_oob(struct nand_chip *chip, loff_t to,
+ 	if (nand_region_is_secured(chip, to, ops->ooblen))
+ 		return -EIO;
+ 
+-	chipnr = (int)(to >> chip->chip_shift);
++	/* Shift to get page */
++	page = (int)(to >> chip->page_shift);
++	if (page < (int)(mtd->skip >> chip->page_shift))
++		return -EROFS;
+ 
+ 	/*
+ 	 * Reset the chip. Some chips (like the Toshiba TC5832DC found in one
+@@ -454,14 +456,13 @@ static int nand_do_write_oob(struct nand_chip *chip, loff_t to,
+ 	 * if we don't do this. I have no clue why, but I seem to have 'fixed'
+ 	 * it in the doc2000 driver in August 1999.  dwmw2.
+ 	 */
++	chipnr = (int)(to >> chip->chip_shift);
+ 	ret = nand_reset(chip, chipnr);
+ 	if (ret)
+ 		return ret;
+ 
+ 	nand_select_target(chip, chipnr);
+ 
+-	/* Shift to get page */
+-	page = (int)(to >> chip->page_shift);
+ 
+ 	/* Check, if it is write protected */
+ 	if (nand_check_wp(chip)) {
+@@ -515,7 +516,7 @@ static int nand_default_block_markbad(struct nand_chip *chip, loff_t ofs)
+ 	} else {
+ 		ops.len = ops.ooblen = 1;
+ 	}
+-	ops.mode = MTD_OPS_PLACE_OOB;
++	ops.mode = MTD_OPS_RAW;
+ 
+ 	page_offset = nand_bbm_get_next_page(chip, 0);
+ 
+@@ -627,6 +628,13 @@ static int nand_block_isreserved(struct mtd_info *mtd, loff_t ofs)
+  */
+ static int nand_block_checkbad(struct nand_chip *chip, loff_t ofs, int allowbbt)
+ {
++	/* If NAND_NO_BADBLOCK is set, the bad block marker is not valid. In
++	   this case we assume a block to be valid. For example Samsungs 8-bit
++	   ECC overwrites the bad block marker. This ECC is supposed to be
++	   good enough to handle most cases and if a page has more than 8 bit
++	   errors, the whole flash has serious problems anyway. */
++	if (chip->options & NAND_NO_BADBLOCK)
++		return 0;
+ 	/* Return info from the table */
+ 	if (chip->bbt)
+ 		return nand_isbad_bbt(chip, ofs, allowbbt);
+@@ -1097,28 +1105,28 @@ static int nand_fill_column_cycles(struct nand_chip *chip, u8 *addrs,
+ 
+ 	/* Bypass all checks during NAND identification */
+ 	if (likely(!ident_stage)) {
+-		/* Make sure the offset is less than the actual page size. */
+-		if (offset_in_page > mtd->writesize + mtd->oobsize)
+-			return -EINVAL;
++	/* Make sure the offset is less than the actual page size. */
++	if (offset_in_page > mtd->writesize + mtd->oobsize)
++		return -EINVAL;
+ 
+-		/*
+-		 * On small page NANDs, there's a dedicated command to access the OOB
+-		 * area, and the column address is relative to the start of the OOB
+-		 * area, not the start of the page. Asjust the address accordingly.
+-		 */
+-		if (mtd->writesize <= 512 && offset_in_page >= mtd->writesize)
+-			offset_in_page -= mtd->writesize;
++	/*
++	 * On small page NANDs, there's a dedicated command to access the OOB
++	 * area, and the column address is relative to the start of the OOB
++	 * area, not the start of the page. Asjust the address accordingly.
++	 */
++	if (mtd->writesize <= 512 && offset_in_page >= mtd->writesize)
++		offset_in_page -= mtd->writesize;
+ 
+-		/*
+-		 * The offset in page is expressed in bytes, if the NAND bus is 16-bit
+-		 * wide, then it must be divided by 2.
+-		 */
+-		if (chip->options & NAND_BUSWIDTH_16) {
+-			if (WARN_ON(offset_in_page % 2))
+-				return -EINVAL;
++	/*
++	 * The offset in page is expressed in bytes, if the NAND bus is 16-bit
++	 * wide, then it must be divided by 2.
++	 */
++	if (chip->options & NAND_BUSWIDTH_16) {
++		if (WARN_ON(offset_in_page % 2))
++			return -EINVAL;
+ 
+-			offset_in_page /= 2;
+-		}
++		offset_in_page /= 2;
++	}
+ 	}
+ 
+ 	addrs[0] = offset_in_page;
+@@ -1215,36 +1223,21 @@ static int nand_lp_exec_read_page_op(struct nand_chip *chip, unsigned int page,
+ 	return nand_exec_op(chip, &op);
+ }
+ 
+-static unsigned int rawnand_last_page_of_lun(unsigned int pages_per_lun, unsigned int lun)
+-{
+-	/* lun is expected to be very small */
+-	return (lun * pages_per_lun) + pages_per_lun - 1;
+-}
+-
+ static void rawnand_cap_cont_reads(struct nand_chip *chip)
+ {
+ 	struct nand_memory_organization *memorg;
+-	unsigned int ppl, first_lun, last_lun;
++	unsigned int pages_per_lun, first_lun, last_lun;
+ 
+ 	memorg = nanddev_get_memorg(&chip->base);
+-	ppl = memorg->pages_per_eraseblock * memorg->eraseblocks_per_lun;
+-	first_lun = chip->cont_read.first_page / ppl;
+-	last_lun = chip->cont_read.last_page / ppl;
++	pages_per_lun = memorg->pages_per_eraseblock * memorg->eraseblocks_per_lun;
++	first_lun = chip->cont_read.first_page / pages_per_lun;
++	last_lun = chip->cont_read.last_page / pages_per_lun;
+ 
+ 	/* Prevent sequential cache reads across LUN boundaries */
+ 	if (first_lun != last_lun)
+-		chip->cont_read.pause_page = rawnand_last_page_of_lun(ppl, first_lun);
++		chip->cont_read.pause_page = first_lun * pages_per_lun + pages_per_lun - 1;
+ 	else
+ 		chip->cont_read.pause_page = chip->cont_read.last_page;
+-
+-	if (chip->cont_read.first_page == chip->cont_read.pause_page) {
+-		chip->cont_read.first_page++;
+-		chip->cont_read.pause_page = min(chip->cont_read.last_page,
+-						 rawnand_last_page_of_lun(ppl, first_lun + 1));
+-	}
+-
+-	if (chip->cont_read.first_page >= chip->cont_read.last_page)
+-		chip->cont_read.ongoing = false;
+ }
+ 
+ static int nand_lp_exec_cont_read_page_op(struct nand_chip *chip, unsigned int page,
+@@ -1311,11 +1304,12 @@ static int nand_lp_exec_cont_read_page_op(struct nand_chip *chip, unsigned int p
+ 	if (!chip->cont_read.ongoing)
+ 		return 0;
+ 
+-	if (page == chip->cont_read.last_page) {
+-		chip->cont_read.ongoing = false;
+-	} else if (page == chip->cont_read.pause_page) {
+-		chip->cont_read.first_page++;
++	if (page == chip->cont_read.pause_page &&
++	    page != chip->cont_read.last_page) {
++		chip->cont_read.first_page = chip->cont_read.pause_page + 1;
+ 		rawnand_cap_cont_reads(chip);
++	} else if (page == chip->cont_read.last_page) {
++		chip->cont_read.ongoing = false;
+ 	}
+ 
+ 	return 0;
+@@ -1325,7 +1319,6 @@ static bool rawnand_cont_read_ongoing(struct nand_chip *chip, unsigned int page)
+ {
+ 	return chip->cont_read.ongoing && page >= chip->cont_read.first_page;
+ }
+-
+ /**
+  * nand_read_page_op - Do a READ PAGE operation
+  * @chip: The NAND chip
+@@ -1357,9 +1350,9 @@ int nand_read_page_op(struct nand_chip *chip, unsigned int page,
+ 								      offset_in_page,
+ 								      buf, len, false);
+ 			else
+-				return nand_lp_exec_read_page_op(chip, page,
+-								 offset_in_page, buf,
+-								 len);
++			return nand_lp_exec_read_page_op(chip, page,
++							 offset_in_page, buf,
++							 len);
+ 		}
+ 
+ 		return nand_sp_exec_read_page_op(chip, page, offset_in_page,
+@@ -1446,12 +1439,12 @@ int nand_change_read_column_op(struct nand_chip *chip,
+ 		return -EINVAL;
+ 
+ 	if (!ident_stage) {
+-		if (offset_in_page + len > mtd->writesize + mtd->oobsize)
+-			return -EINVAL;
++	if (offset_in_page + len > mtd->writesize + mtd->oobsize)
++		return -EINVAL;
+ 
+-		/* Small page NANDs do not support column change. */
+-		if (mtd->writesize <= 512)
+-			return -ENOTSUPP;
++	/* Small page NANDs do not support column change. */
++	if (mtd->writesize <= 512)
++		return -ENOTSUPP;
+ 	}
+ 
+ 	if (nand_has_exec_op(chip)) {
+@@ -2019,7 +2012,7 @@ static int nand_set_features_op(struct nand_chip *chip, u8 feature,
+ 				const void *data)
+ {
+ 	const u8 *params = data;
+-	int i, ret;
++	int ret;
+ 
+ 	if (nand_has_exec_op(chip)) {
+ 		const struct nand_interface_config *conf =
+@@ -2040,8 +2033,7 @@ static int nand_set_features_op(struct nand_chip *chip, u8 feature,
+ 	}
+ 
+ 	chip->legacy.cmdfunc(chip, NAND_CMD_SET_FEATURES, feature, -1);
+-	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
+-		chip->legacy.write_byte(chip, params[i]);
++	chip->legacy.write_buf(chip, params, ONFI_SUBFEATURE_PARAM_LEN);
+ 
+ 	ret = chip->legacy.waitfunc(chip);
+ 	if (ret < 0)
+@@ -2102,8 +2094,7 @@ static int nand_get_features_op(struct nand_chip *chip, u8 feature,
+ 	}
+ 
+ 	chip->legacy.cmdfunc(chip, NAND_CMD_GET_FEATURES, feature, -1);
+-	for (i = 0; i < ONFI_SUBFEATURE_PARAM_LEN; ++i)
+-		params[i] = chip->legacy.read_byte(chip);
++	chip->legacy.read_buf(chip,  params, ONFI_SUBFEATURE_PARAM_LEN);
+ 
+ 	return 0;
+ }
+@@ -3525,9 +3516,13 @@ static void rawnand_cont_read_skip_first_page(struct nand_chip *chip, unsigned i
+ 		return;
+ 
+ 	chip->cont_read.first_page++;
+-	rawnand_cap_cont_reads(chip);
++	if (chip->cont_read.first_page == chip->cont_read.pause_page)
++		chip->cont_read.first_page++;
++	if (chip->cont_read.first_page >= chip->cont_read.last_page)
++		chip->cont_read.ongoing = false;
+ }
+ 
++#if 0 //### TODO: Add support for read_retry in nand_do_read_ops()
+ /**
+  * nand_setup_read_retry - [INTERN] Set the READ RETRY mode
+  * @chip: NAND chip object
+@@ -3549,6 +3544,7 @@ static int nand_setup_read_retry(struct nand_chip *chip, int retry_mode)
+ 
+ 	return chip->ops.setup_read_retry(chip, retry_mode);
+ }
++#endif
+ 
+ static void nand_wait_readrdy(struct nand_chip *chip)
+ {
+@@ -3572,18 +3568,35 @@ static void nand_wait_readrdy(struct nand_chip *chip)
+ static int nand_do_read_ops(struct nand_chip *chip, loff_t from,
+ 			    struct mtd_oob_ops *ops)
+ {
+-	int chipnr, page, realpage, col, bytes, aligned, oob_required;
++	int chipnr, page, realpage, aligned, oob_required;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
++	struct mtd_ecc_stats stats;
+ 	int ret = 0;
+-	uint32_t readlen = ops->len;
+-	uint32_t oobreadlen = ops->ooblen;
+-	uint32_t max_oobsize = mtd_oobavail(mtd, ops);
+-
+-	uint8_t *bufpoi, *oob, *buf;
+-	int use_bounce_buf;
++	uint32_t bytes, col;
++	uint8_t *buf = ops->datbuf;
++	uint32_t readlen = buf ? ops->len : 0;
++	uint8_t *oobbuf = ops->oobbuf;
++	uint32_t oobreadlen = oobbuf ? ops->ooblen : 0;
++	uint32_t oobmaxlen = mtd_oobavail(mtd, ops);
+ 	unsigned int max_bitflips = 0;
+-	int retry_mode = 0;
+-	bool ecc_fail = false;
++	uint8_t *bufpoi;
++	int skippage = (int)(mtd->skip >> chip->page_shift);
++
++	ops->retlen = 0;
++	if (oobbuf)
++		ops->oobretlen = 0;
++	if (!readlen)
++		return 0;
++
++	/* Don't allow multipage oob reads with offset */
++	if (oobbuf && ops->ooboffs && (ops->ooboffs + oobreadlen > oobmaxlen)) {
++		pr_debug("%s: Attempt read beyond end of page\n", __func__);
++		return -EINVAL;
++	}
++	oobmaxlen -= ops->ooboffs;
++	oob_required = oobbuf ? 1 : 0;
++
++	stats = mtd->ecc_stats;
+ 
+ 	/* Check if the region is secured */
+ 	if (nand_region_is_secured(chip, from, readlen))
+@@ -3596,126 +3609,81 @@ static int nand_do_read_ops(struct nand_chip *chip, loff_t from,
+ 	page = realpage & chip->pagemask;
+ 
+ 	col = (int)(from & (mtd->writesize - 1));
+-
+-	buf = ops->datbuf;
+-	oob = ops->oobbuf;
+-	oob_required = oob ? 1 : 0;
++//	printk("<%x,%x>", readlen, col);	/* ### */
+ 
+ 	if (likely(ops->mode != MTD_OPS_RAW))
+ 		rawnand_enable_cont_reads(chip, page, readlen, col);
+ 
++	if (likely(ops->mode != MTD_OPS_RAW))
++		rawnand_enable_cont_reads(chip, page, readlen, col);
+ 	while (1) {
+-		struct mtd_ecc_stats ecc_stats = mtd->ecc_stats;
+ 
+ 		bytes = min(mtd->writesize - col, readlen);
+ 		aligned = (bytes == mtd->writesize);
+ 
+-		if (!aligned)
+-			use_bounce_buf = 1;
+-		else if (chip->options & NAND_USES_DMA)
+-			use_bounce_buf = !virt_addr_valid(buf) ||
+-					 !IS_ALIGNED((unsigned long)buf,
+-						     chip->buf_align);
+-		else
+-			use_bounce_buf = 0;
+ 
+ 		/* Is the current page in the buffer? */
+-		if (realpage != chip->pagecache.page || oob) {
+-			bufpoi = use_bounce_buf ? chip->data_buf : buf;
+-
+-			if (use_bounce_buf && aligned)
+-				pr_debug("%s: using read bounce buffer for buf@%p\n",
+-						 __func__, buf);
+-
+-read_retry:
+-			/*
+-			 * Now read the page into the buffer.  Absent an error,
+-			 * the read methods return max bitflips per ecc step.
+-			 */
+-			if (unlikely(ops->mode == MTD_OPS_RAW))
+-				ret = chip->ecc.read_page_raw(chip, bufpoi,
+-							      oob_required,
+-							      page);
++		if (realpage != chip->pagecache.page || oobbuf) {
++			unsigned int prev_corrected = mtd->ecc_stats.corrected;
++
++			bufpoi = aligned ? buf : chip->data_buf;
++
++			/* Now read the page into the buffer: if we are at
++			   the beginning in the skip region, read as empty */
++			if (realpage < skippage) {
++				memset(bufpoi, 0xFF, mtd->writesize);
++				memset(chip->oob_poi, 0xFF, mtd->oobsize);
++			} else if (unlikely(ops->mode == MTD_OPS_RAW))
++				ret = chip->ecc.read_page_raw(chip,
++						bufpoi, oob_required, page);
+ 			else if (!aligned && NAND_HAS_SUBPAGE_READ(chip) &&
+-				 !oob)
+-				ret = chip->ecc.read_subpage(chip, col, bytes,
+-							     bufpoi, page);
++			    !oobbuf)
++				ret = chip->ecc.read_subpage(chip,
++						col, bytes, bufpoi, page);
+ 			else
+ 				ret = chip->ecc.read_page(chip, bufpoi,
+ 							  oob_required, page);
+-			if (ret < 0) {
+-				if (use_bounce_buf)
+-					/* Invalidate page cache */
+-					chip->pagecache.page = -1;
++			if (ret < 0)
+ 				break;
+-			}
++			ret = 0;
+ 
+-			/*
+-			 * Copy back the data in the initial buffer when reading
+-			 * partial pages or when a bounce buffer is required.
+-			 */
+-			if (use_bounce_buf) {
+-				if (!NAND_HAS_SUBPAGE_READ(chip) && !oob &&
+-				    !(mtd->ecc_stats.failed - ecc_stats.failed) &&
+-				    (ops->mode != MTD_OPS_RAW)) {
++			/* Transfer not aligned data */
++			if (!aligned) {
++				if (!NAND_HAS_SUBPAGE_READ(chip) && !oobbuf &&
++				    !(mtd->ecc_stats.failed - stats.failed))
+ 					chip->pagecache.page = realpage;
+-					chip->pagecache.bitflips = ret;
+-				} else {
+-					/* Invalidate page cache */
+-					chip->pagecache.page = -1;
+-				}
+ 				memcpy(buf, bufpoi + col, bytes);
+ 			}
+ 
+-			if (unlikely(oob)) {
+-				int toread = min(oobreadlen, max_oobsize);
++			buf += bytes;
++
++			if (unlikely(oobbuf)) {
++				int toread = oobmaxlen;
+ 
++				if (toread > oobreadlen)
++					toread = oobreadlen;
+ 				if (toread) {
+-					oob = nand_transfer_oob(chip, oob, ops,
+-								toread);
++					oobbuf = nand_transfer_oob(chip,
++						oobbuf, ops, toread);
+ 					oobreadlen -= toread;
+ 				}
+ 			}
+ 
+ 			nand_wait_readrdy(chip);
+ 
+-			if (mtd->ecc_stats.failed - ecc_stats.failed) {
+-				if (retry_mode + 1 < chip->read_retries) {
+-					retry_mode++;
+-					ret = nand_setup_read_retry(chip,
+-							retry_mode);
+-					if (ret < 0)
+-						break;
+-
+-					/* Reset ecc_stats; retry */
+-					mtd->ecc_stats = ecc_stats;
+-					goto read_retry;
++			max_bitflips = max(max_bitflips,
++					   mtd->ecc_stats.corrected -
++					   prev_corrected);
+ 				} else {
+-					/* No more retry modes; real failure */
+-					ecc_fail = true;
+-				}
+-			}
+-
+-			buf += bytes;
+-			max_bitflips = max_t(unsigned int, max_bitflips, ret);
+-		} else {
++//###			printk("+");//###
+ 			memcpy(buf, chip->data_buf + col, bytes);
+ 			buf += bytes;
+-			max_bitflips = max_t(unsigned int, max_bitflips,
+-					     chip->pagecache.bitflips);
+ 
+ 			rawnand_cont_read_skip_first_page(chip, page);
+ 		}
+ 
+ 		readlen -= bytes;
+ 
+-		/* Reset to retry mode 0 */
+-		if (retry_mode) {
+-			ret = nand_setup_read_retry(chip, 0);
+-			if (ret < 0)
+-				break;
+-			retry_mode = 0;
+-		}
+ 
+ 		if (!readlen)
+ 			break;
+@@ -3737,15 +3705,14 @@ static int nand_do_read_ops(struct nand_chip *chip, loff_t from,
+ 
+ 	if (WARN_ON_ONCE(chip->cont_read.ongoing))
+ 		chip->cont_read.ongoing = false;
+-
+ 	ops->retlen = ops->len - (size_t) readlen;
+-	if (oob)
++	if (oobbuf)
+ 		ops->oobretlen = ops->ooblen - oobreadlen;
+ 
+-	if (ret < 0)
++	if (ret)
+ 		return ret;
+ 
+-	if (ecc_fail)
++	if (mtd->ecc_stats.failed - stats.failed)
+ 		return -EBADMSG;
+ 
+ 	return max_bitflips;
+@@ -3917,13 +3884,17 @@ static int nand_do_read_oob(struct nand_chip *chip, loff_t from,
+ 			    struct mtd_oob_ops *ops)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+-	unsigned int max_bitflips = 0;
+ 	int page, realpage, chipnr;
+ 	struct mtd_ecc_stats stats;
+ 	int readlen = ops->ooblen;
+-	int len;
++	uint32_t max_oobsize;
+ 	uint8_t *buf = ops->oobbuf;
+-	int ret = 0;
++	int skippage = (int)(mtd->skip >> chip->page_shift);
++	unsigned int max_bitflips = 0;
++
++	ops->oobretlen = 0;
++	if (!readlen)
++		return 0;
+ 
+ 	pr_debug("%s: from = 0x%08Lx, len = %i\n",
+ 			__func__, (unsigned long long)from, readlen);
+@@ -3932,9 +3903,18 @@ static int nand_do_read_oob(struct nand_chip *chip, loff_t from,
+ 	if (nand_region_is_secured(chip, from, readlen))
+ 		return -EIO;
+ 
++	max_oobsize = mtd_oobavail(mtd, ops);
++
++	/* Don't allow multipage oob reads with offset */
++	if (ops->ooboffs && (ops->ooboffs + readlen > max_oobsize)) {
++		pr_debug("%s: attempt to read beyond end of page\n",
++				__func__);
++		return -EINVAL;
++	}
++
++	max_oobsize -= ops->ooboffs;
+ 	stats = mtd->ecc_stats;
+ 
+-	len = mtd_oobavail(mtd, ops);
+ 
+ 	chipnr = (int)(from >> chip->chip_shift);
+ 	nand_select_target(chip, chipnr);
+@@ -3944,20 +3924,26 @@ static int nand_do_read_oob(struct nand_chip *chip, loff_t from,
+ 	page = realpage & chip->pagemask;
+ 
+ 	while (1) {
++		unsigned int prev_corrected = mtd->ecc_stats.corrected;
++		int len = max_oobsize;
++
++		if (len > readlen)
++			len = readlen;
++		if (realpage < skippage) {
++			/* If we are in the skip region, read as empty */
++			memset(buf, 0xFF, len);
++		} else {
+ 		if (ops->mode == MTD_OPS_RAW)
+-			ret = chip->ecc.read_oob_raw(chip, page);
++				chip->ecc.read_oob_raw(chip, page);
+ 		else
+-			ret = chip->ecc.read_oob(chip, page);
+-
+-		if (ret < 0)
+-			break;
+-
+-		len = min(len, readlen);
++				chip->ecc.read_oob(chip, page);
+ 		buf = nand_transfer_oob(chip, buf, ops, len);
+ 
+ 		nand_wait_readrdy(chip);
+ 
+-		max_bitflips = max_t(unsigned int, max_bitflips, ret);
++		}
++		max_bitflips = max(max_bitflips,
++				   mtd->ecc_stats.corrected - prev_corrected);
+ 
+ 		readlen -= len;
+ 		if (!readlen)
+@@ -3976,10 +3962,7 @@ static int nand_do_read_oob(struct nand_chip *chip, loff_t from,
+ 	}
+ 	nand_deselect_target(chip);
+ 
+-	ops->oobretlen = ops->ooblen - readlen;
+-
+-	if (ret < 0)
+-		return ret;
++	ops->oobretlen = ops->ooblen;
+ 
+ 	if (mtd->ecc_stats.failed - stats.failed)
+ 		return -EBADMSG;
+@@ -4003,6 +3986,8 @@ static int nand_read_oob(struct mtd_info *mtd, loff_t from,
+ 	int ret;
+ 
+ 	ops->retlen = 0;
++	if (ops->oobbuf)
++		ops->oobretlen = 0;
+ 
+ 	if (ops->mode != MTD_OPS_PLACE_OOB &&
+ 	    ops->mode != MTD_OPS_AUTO_OOB &&
+@@ -4024,7 +4009,6 @@ static int nand_read_oob(struct mtd_info *mtd, loff_t from,
+ 		ops->stats->corrected_bitflips +=
+ 			mtd->ecc_stats.corrected - old_stats.corrected;
+ 	}
+-
+ 	nand_release_device(chip);
+ 	return ret;
+ }
+@@ -4447,13 +4431,17 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 
+ 	uint8_t *oob = ops->oobbuf;
+ 	uint8_t *buf = ops->datbuf;
+-	int ret;
++	int ret, subpage;
+ 	int oob_required = oob ? 1 : 0;
+ 
+ 	ops->retlen = 0;
++	if (oob)
++		ops->oobretlen = 0;
+ 	if (!writelen)
+ 		return 0;
+ 
++	if (chip->options & NAND_SW_WRITE_PROTECT)
++		return -EROFS;
+ 	/* Reject writes, which are not page aligned */
+ 	if (NOTALIGNED(to) || NOTALIGNED(ops->len)) {
+ 		pr_notice("%s: attempt to write non page aligned data\n",
+@@ -4466,6 +4454,10 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 		return -EIO;
+ 
+ 	column = to & (mtd->writesize - 1);
++	subpage = column || (writelen & (mtd->writesize - 1));
++
++	if (subpage && oob)
++		return -EINVAL;
+ 
+ 	chipnr = (int)(to >> chip->chip_shift);
+ 	nand_select_target(chip, chipnr);
+@@ -4476,7 +4468,10 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 		goto err_out;
+ 	}
+ 
++	/* Don't allow writing into skip area */
+ 	realpage = (int)(to >> chip->page_shift);
++	if (realpage < (int)(mtd->skip >> chip->page_shift))
++		return -EROFS;
+ 	page = realpage & chip->pagemask;
+ 
+ 	/* Invalidate the page cache, when we write to the cached page */
+@@ -4485,10 +4480,12 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 		chip->pagecache.page = -1;
+ 
+ 	/* Don't allow multipage oob writes with offset */
+-	if (oob && ops->ooboffs && (ops->ooboffs + ops->ooblen > oobmaxlen)) {
++	if (oob && ops->ooboffs && (ops->ooboffs + oobwritelen > oobmaxlen)) {
++		pr_notice("%s: attempt to write past end of page\n", __func__);
+ 		ret = -EINVAL;
+ 		goto err_out;
+ 	}
++	oobmaxlen -= ops->ooboffs;
+ 
+ 	while (1) {
+ 		int bytes = mtd->writesize;
+@@ -4520,7 +4517,10 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 		}
+ 
+ 		if (unlikely(oob)) {
+-			size_t len = min(oobwritelen, oobmaxlen);
++			size_t len = oobmaxlen;
++
++			if (len > oobwritelen)
++				len = oobwritelen;
+ 			oob = nand_fill_oob(chip, oob, len, ops);
+ 			oobwritelen -= len;
+ 		} else {
+@@ -4553,7 +4553,7 @@ static int nand_do_write_ops(struct nand_chip *chip, loff_t to,
+ 
+ 	ops->retlen = ops->len - writelen;
+ 	if (unlikely(oob))
+-		ops->oobretlen = ops->ooblen;
++		ops->oobretlen = ops->ooblen - oobwritelen;
+ 
+ err_out:
+ 	nand_deselect_target(chip);
+@@ -4608,6 +4608,8 @@ static int nand_write_oob(struct mtd_info *mtd, loff_t to,
+ 	int ret = 0;
+ 
+ 	ops->retlen = 0;
++	if (ops->oobbuf)
++		ops->oobretlen = 0;
+ 
+ 	nand_get_device(chip);
+ 
+@@ -4654,6 +4656,7 @@ static int nand_erase(struct mtd_info *mtd, struct erase_info *instr)
+ int nand_erase_nand(struct nand_chip *chip, struct erase_info *instr,
+ 		    int allowbbt)
+ {
++	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	int page, pages_per_block, ret, chipnr;
+ 	loff_t len;
+ 
+@@ -4661,6 +4664,9 @@ int nand_erase_nand(struct nand_chip *chip, struct erase_info *instr,
+ 			__func__, (unsigned long long)instr->addr,
+ 			(unsigned long long)instr->len);
+ 
++	/* Don't erase in skip region or if software write-protected */
++	if ((chip->options & NAND_SW_WRITE_PROTECT) || (instr->addr < mtd->skip))
++		return -EROFS;
+ 	if (check_offs_len(chip, instr->addr, instr->len))
+ 		return -EINVAL;
+ 
+@@ -4694,7 +4700,6 @@ int nand_erase_nand(struct nand_chip *chip, struct erase_info *instr,
+ 
+ 	while (len) {
+ 		loff_t ofs = (loff_t)page << chip->page_shift;
+-
+ 		/* Check if we have a bad block, we do not erase bad blocks! */
+ 		if (nand_block_checkbad(chip, ((loff_t) page) <<
+ 					chip->page_shift, allowbbt)) {
+@@ -4793,8 +4798,11 @@ static int nand_block_isbad(struct mtd_info *mtd, loff_t offs)
+  */
+ static int nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
+ {
++	struct nand_chip *chip = mtd->priv;
+ 	int ret;
+ 
++	if (chip->options & NAND_NO_BADBLOCK)
++		return 0;
+ 	ret = nand_block_isbad(mtd, ofs);
+ 	if (ret) {
+ 		/* If it was bad already, return success and do nothing */
+@@ -4845,7 +4853,6 @@ static void nand_resume(struct mtd_info *mtd)
+ 			__func__);
+ 	}
+ 	mutex_unlock(&chip->lock);
+-
+ 	wake_up_all(&chip->resume_wq);
+ }
+ 
+@@ -5036,7 +5043,7 @@ EXPORT_SYMBOL_GPL(nand_decode_ext_id);
+  * decodes a matching ID table entry and assigns the MTD size parameters for
+  * the chip.
+  */
+-static void nand_decode_id(struct nand_chip *chip, struct nand_flash_dev *type)
++static void nand_decode_id(struct nand_chip *chip, const struct nand_flash_dev *type)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct nand_memory_organization *memorg;
+@@ -5070,13 +5077,13 @@ static void nand_decode_bbm_options(struct nand_chip *chip)
+ 		chip->badblockpos = NAND_BBM_POS_SMALL;
+ }
+ 
+-static inline bool is_full_id_nand(struct nand_flash_dev *type)
++static inline bool is_full_id_nand(const struct nand_flash_dev *type)
+ {
+ 	return type->id_len;
+ }
+ 
+ static bool find_full_id_nand(struct nand_chip *chip,
+-			      struct nand_flash_dev *type)
++			      const struct nand_flash_dev *type)
+ {
+ 	struct nand_device *base = &chip->base;
+ 	struct nand_ecc_props requirements;
+@@ -5234,11 +5241,10 @@ static void rawnand_late_check_supported_ops(struct nand_chip *chip)
+ 
+ 	rawnand_check_cont_read_support(chip);
+ }
+-
+ /*
+  * Get the flash and manufacturer id and lookup if the type is supported.
+  */
+-static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
++static int nand_detect(struct nand_chip *chip, const struct nand_flash_dev *type)
+ {
+ 	const struct nand_manufacturer_desc *manufacturer_desc;
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+@@ -5268,7 +5274,6 @@ static int nand_detect(struct nand_chip *chip, struct nand_flash_dev *type)
+ 	nand_select_target(chip, 0);
+ 
+ 	rawnand_early_check_supported_ops(chip);
+-
+ 	/* Send the command for reading device ID */
+ 	ret = nand_readid_op(chip, 0, id_data, 2);
+ 	if (ret)
+@@ -5673,7 +5678,7 @@ static int rawnand_dt_init(struct nand_chip *chip)
+  * as been banned for the benefit of the ->init_ecc()/cleanup_ecc() hooks.
+  */
+ static int nand_scan_ident(struct nand_chip *chip, unsigned int maxchips,
+-			   struct nand_flash_dev *table)
++		    const struct nand_flash_dev *table)
+ {
+ 	struct mtd_info *mtd = nand_to_mtd(chip);
+ 	struct nand_memory_organization *memorg;
+@@ -6475,6 +6480,13 @@ static int nand_scan_tail(struct nand_chip *chip)
+ 		goto err_nand_manuf_cleanup;
+ 	}
+ 
++	/*
++	 * Attention! Some ECC methods (like the BCH engine on i.MX CPUs) may
++	 * produce ECC sums with a bit size per step that is not a multiple of
++	 * bytes. These drivers should compute entry ecc->total in their
++	 * attach() code already and ecc->bytes should be ignored then. In all
++	 * other cases, i.e. if ecc->total is still 0, compute it now.
++	 */
+ 	if (!ecc->total) {
+ 		ecc->total = ecc->steps * ecc->bytes;
+ 		chip->base.ecc.ctx.total = ecc->total;
+@@ -6577,7 +6589,6 @@ static int nand_scan_tail(struct nand_chip *chip)
+ 		if (ret)
+ 			goto err_free_interface_config;
+ 	}
+-
+ 	rawnand_late_check_supported_ops(chip);
+ 
+ 	/*
+diff --git a/drivers/mtd/nand/raw/nand_bbt.c b/drivers/mtd/nand/raw/nand_bbt.c
+index a8fba5f39..146386be6 100644
+--- a/drivers/mtd/nand/raw/nand_bbt.c
++++ b/drivers/mtd/nand/raw/nand_bbt.c
+@@ -316,7 +316,7 @@ static int scan_read_oob(struct nand_chip *this, uint8_t *buf, loff_t offs,
+ 	struct mtd_oob_ops ops = { };
+ 	int res, ret = 0;
+ 
+-	ops.mode = MTD_OPS_PLACE_OOB;
++	ops.mode = MTD_OPS_RAW;
+ 	ops.ooboffs = 0;
+ 	ops.ooblen = mtd->oobsize;
+ 
+@@ -423,7 +423,7 @@ static int scan_block_fast(struct nand_chip *this, struct nand_bbt_descr *bd,
+ 	ops.oobbuf = buf;
+ 	ops.ooboffs = 0;
+ 	ops.datbuf = NULL;
+-	ops.mode = MTD_OPS_PLACE_OOB;
++	ops.mode = MTD_OPS_RAW;
+ 
+ 	page_offset = nand_bbm_get_next_page(this, 0);
+ 
+diff --git a/include/linux/mtd/mtd.h b/include/linux/mtd/mtd.h
+index 8d10d9d2e..bc6bc1a7c 100644
+--- a/include/linux/mtd/mtd.h
++++ b/include/linux/mtd/mtd.h
+@@ -238,7 +238,8 @@ struct mtd_master {
+ struct mtd_info {
+ 	u_char type;
+ 	uint32_t flags;
+-	uint64_t size;	 // Total size of the MTD
++	uint64_t size;	 /* Total size of the MTD */
++	uint64_t skip;   /* F&S: Skip these many bytes at start of device */
+ 
+ 	/* "Major" erase size for the device. Naïve users may take this
+ 	 * to be the only erase size available, or may use the more detailed
+diff --git a/include/linux/mtd/rawnand.h b/include/linux/mtd/rawnand.h
+index e84522e31..71f5be7eb 100644
+--- a/include/linux/mtd/rawnand.h
++++ b/include/linux/mtd/rawnand.h
+@@ -170,6 +170,11 @@ struct gpio_desc;
+  */
+ #define NAND_USES_DMA		BIT(20)
+ 
++/* F&S Extensions */
++/* Chip can't use bad block marker because of special type of ECC */
++#define NAND_NO_BADBLOCK	0x04000000
++/* Chip is software write-protected */
++#define NAND_SW_WRITE_PROTECT	0x08000000
+ /*
+  * In case your controller is implementing ->legacy.cmd_ctrl() and is relying
+  * on the default ->cmdfunc() implementation, you may want to let the core
+diff --git a/include/linux/mxs-dma-ext.h b/include/linux/mxs-dma-ext.h
+new file mode 100644
+index 000000000..e217f8014
+--- /dev/null
++++ b/include/linux/mxs-dma-ext.h
+@@ -0,0 +1,60 @@
++/*
++ * Copyright 2011-2012 Freescale Semiconductor, Inc. All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MACH_MXS_DMA_EXT_H__
++#define __MACH_MXS_DMA_EXT_H__
++
++#include <linux/dmaengine.h>
++
++#define CCW_CMD_DMA_NO_XFER	(0 << 0)
++#define CCW_CMD_DMA_WRITE	(1 << 0)
++#define CCW_CMD_DMA_READ	(2 << 0)
++#define CCW_CMD_DMA_SENSE	(3 << 0) /* not implemented! */
++#define CCW_CMD_MASK		(3 << 0)
++#define CCW_CMD_SHIFT		0
++#define CCW_CHAIN		(1 << 2) /* automatically set by driver */
++#define CCW_IRQ			(1 << 3)
++#define CCW_NAND_LOCK		(1 << 4)
++#define CCW_NAND_WAIT4READY	(1 << 5)
++#define CCW_DEC_SEM		(1 << 6) /* automatically set by driver */
++#define CCW_WAIT4END		(1 << 7)
++#define CCW_HALT_ON_TERM	(1 << 8)
++#define CCW_TERM_FLUSH		(1 << 9) /* not available on i.MX6 */
++#define CCW_PIO_NUM(n)		((n) << 12)
++#define CCW_PIO_NUM_MASK	(0xF << 12)
++#define CCW_PIO_NUM_SHIFT	12
++#define CCW_XFER_COUNT(n)	((n) << 16)
++#define CCW_XFER_COUNT_MASK	(0xFFFF << 16)
++#define CCW_XFER_COUNT_SHIFT	16
++
++/* We currently only support GPMI, so 6 PIO words are enough */
++#define MAX_XFER_BYTES	0xff00
++#define MXS_PIO_WORDS	6
++
++struct mxs_dma_ccw {
++	u32 next;			/* set to zero, driver will replace */
++	u32 cmd;			/* see CCW_* above */
++	u32 bufaddr;			/* physical address! */
++	u32 pio[MXS_PIO_WORDS];
++};
++
++struct mxs_dma_data {
++	int chan_irq;
++};
++
++static inline int mxs_dma_ext_is_apbh(struct dma_chan *chan)
++{
++	return !strcmp(dev_name(chan->device->dev), "mxs-dma-ext-apbh");
++}
++
++static inline int mxs_dma_ext_is_apbx(struct dma_chan *chan)
++{
++	return !strcmp(dev_name(chan->device->dev), "mxs-dma-ext-apbx");
++}
++
++#endif /* __MACH_MXS_DMA_EXT_H__ */
+-- 
+2.40.1
+
