@@ -57,7 +57,6 @@ CORE_IMAGE_EXTRA_INSTALL += " \
     bcsend \
     fbset \
     firmwared \
-    freerdp \
     fs-remote\
     hostapd \
     liberation-fonts \
