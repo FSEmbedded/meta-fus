@@ -60,4 +60,7 @@ SPDX_ARCHIVE_PACKAGED ?= "0"
 SPDX_INCLUDE_COMPILED_SOURCES:pn-linux-fus-debug  ?= "1"
 
 CYCLONEDX_SPEC_VERSION ?= "1.6"
-CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "0"
+# Adding none-runtime-packages seem to be broken in version
+# 372b152f94397b68dd9d9c4f5ee06b24c2c7fa1d
+# of meta-cyclonedx so disable it for now
+CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "1"
