@@ -9,8 +9,8 @@ include recipes-kernel/linux/cve-exclusion_6.6.inc
 do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
 
 SRCBRANCH="master"
-# v6.6.129-2.2.2-fus1.3
-SRCREV = "58013837ba00ecdc66e5325b01a09d63ad73718e"
+# v6.6.129-2.2.2-fus1.4
+SRCREV = "fcd3f1ec91491252bde22f9f5c5357010e8d18ff"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
