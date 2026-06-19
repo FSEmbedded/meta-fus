@@ -13,6 +13,11 @@ RPROVIDES:${PN} = ""
 
 FILES:${PN} = ""
 
+# We do not need Device Trees in the Debug build
+python () {
+    d.setVar('KERNEL_DEVICETREE', '')
+}
+
 deltask do_deploy
 
 do_deploy_spdx() {
