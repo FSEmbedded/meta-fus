@@ -9,12 +9,12 @@ include recipes-kernel/linux/cve-exclusion_6.6.inc
 do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
 
 SRCBRANCH="master"
-# v6.6.129-2.2.2-fus1.4
-SRCREV = "fcd3f1ec91491252bde22f9f5c5357010e8d18ff"
+# v6.6.142-2.2.2-fus1.0
+SRCREV = "98ab8a3f3a724545af9c63077695881765cdfd3e"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
-LINUX_VERSION = "6.6.129"
+LINUX_VERSION = "6.6.142"
 
 KBUILD_DEFCONFIG:mx6-nxp-bsp = "fsimx6_defconfig"
 KBUILD_DEFCONFIG:mx6sx-nxp-bsp = "fsimx6sx_defconfig"
