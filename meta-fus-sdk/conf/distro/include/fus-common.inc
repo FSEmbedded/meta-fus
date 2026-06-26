@@ -64,3 +64,4 @@ CYCLONEDX_SPEC_VERSION ?= "1.6"
 # 372b152f94397b68dd9d9c4f5ee06b24c2c7fa1d
 # of meta-cyclonedx so disable it for now
 CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "1"
+CYCLONEDX_EXTRA_RUNTIME_RECIPES += " u-boot-fus"
