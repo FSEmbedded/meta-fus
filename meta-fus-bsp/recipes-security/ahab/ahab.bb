@@ -10,9 +10,6 @@ LICENSE = "CLOSED"
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:${DL_DIR}:"
 SRC_URI += " file://fsimage.sh file://input.csf file://os_cntr.cfg  "
 
-S = "${WORKDIR}/git"
-B = "${WORKDIR}/build"
-
 PACKAGE_ARCH = "${MACHINE_ARCH}"
 COMPATIBLE_MACHINE = "(mx8|mx93)"
 
@@ -59,7 +56,7 @@ do_configure() {
 		tar -xf ../keys.tar.gz -C ../
 	fi
 
-	cp ${WORKDIR}/input.csf ${B}/input_edited.csf
+	cp ${UNPACKDIR}/input.csf ${B}/input_edited.csf
 	sed -i "s/###crtsname###/${SRK_filename}/g" ${B}/input_edited.csf
 	sed -i "s/###index###/${SRK_index}/g" ${B}/input_edited.csf
 	sed -i "s/###revoke###/${SRK_revoke}/g" ${B}/input_edited.csf
@@ -72,16 +69,16 @@ do_configure() {
 	cp ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${MACHINE_ARCH}.fs ${B}/uboot-${MACHINE_ARCH}_signed.fs
 
 	if ${SIGN_LINUX}; then
-		cp ${WORKDIR}/os_cntr.cfg ${B}/os_cntr_edited.cfg
+		cp ${UNPACKDIR}/os_cntr.cfg ${B}/os_cntr_edited.cfg
 		cp ${DEPLOY_DIR_IMAGE}/fitImage-${MACHINE_ARCH}.bin ${B}/
 	fi
 
 	### skript kopieren
 	for i in ${Update_Files}; do
-		cp ${DL_DIR}/${i} ${WORKDIR}
+		cp ${DL_DIR}/${i} ${UNPACKDIR}
 	done
 	for i in ${Update_Scripts}; do
-		cp ${DL_DIR}/${i} ${WORKDIR}
+		cp ${DL_DIR}/${i} ${UNPACKDIR}
 	done
 }
 
@@ -95,7 +92,7 @@ do_compile() {
 	for file in ${image_list}
 	do
 		### we need container and signature offsets, we parse the first from the fsimage.sh output and get the second from the container header
-		cat ${B}/${file}_signed.fs | ${WORKDIR}/fsimage.sh | grep "IMX Container Header" | grep -v "NXP signed" | while read line
+		cat ${B}/${file}_signed.fs | ${UNPACKDIR}/fsimage.sh | grep "IMX Container Header" | grep -v "NXP signed" | while read line
 		do
 			container_hex=0x$(echo $line | sed 's/.*: 0*//' | sed 's/ .*//')
 			container_dec=$(printf %d $container_hex)
@@ -139,10 +136,10 @@ do_compile() {
 	fi
 
 	for i in ${Update_Files}; do
-		cp ${WORKDIR}/os_cntr.cfg ${B}/script.cfg #alles von W zu B
+		cp ${UNPACKDIR}/os_cntr.cfg ${B}/script.cfg #alles von W zu B
 		sed -i "s/###fitimage###/${i}.scr/g" ${B}/script.cfg
-		mkimage -T script -n "Bootscript" -C none -d ${WORKDIR}/${i} ${B}/${i}.scr
-		mkimage -n script.cfg -T imx8image -d ${B}/${i}.scr ${B}/${i}.cntr >> ${WORKDIR}/scripts.log
+		mkimage -T script -n "Bootscript" -C none -d ${UNPACKDIR}/${i} ${B}/${i}.scr
+		mkimage -n script.cfg -T imx8image -d ${B}/${i}.scr ${B}/${i}.cntr >> ${UNPACKDIR}/scripts.log
 		
 		cp ${B}/input_edited.csf ${B}/input_edited3.csf
 		sed -i "s/###signature###/0x90/g" ${B}/input_edited3.csf
@@ -152,7 +149,7 @@ do_compile() {
 		cst -i ${B}/input_edited3.csf -o ${B}/${i}.scr.cntr.signed
 	done
 	for i in ${Update_Scripts}; do
-		mkimage -n script.cfg -T imx8image -d ${WORKDIR}/${i}.scr ${B}/${i}.cntr >> ${WORKDIR}/scripts.log
+		mkimage -n script.cfg -T imx8image -d ${UNPACKDIR}/${i}.scr ${B}/${i}.cntr >> ${UNPACKDIR}/scripts.log
 
 		cp ${B}/input_edited.csf ${B}/input_edited3.csf
 		sed -i "s/###signature###/0x90/g" ${B}/input_edited3.csf

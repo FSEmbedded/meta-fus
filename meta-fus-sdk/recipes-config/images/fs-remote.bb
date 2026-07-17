@@ -11,5 +11,5 @@ SRC_URI = " file://fsremote.sh "
 do_install() {
    	install -d ${D}/${sbindir}
 
-	install -m 0744 ${WORKDIR}/fsremote.sh ${D}/${sbindir}/fsremote.sh
+	install -m 0744 ${UNPACKDIR}/fsremote.sh ${D}/${sbindir}/fsremote.sh
 }

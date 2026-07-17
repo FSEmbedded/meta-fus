@@ -30,18 +30,18 @@ do_install() {
 	install -d ${D}${sysconfdir}/udev/rules.d
 
     if [ "${HAS_X11}" = "yes" ]; then
-		install -m 0755 ${WORKDIR}/fsdistro-x11.sh  ${D}${sysconfdir}/profile.d/
+		install -m 0755 ${UNPACKDIR}/fsdistro-x11.sh  ${D}${sysconfdir}/profile.d/
     fi
 
-	install -m 0755 ${WORKDIR}/fsalias.sh  ${D}${sysconfdir}/profile.d/
-	install -m 0755 ${WORKDIR}/systemd-fsgetty-generator ${D}${systemd_unitdir}/system-generators/
+	install -m 0755 ${UNPACKDIR}/fsalias.sh  ${D}${sysconfdir}/profile.d/
+	install -m 0755 ${UNPACKDIR}/systemd-fsgetty-generator ${D}${systemd_unitdir}/system-generators/
 
 	# setup own network configuration for lan* because in normal one is only eth* available but for
 	# PicoCoreMX8MX our network interfaces are called lan*
-	install -m 0644 ${WORKDIR}/81-wired-lan.network ${D}${systemd_unitdir}/network/
+	install -m 0644 ${UNPACKDIR}/81-wired-lan.network ${D}${systemd_unitdir}/network/
 
-	install -m 0644 ${WORKDIR}/99-TSC2004-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
-	install -m 0644 ${WORKDIR}/99-SX8654-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
+	install -m 0644 ${UNPACKDIR}/99-TSC2004-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
+	install -m 0644 ${UNPACKDIR}/99-SX8654-touchscreen.rules ${D}${sysconfdir}/udev/rules.d
 
 }
 

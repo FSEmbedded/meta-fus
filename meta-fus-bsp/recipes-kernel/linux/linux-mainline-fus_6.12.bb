@@ -27,7 +27,7 @@ SRC_URI:append:mx6-mainline-bsp = " \
 SRC_URI:append:mx8-mainline-bsp = " file://fsimx8_defconfig "
 SRC_URI:append:mx6-mainline-bsp = " file://fsimx6_defconfig "
 
-SRCBRANCH="linux-6.12.y"
+SRCBRANCH = "linux-6.12.y"
 SRCREV = "c2d104a355013a14bcd73e31fb2c4bc21922115a"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and

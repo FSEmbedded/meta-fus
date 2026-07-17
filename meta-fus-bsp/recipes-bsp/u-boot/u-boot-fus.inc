@@ -21,7 +21,7 @@ UBOOT_LOCALVERSION = "${LOCALVERSION}"
 
 PV = "${UBOOT_VERSION}"
 CVE_PRODUCT = "u-boot"
-S = "${WORKDIR}/git"
+
 B = "${WORKDIR}/build"
 
 UBOOT_MAKE_TARGET ??= "all"

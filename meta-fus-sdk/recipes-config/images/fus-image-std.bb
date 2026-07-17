@@ -44,7 +44,10 @@ ROOTFS_POSTPROCESS_COMMAND += "update_issue; "
 
 ## Select Image Features
 IMAGE_FEATURES += " \
-    debug-tweaks \
+    allow-empty-password \
+    allow-root-login \
+    empty-root-password \
+    post-install-logging \
     splash \
     hwcodecs \
     package-management \

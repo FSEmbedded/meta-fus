@@ -7,7 +7,7 @@ SRC_URI:append = " file://psplash-colors.h \
 SPLASH_IMAGES = "file://FS-Logo-256px.png;outsuffix=default"
 
 do_configure:prepend() {
-	install -m 0644 ${WORKDIR}/psplash-colors.h ${S}/
-	install -m 0644 ${WORKDIR}/psplash-config.h ${S}/
-	install -m 0644 ${WORKDIR}/radeon-font.h ${S}/
+	install -m 0644 ${UNPACKDIR}/psplash-colors.h ${S}/
+	install -m 0644 ${UNPACKDIR}/psplash-config.h ${S}/
+	install -m 0644 ${UNPACKDIR}/radeon-font.h ${S}/
 }

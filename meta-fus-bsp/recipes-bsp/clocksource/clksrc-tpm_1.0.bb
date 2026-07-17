@@ -9,8 +9,6 @@ SRC_URI = "file://clocksource.sh \
            file://clocksource-hook.sh \
 "
 
-S = "${WORKDIR}"
-
 inherit systemd
 
 SYSTEMD_SERVICE:${PN} = "clocksource.service"

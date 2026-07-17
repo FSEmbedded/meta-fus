@@ -19,9 +19,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
 SRC_URI = "git://github.com/FSEmbedded/linux-fus;branch=${SRCBRANCH};protocol=https"
 
-
 PV = "${LINUX_VERSION}"
-S = "${WORKDIR}/git"
 
 # We need to pass it as param since kernel might support more then one
 # machine, with different entry points
@@ -35,13 +33,14 @@ RREPLACES:${KERNEL_PACKAGE_NAME}-base += "kernel-module-imx-gpu-viv"
 RCONFLICTS:${KERNEL_PACKAGE_NAME}-base += "kernel-module-imx-gpu-viv"
 
 do_extraunpack () {
-	mv ${WORKDIR}/linux-fus/* ${S}/
+	mv ${UNPACKDIR}/${BP}/* ${S}/
 }
+addtask do_extraunpack after do_unpack before do_patch
 
 kernel_do_configure:prepend() {
 
-	if [ -e ${WORKDIR}/custom_defconfig ]; then
-		install -m 0644 ${WORKDIR}/custom_defconfig ${WORKDIR}/defconfig
+	if [ -e ${UNPACKDIR}/custom_defconfig ]; then
+		install -m 0644 ${UNPACKDIR}/custom_defconfig ${WORKDIR}/defconfig
 	else
 		install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
 	fi

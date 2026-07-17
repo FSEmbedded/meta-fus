@@ -22,14 +22,14 @@ SRC_URI = " \
 DEPENDS:append = " u-boot-mkimage-native"
 
 do_compile() {
-    uboot-mkimage -A ${ARCH} -O u-boot -T script -C none -n "F&S install script" -d ${WORKDIR}/install.txt ${WORKDIR}/install.scr
-	uboot-mkimage -A ${ARCH} -O u-boot -T script -C none -n "F&S install script" -d ${WORKDIR}/update-uboot-nboot-sysimg.txt ${WORKDIR}/update-uboot-nboot-sysimg.scr
+    uboot-mkimage -A ${ARCH} -O u-boot -T script -C none -n "F&S install script" -d ${UNPACKDIR}/install.txt ${B}/install.scr
+	uboot-mkimage -A ${ARCH} -O u-boot -T script -C none -n "F&S install script" -d ${UNPACKDIR}/update-uboot-nboot-sysimg.txt ${B}/update-uboot-nboot-sysimg.scr
 }
 
 do_deploy() {
 	install -d ${DEPLOYDIR}/
-	install -m 0777 ${WORKDIR}/install.scr ${DEPLOYDIR}
-	install -m 0777 ${WORKDIR}/update-uboot-nboot-sysimg.scr ${DEPLOYDIR}
+	install -m 0777 ${B}/install.scr ${DEPLOYDIR}
+	install -m 0777 ${B}/update-uboot-nboot-sysimg.scr ${DEPLOYDIR}
 }
 addtask deploy before do_build after do_compile
 

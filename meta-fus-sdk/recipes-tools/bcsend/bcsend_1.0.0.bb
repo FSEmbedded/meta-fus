@@ -14,7 +14,6 @@ SRC_URI = "git://github.com/FSEmbedded/bcsend-linux;branch=main;protocol=https \
 
 SRCREV = "766463bd97ee8950d3e6c0c19c208457a367259f"
 
-S = "${WORKDIR}/git"
 
 inherit systemd
 
@@ -37,9 +36,9 @@ do_install() {
 
     install -d ${D}${systemd_system_unitdir}
     install -d ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d
-    install -m 0644 ${WORKDIR}/bcsend.service ${D}${systemd_system_unitdir}/bcsend.service
+    install -m 0644 ${UNPACKDIR}/bcsend.service ${D}${systemd_system_unitdir}/bcsend.service
 
-    install -m 0644 ${WORKDIR}/systemd-networkd-wait-online-any.conf \
+    install -m 0644 ${UNPACKDIR}/systemd-networkd-wait-online-any.conf \
         ${D}${systemd_system_unitdir}/systemd-networkd-wait-online.service.d/systemd-networkd-wait-online-any.conf
 
 }
