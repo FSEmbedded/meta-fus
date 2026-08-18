@@ -1,0 +1,130 @@
+#!/bin/sh
+# RAUC bundle hook script — three stages: slot-post-install (read-back
+# verification, all raw slots), slot-install (container-mode appfs staging)
+# and install-check (container app-bundle compatible-string override).
+#
+# slot-post-install re-reads the slot device and compares its SHA-256
+# against the just-installed image; a mismatch fails the installation so
+# RAUC keeps the previous slot active. catches wrong-device, truncated or
+# partial writes and bus/driver errors; does not prove the bytes reached
+# physical flash (drop_caches only drops the kernel page cache). requires
+# raw slots whose on-flash bytes equal the bundle image — the F&S A/B
+# layout writes every RAUC-written slot as a raw image. pure POSIX/busybox.
+
+set -u
+
+# sha256 of the first $2 bytes of device/file $1. 4 KiB blocks plus a
+# byte-wise remainder, so the read is byte-exact for any size without dd
+# iflag=count_bytes or head -c (not guaranteed on every busybox).
+hash_bytes() {
+    _dev="$1"; _size="$2"; _blk=4096
+    _full=$((_size / _blk))
+    _rem=$((_size % _blk))
+    {
+        [ "$_full" -gt 0 ] && dd if="$_dev" bs="$_blk" count="$_full" 2>/dev/null
+        [ "$_rem"  -gt 0 ] && dd if="$_dev" bs=1 skip=$((_full * _blk)) count="$_rem" 2>/dev/null
+    } | sha256sum | awk '{ print $1 }'
+}
+
+case "$1" in
+slot-post-install)
+    # locate the just-installed image inside the mounted bundle: prefer the
+    # name RAUC exports, fall back to the single image of this slot's class.
+    img=""
+    if [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_BUNDLE_MOUNT_POINT:-}/${RAUC_IMAGE_NAME}" ]; then
+        img="${RAUC_BUNDLE_MOUNT_POINT}/${RAUC_IMAGE_NAME}"
+    elif [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_IMAGE_NAME}" ]; then
+        img="${RAUC_IMAGE_NAME}"
+    else
+        # rootfs and appfs are both *.squashfs, so match the specific image
+        # basenames, not a bare glob. the OS-image prefix covers every
+        # image of this layer.
+        case "${RAUC_SLOT_NAME%%.*}" in
+            rootfs) img=$(ls "${RAUC_BUNDLE_MOUNT_POINT}"/fusys-image-*.squashfs 2>/dev/null | head -n1) ;;
+            appfs)  img=$(ls "${RAUC_BUNDLE_MOUNT_POINT}"/fus-app-image-*.squashfs 2>/dev/null | head -n1) ;;
+            boot)   img=$(ls "${RAUC_BUNDLE_MOUNT_POINT}"/*.vfat 2>/dev/null | head -n1) ;;
+        esac
+    fi
+
+    if [ -z "$img" ] || [ ! -f "$img" ]; then
+        echo "verify[$RAUC_SLOT_NAME]: cannot locate bundle image (RAUC_IMAGE_NAME='${RAUC_IMAGE_NAME:-}')" >&2
+        exit 1
+    fi
+
+    size=$(wc -c < "$img")
+    img_digest=$(sha256sum "$img" | awk '{ print $1 }')
+
+    # force the kernel to re-read from the device, not the page cache; a
+    # cached read-back would pass even on a bad write, so warn loudly.
+    sync
+    if ! echo 3 > /proc/sys/vm/drop_caches 2>/dev/null; then
+        echo "verify[$RAUC_SLOT_NAME]: WARNING could not drop caches; read-back may hit the page cache" >&2
+    fi
+
+    dev_digest=$(hash_bytes "${RAUC_SLOT_DEVICE}" "$size")
+
+    # log both digests so a known-good install visibly passes.
+    echo "verify[$RAUC_SLOT_NAME] dev=${RAUC_SLOT_DEVICE} size=${size}" >&2
+    echo "verify[$RAUC_SLOT_NAME] image=${img_digest}" >&2
+    echo "verify[$RAUC_SLOT_NAME] slot =${dev_digest}" >&2
+
+    if [ "$dev_digest" != "$img_digest" ]; then
+        echo "verify[$RAUC_SLOT_NAME]: READ-BACK MISMATCH — slot write not trustworthy" >&2
+        exit 1
+    fi
+    echo "verify[$RAUC_SLOT_NAME]: OK" >&2
+    ;;
+slot-install)
+    # container-mode appfs slot only: RAUC does not write the device (see
+    # rauc-conf.bbappend, allow-mounted=true) -- this hook stages the app
+    # image + its 3 verity sidecars at the atomic .incoming rename point
+    # that fs-updater-lib later renames into app_<slot>.squashfs on commit.
+    # dumb and terminal: no U-Boot access, no fs-updater invocation. the
+    # destination is substituted from @@FUS_APP_IMG_DIR@@ at build time.
+    img=""
+    if [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_BUNDLE_MOUNT_POINT:-}/${RAUC_IMAGE_NAME}" ]; then
+        img="${RAUC_BUNDLE_MOUNT_POINT}/${RAUC_IMAGE_NAME}"
+    elif [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_IMAGE_NAME}" ]; then
+        img="${RAUC_IMAGE_NAME}"
+    fi
+    if [ -z "$img" ]; then
+        echo "slot-install[$RAUC_SLOT_NAME]: cannot locate bundle image (RAUC_IMAGE_NAME='${RAUC_IMAGE_NAME:-}')" >&2
+        exit 1
+    fi
+    for s in verity roothash roothash.p7s; do
+        if [ ! -f "$img.$s" ]; then
+            echo "slot-install[$RAUC_SLOT_NAME]: missing sidecar $img.$s" >&2
+            exit 1
+        fi
+    done
+
+    dest_dir="@@FUS_APP_IMG_DIR@@"
+    mkdir -p "$dest_dir"
+    rm -f "$dest_dir/.incoming.squashfs" "$dest_dir/.incoming.squashfs.verity" \
+          "$dest_dir/.incoming.squashfs.roothash" "$dest_dir/.incoming.squashfs.roothash.p7s"
+    cp "$img" "$dest_dir/.incoming.squashfs"
+    cp "$img.verity" "$dest_dir/.incoming.squashfs.verity"
+    cp "$img.roothash" "$dest_dir/.incoming.squashfs.roothash"
+    cp "$img.roothash.p7s" "$dest_dir/.incoming.squashfs.roothash.p7s"
+    sync
+    echo "slot-install[$RAUC_SLOT_NAME]: staged $img (+ 3 sidecars) to $dest_dir/.incoming.squashfs" >&2
+    ;;
+install-check)
+    # container app-bundle only (fus-app-bundle.bb): its manifest carries
+    # an -appfs-suffixed compatible so fs-updater-lib can classify it,
+    # which would fail RAUC's exact-equality default check. accept exactly
+    # that one suffixed form; reject everything else with exit 10 (RAUC's
+    # install-check rejection convention). dormant for other bundles.
+    if [ "${RAUC_MF_COMPATIBLE:-}" = "${RAUC_SYSTEM_COMPATIBLE:-}-appfs" ]; then
+        echo "install-check: compatible '${RAUC_MF_COMPATIBLE:-}' accepted (app bundle)" >&2
+        exit 0
+    fi
+    echo "install-check: compatible '${RAUC_MF_COMPATIBLE:-}' rejected (expected '${RAUC_SYSTEM_COMPATIBLE:-}-appfs')" >&2
+    exit 10
+    ;;
+*)
+    # not a stage we handle; succeed so other hook phases are never blocked.
+    exit 0
+    ;;
+esac
+exit 0
