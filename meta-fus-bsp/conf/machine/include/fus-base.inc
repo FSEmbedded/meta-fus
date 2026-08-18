@@ -36,5 +36,5 @@ PREFERRED_PROVIDER_virtual/bootloader:mx8mn-nxp-bsp  ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx8mp-nxp-bsp  ??= "u-boot-fus"
 PREFERRED_PROVIDER_virtual/bootloader:mx8ulp-nxp-bsp  ??= "u-boot-fus"
 
-PREFERRED_PROVIDER_virtual/bootloader:imx93-nxp-bsp  ??= "u-boot-fus"
+PREFERRED_PROVIDER_virtual/bootloader:mx93-nxp-bsp  ??= "u-boot-fus"
 
