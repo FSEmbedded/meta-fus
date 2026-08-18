@@ -1,0 +1,29 @@
+# fs-updater completion
+
+_fs_updater()
+{
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opt_generic="
+        --set_app_state_bad --is_app_state_bad
+        --set_fw_state_bad --is_fw_state_bad
+        --apply_update --commit_update
+        --update_reboot_state --firmware_version
+        --application_version"
+    opt_azure="
+        --is_update_available --install_update --detach
+        --download_progress --download_update
+        --install_progress --cancel_install"
+    opt_local="
+        --help --version --debug --serial
+        --switch_fw_slot --switch_app_slot
+        --rollback_update"
+    opts="${opt_generic} ${opt_local} ${opt_azure}"
+    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+    return 0
+
+}
+
+complete -F _fs_updater fs-updater

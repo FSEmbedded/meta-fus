@@ -1,0 +1,74 @@
+#!/bin/sh
+# fs-updater-guard-rootfs -- rootfs-mode install gate in front of fs-updater.
+#
+# app=rootfs has no application-only update path; a bundle carrying an
+# appfs image member would fail only at RAUC's slot matching, after
+# fs-updater-lib already wrote a sticky pending-app state. reject such
+# bundles up front; everything else is exec'd through unchanged.
+#
+# two independent rejection rules over the same bundle metadata:
+#   - compatible ending in -appfs (the container-mode app-bundle convention)
+#   - an image member of class appfs (catches the slot-mode app-only and
+#     combined bundles, which carry no suffix)
+#
+# never eval or source `rauc info --output-format=shell` output -- the
+# bundle is untrusted at this point; values are extracted textually only.
+#
+# residual gap (accepted): the install runs in fs-updater-service over
+# D-Bus, so a direct D-Bus client bypassing the CLI does not pass this gate.
+set -u
+
+FS_UPDATER_REAL="${FUS_UPDATER_REAL_BIN:-/usr/sbin/fs-updater.real}"
+
+# only --install_update as the first argument is inspected; every other
+# invocation goes straight to the real binary's own argument validation.
+bundle=
+case "${1:-}" in
+--install_update)
+    [ "$#" -ge 2 ] || exec "$FS_UPDATER_REAL" "$@"
+    bundle=$2
+    ;;
+--install_update=?*)
+    bundle=${1#--install_update=}
+    ;;
+*)
+    exec "$FS_UPDATER_REAL" "$@"
+    ;;
+esac
+
+# fail closed from here on: no verdict on the bundle means no install.
+info=$(rauc info --output-format=shell "$bundle") || {
+    echo "fs-updater-guard-rootfs: 'rauc info' failed for '$bundle'; rejecting install" >&2
+    exit 1
+}
+
+compat=$(printf '%s\n' "$info" | sed -n "s/^RAUC_MF_COMPATIBLE=//p" | head -n 1)
+case "$compat" in
+\'*\')
+    compat=${compat#\'}
+    compat=${compat%\'}
+    ;;
+esac
+
+if [ -z "$compat" ]; then
+    echo "fs-updater-guard-rootfs: no RAUC_MF_COMPATIBLE in 'rauc info' output for '$bundle'; rejecting install" >&2
+    exit 1
+fi
+
+case "$compat" in
+*-appfs)
+    echo "fs-updater-guard-rootfs: rejecting application-only bundle '$bundle' (compatible '$compat'): this image bakes the application into the rootfs slot and has no application-only update path" >&2
+    exit 1
+    ;;
+esac
+
+# exact per-line match against each RAUC_IMAGE_CLASS_<n> value; "appfs"
+# only -- a class like "appfs-extra" must not trip this.
+if printf '%s\n' "$info" \
+        | sed -n "s/^RAUC_IMAGE_CLASS_[0-9]\{1,\}='\{0,1\}\([^']*\)'\{0,1\}\$/\1/p" \
+        | grep -qx appfs; then
+    echo "fs-updater-guard-rootfs: rejecting bundle '$bundle' (declares an appfs image member): this image has no appfs slot" >&2
+    exit 1
+fi
+
+exec "$FS_UPDATER_REAL" "$@"
