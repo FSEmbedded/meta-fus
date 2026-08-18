@@ -79,6 +79,14 @@ FUS_UPDATE_KEYRING_FILE   ?= "${FUS_UPDATE_CERT_DIR}/${FUS_UPDATE_CERT_VARIANT}/
 FUS_UPDATE_SIGN_KEY_FILE  ?= "${FUS_UPDATE_CERT_DIR}/${FUS_UPDATE_CERT_VARIANT}/sign.key.pem"
 FUS_UPDATE_SIGN_CERT_FILE ?= "${FUS_UPDATE_CERT_DIR}/${FUS_UPDATE_CERT_VARIANT}/sign.cert.pem"
 
+# signing material of the application payload (dm-verity root hash). defaults
+# to the bundle material; a production build points both at a dedicated
+# app-purpose leaf. set globally (local.conf or distro), never per recipe or
+# per machine: the image class signs with it and the runtime package installs
+# the same certificate as the one the device verifies against.
+FUS_APP_CONTAINER_SIGN_KEY  ?= "${FUS_UPDATE_SIGN_KEY_FILE}"
+FUS_APP_CONTAINER_SIGN_CERT ?= "${FUS_UPDATE_SIGN_CERT_FILE}"
+
 # hawkBit client device configuration, templated into
 # /etc/rauc-hawkbit-updater/config.conf. defaults are empty/dev so no
 # deployment secret is baked into the layer; with an empty server the
