@@ -1,0 +1,55 @@
+#!/bin/sh
+# fus-app-mount — mount the active A/B application slot read-only at the app
+# mount point. The slot follows the booted rootfs: the active rootfs
+# partition's GPT label (@@ROOT_A@@/@@ROOT_B@@) selects the matching
+# application partition (@@APP_A@@/@@APP_B@@). Never fails the boot — if the
+# slot cannot be determined it logs and exits 0.
+set -u
+
+APP_MOUNT="@@APP_MOUNT@@"
+
+slot=""
+# 1) Primary: the GPT label of the partition mounted at / (self-contained,
+#    no dependency on a specific kernel cmdline variable).
+root_src=$(awk '$2=="/" {print $1; exit}' /proc/mounts 2>/dev/null)
+[ -n "$root_src" ] && [ -L "$root_src" ] && root_src=$(readlink -f "$root_src")
+case "$(blkid -s PARTLABEL -o value "$root_src" 2>/dev/null)" in
+    @@ROOT_A@@) slot=A ;;
+    @@ROOT_B@@) slot=B ;;
+esac
+
+# 2) Fallback: rauc.slot= on the kernel command line (set by U-Boot's A/B selector).
+if [ -z "$slot" ]; then
+    for tok in $(cat /proc/cmdline 2>/dev/null); do
+        case "$tok" in rauc.slot=*) slot=${tok#rauc.slot=} ;; esac
+    done
+fi
+
+case "$slot" in
+    A|a) app="@@APP_A@@" ;;
+    B|b) app="@@APP_B@@" ;;
+    *)
+        logger -t fus-app-mount "cannot determine A/B slot (root='${root_src}'); not mounting ${APP_MOUNT}"
+        exit 0
+        ;;
+esac
+
+if mountpoint -q "$APP_MOUNT" 2>/dev/null; then
+    exit 0
+fi
+
+dev="/dev/disk/by-partlabel/${app}"
+# udev may not have created the by-partlabel symlink yet when this runs early
+# in the boot; wait for it, bounded so a missing slot never blocks the boot.
+i=0
+while [ ! -e "$dev" ] && [ "$i" -lt 10 ]; do sleep 1; i=$((i + 1)); done
+if [ ! -e "$dev" ]; then
+    logger -t fus-app-mount "device ${dev} did not appear; not mounting ${APP_MOUNT}"
+    exit 0
+fi
+if mount -o ro,nodev,nosuid "$dev" "$APP_MOUNT"; then
+    logger -t fus-app-mount "mounted ${app} (${dev}) at ${APP_MOUNT} (slot ${slot})"
+else
+    logger -t fus-app-mount "failed to mount ${dev} at ${APP_MOUNT}"
+fi
+exit 0

@@ -1,0 +1,28 @@
+[Unit]
+Description=Verity-verify + loop-mount + OverlayFS-merge the active container app
+Documentation=file:/usr/bin/fus-app-container-runtime
+DefaultDependencies=no
+After=fus-app-container-bootguard.service
+RequiresMountsFor=@@DATA_MOUNT@@
+# Provide the mode-agnostic app-mount readiness point: the application
+# service waits on fus-app.target, and this merge must complete before the
+# target is reached (same contract as fus-app-mount.service for slot mode).
+Before=fus-app.target
+ConditionPathIsDirectory=@@APP_MOUNT@@
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Same reason as the guard before it: Type=oneshot has no start timeout of its
+# own, and this unit is ordered before the application's readiness point. It
+# runs veritysetup and a signature check over a file on the persistent
+# partition, so a stalled device leaves the application waiting indefinitely
+# rather than starting without a mount -- which is what this verb is otherwise
+# careful to allow.
+TimeoutStartSec=60
+ExecStart=/usr/bin/fus-app-container-runtime mount
+
+[Install]
+WantedBy=multi-user.target

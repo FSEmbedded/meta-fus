@@ -1,0 +1,467 @@
+#!/bin/sh
+# fus-app-container-runtime — bootguard / mount / trials-reset for the
+# container application-update mode. The confirm and deadline verbs live in
+# the mode-invariant fus-update-confirm package (external callers drive
+# commit/reject there); this script owns only the container-mode mechanism.
+#
+# The app ships as a loop-mounted, dm-verity-checked squashfs file on the
+# persistent /data partition (app_a.squashfs / app_b.squashfs, selected by
+# the U-Boot `application` A/B variable), merged read-only via OverlayFS over
+# /opt/fus-app. Container updates always ride a real reboot cycle — the
+# new app is only live after the device restarts into it.
+#
+# fs-updater (the "good service") owns EVERY state transition: this script
+# never writes `application` or `update_reboot_state` itself, only reads
+# them (via `fs-updater --update_reboot_state`'s exit code -- queried here
+# before any filesystem is mounted -- and `fw_printenv`) and drives the
+# existing rollback actor (--rollback_update, through the shared
+# pending-state library) when the trial budget runs out.
+#
+# Application-only updates are NOT covered by U-Boot's native
+# BOOT_A_LEFT/BOOT_B_LEFT bootcount (that only protects BOOT_ORDER, i.e. the
+# firmware slot) — verified: no firmware-side detector reacts to an app-only
+# pending update, and no generic attempt counter exists anywhere in
+# fs-updater-lib for either dimension. Without a counter here, an unattended
+# device carrying a boot-wedging app has nothing that ends the situation: the
+# deadline timer reboots into the same application every period and no
+# dimension counts anything down. bootguard is that count.
+#
+# What it does NOT protect in this mode, despite an earlier reading here: the
+# firmware budget is not drawn in. fus-health-check ships monitor-only in
+# container mode (fus-health-monitor.conf clears its Before= and makes it exit 0
+# regardless), so boot-complete.target is reached and rauc-mark-good restores
+# BOOT_x_LEFT on every boot however the application is faring. The end state
+# this guard prevents here is a device that settles, idle, running an
+# application that does not work -- with the health monitor's log line as the
+# only sign -- not a bootloader left without a candidate. In the slot mode,
+# where the health check does gate boot-complete.target, that erosion is real
+# and this counter is what bounds it first.
+#
+#   bootguard — runs BEFORE mount. Counts a boot attempt against a pending
+#               app update; at 0 calls --rollback_update BEFORE the mount
+#               verb runs, so the corrected slot is mounted THIS SAME boot
+#               (no extra reboot: rollback_application() flushes the
+#               `application` env write synchronously). Must finish and
+#               revert while the firmware trial budget is still open, so the
+#               reverting boot still reaches boot-complete.target and
+#               rauc-mark-good resets BOOT_x_LEFT — invariant: app trial
+#               budget <= firmware trial budget (both default to 3, so the
+#               app always reverts in-boot before a firmware fallback could
+#               ever trigger).
+#   mount     — verity-verify + loop-mount the active app_<slot>.squashfs at
+#               FUS_UPDATE_APP_CURRENT, then OverlayFS-merge it (with the
+#               persistent upper/work dirs) onto FUS_UPDATE_APP_MOUNT. Never
+#               fails the boot — a missing/unmountable/unverifiable app just
+#               leaves the mount point empty; ConditionPathExists-style
+#               consumers (the app launcher) skip cleanly.
+#   trials-reset — clear the boot-attempt counter once an external caller's
+#               commit/reject settled a pending app update. Invoked by
+#               fus-update-confirm; the counter is this script's own state
+#               file, so its reset verb lives here.
+#
+# This script owns two small state files: a boot-attempt counter (trials=N)
+# and a last-mounted-slot marker (used only to reset the overlay scratch on
+# a slot change). Neither is a rich state store:
+# fs-updater-lib's `update_reboot_state` is already the single source of
+# truth for "is an app update pending"; a second, richer notion of that here
+# would be a second store that can desync from it. Every boot, the counter's
+# lifecycle is DERIVED from that single source of truth: not pending ->
+# reset/delete the counter; pending -> decrement it. The counter records the
+# slot it was granted for, because the pending state alone cannot tell one
+# update from its successor: a settle through the library leaves the counter
+# on disk, and without the slot the next update would inherit it.
+set -u
+
+# Defaults are sed-templated at build time from meta-fus-sdk/conf/include/
+# fus-update-layout.inc's FUS_UPDATE_APP_* values (see fus-app-container-
+# runtime.bb do_install) — changing the layout include is enough, no matching
+# edit needed here. The FUS_APP_* env vars remain a runtime override for test
+# harnesses that stage a private layout (see lib/oeqa/runtime/cases/
+# fus_container.py). FUS_APP_CURRENT is the mount point for the
+# verity-verified, currently-active squashfs — the OverlayFS lowerdir, not a
+# symlink.
+CONTAINER_BASE="${FUS_APP_CONTAINER_BASE:-@@CONTAINER_BASE@@}"
+IMG_DIR="${FUS_APP_IMG_DIR:-@@IMG_DIR@@}"
+CURRENT="${FUS_APP_CURRENT:-@@CURRENT@@}"
+OVERLAY_UPPER="${FUS_APP_OVERLAY_UPPER:-@@OVERLAY_UPPER@@}"
+OVERLAY_WORK="${FUS_APP_OVERLAY_WORK:-@@OVERLAY_WORK@@}"
+APP_MOUNT="${FUS_APP_MOUNT:-@@APP_MOUNT@@}"
+
+TRIALS_FILE="${FUS_APP_TRIALS_FILE:-$CONTAINER_BASE/trials}"
+TRIALS_DEFAULT="${FUS_TRIALS:-3}"
+
+# Last app slot this script set up an overlay for. The active slot flips only
+# when a different app image is activated, so a change here means the OverlayFS
+# lowerdir is now a different image and its persistent upper/work scratch must
+# not carry over.
+LAST_SLOT_FILE="${FUS_APP_LAST_SLOT_FILE:-$CONTAINER_BASE/last-slot}"
+
+VERITY_CERT="${FUS_APP_VERITY_CERT:-/etc/fus-app-container/verity.crt}"
+
+# Shared fs-updater pending-state predicates + log(), shipped by the
+# mode-invariant fus-update-confirm package. Overridable so a test harness
+# can stage the library from source.
+# shellcheck disable=SC1090  # runtime path; the library is linted on its own
+. "${FUS_PENDING_STATE_LIB:-/usr/lib/fus-update/pending-state.sh}"
+
+# --- trials file (one key=value per line) -----------------------------------
+# Two keys: the remaining budget, and the target slot it was granted for. One
+# combined line would break the readers outside this script, which parse each
+# key on its own.
+trials_get() {
+    [ -f "$TRIALS_FILE" ] || { echo "$TRIALS_DEFAULT"; return 0; }
+    _v=$(sed -n 's/^trials=\(.*\)$/\1/p' "$TRIALS_FILE" | tail -n1)
+    case "$_v" in ''|*[!0-9]*) echo "$TRIALS_DEFAULT" ;; *) echo "$_v" ;; esac
+}
+
+# The slot the recorded budget was granted for. Empty for a counter written
+# before this derivation existed, and for one whose slot could not be read.
+trials_target_get() {
+    [ -f "$TRIALS_FILE" ] || { echo ""; return 0; }
+    sed -n 's/^target=\(.*\)$/\1/p' "$TRIALS_FILE" | tail -n1
+}
+
+# Answers non-zero when the value was NOT stored. That case has to be visible:
+# the next boot reads the default again, so the budget never erodes and a
+# wedging update never reverts -- an unbounded trial budget, granted silently.
+trials_set() { # trials_set <count> <target>
+    mkdir -p "$CONTAINER_BASE" || return 1
+    if ! { echo "trials=$1"; echo "target=$2"; } > "$TRIALS_FILE.tmp.$$"; then
+        rm -f "$TRIALS_FILE.tmp.$$"
+        return 1
+    fi
+    mv -f "$TRIALS_FILE.tmp.$$" "$TRIALS_FILE" || {
+        rm -f "$TRIALS_FILE.tmp.$$"
+        return 1
+    }
+    sync
+}
+
+trials_reset() {
+    rm -f "$TRIALS_FILE"
+}
+
+# The slot a pending update is heading for. Normalized, because both cases are
+# valid in the environment and a case flip must not read as a new target.
+# Empty when the value cannot be read or is not a slot.
+pending_target_get() {
+    _t=$(fw_printenv -n application 2>/dev/null)
+    case "$_t" in
+    A|a) echo A ;;
+    B|b) echo B ;;
+    *)   echo "" ;;
+    esac
+}
+
+# --- last-slot marker (single key=value line) -------------------------------
+last_slot_get() {
+    [ -f "$LAST_SLOT_FILE" ] || { echo ""; return 0; }
+    sed -n 's/^slot=\(.*\)$/\1/p' "$LAST_SLOT_FILE" | tail -n1
+}
+
+last_slot_set() {
+    mkdir -p "$CONTAINER_BASE"
+    echo "slot=$1" > "$LAST_SLOT_FILE.tmp.$$"
+    mv -f "$LAST_SLOT_FILE.tmp.$$" "$LAST_SLOT_FILE"
+    sync
+}
+
+# --- subcommands --------------------------------------------------------
+
+# The firmware fallback the boot guard has to settle before the mount. It is
+# the combined state only: there the bootloader has already returned to the
+# proven firmware while the application selector still names the image the
+# failed update brought, so the mount would pair the two for a whole boot.
+# The recovery itself is the library's -- the selector belongs to it, and its
+# flip is unconditional, so a caller that corrects the variable first only
+# makes the library flip it back onto the failed slot. Running it here rather
+# than in the confirm unit changes nothing but the moment.
+#
+# Only the combined state: an application-only update is not what a firmware
+# fallback decides, and the environment can carry a fallback shape while the
+# application half is the only thing pending.
+bootguard_settle_fw_fallback() { # bootguard_settle_fw_fallback <state-rc>
+    [ "$1" = "$APP_FW_PENDING_CODE" ] || return 1
+    revert_boot_detected || return 1
+
+    # Presence of the slot the recovery will select, for the record only. The
+    # fallback is already a fact and proven firmware without an application is
+    # the safe remainder, so this must not gate anything.
+    _bg_target=$(pending_target_get)
+    case "$_bg_target" in
+    A) cmd_verify_slot B >/dev/null 2>&1 || log "note: application slot B holds no usable payload" ;;
+    B) cmd_verify_slot A >/dev/null 2>&1 || log "note: application slot A holds no usable payload" ;;
+    esac
+
+    log "firmware fallback under a combined update -- settling before the mount"
+    if ! commit_update_ok; then
+        # Fall through to the trial accounting on purpose. The confirm run
+        # reaches the same verb later in this boot and fails the same way, so
+        # the state stays pending: the mark-good gate then withholds the proven
+        # slot's counter reset, the deadline reboots, and both budgets erode
+        # toward a bootloader with no candidate left. The trial countdown is
+        # the bounded way out of that, and it has to keep running.
+        log "WARN: settling the combined fallback failed -- counting this boot as an application trial instead"
+        return 1
+    fi
+
+    # The counter belonged to the update that just ended. Left behind, it is
+    # inherited by the next update to the same slot, which then starts with a
+    # spent budget -- and with one trial left, the first healthy boot of that
+    # update would quarantine its slot. Nothing else clears it in this boot:
+    # the device is idle from here, and an install can arrive before the next
+    # boot does.
+    trials_reset
+    log "combined fallback settled; the mount pairs the proven firmware with its own application"
+    return 0
+}
+
+cmd_bootguard() {
+    # Nothing below may run on an answer that was never given. The counter is
+    # this dimension's only bound: cleared on no evidence, the budget cannot
+    # erode and a wedging update never reverts on its own -- the same hazard
+    # this script already names for a counter it cannot WRITE, on the path
+    # where it cannot READ. The other verbs of the door check this; this one
+    # did not, so an updater that is missing or that dies took the budget with
+    # it.
+    if ! updater_reachable; then
+        log "ERROR: cannot run the updater -- leaving the application trial counter as it stands"
+        return 0
+    fi
+
+    # Read once and pass the value on. Each predicate asks the CLI itself, so
+    # chaining them can hand this one boot two different answers.
+    _state=$(updater_state_rc)
+
+    # The updater ran and reported nothing about the device. Distinct from every
+    # code below, which names a condition: this one names the absence of an
+    # answer, so the only safe act is none.
+    if [ "$_state" = "$UPDATER_FATAL_CODE" ]; then
+        log "WARN: bootguard: the updater answered $_state and said nothing about this device; leaving the application trial counter as it stands"
+        return 0
+    fi
+
+    # Before the trial accounting, not after: the fallback boot was spent by
+    # the firmware, and charging the application for it would revert a healthy
+    # image -- and, at an exhausted budget, condemn its slot on evidence that
+    # belongs to the other dimension.
+    bootguard_settle_fw_fallback "$_state" && return 0
+
+    if ! rc_in_set "$_state" "$APP_PENDING_ATBOOT_CODES"; then
+        # Says what it saw and what it did, and nothing more: this branch also
+        # takes every settled boot, where a verdict like "not trial-protected"
+        # would be untrue. The judgement belongs in the contract test.
+        log "bootguard: state $_state; no attempt counted"
+        trials_reset
+        return 0
+    fi
+
+    _target=$(pending_target_get)
+    _recorded=$(trials_target_get)
+
+    if [ -z "$_target" ]; then
+        # Unreadable slot: keep charging the recorded budget. Costing a trial
+        # is always safe here, granting one is not.
+        _target=$_recorded
+    elif [ -n "$_recorded" ] && [ "$_target" != "$_recorded" ]; then
+        # A different target is a later update, and its budget is its own --
+        # otherwise it inherits whatever its predecessor left behind, which is
+        # what a settle through the library alone leaves on disk.
+        trials_reset
+    fi
+    # An untagged counter predates this derivation and is inherited rather
+    # than refreshed: a fresh budget could outlast the firmware trial budget,
+    # and the app has to revert before a firmware fallback can trigger.
+
+    _trials=$(trials_get)
+    _trials=$((_trials - 1))
+
+    if [ "$_trials" -le 0 ]; then
+        log "app trial budget exhausted -- rolling back before mount"
+        # Record the failure before reverting: `application` still names the
+        # failing slot here, and the mark then survives a revert that fails.
+        # Marking cannot block the revert -- that takes the pending branch,
+        # which does not inspect the slot digits.
+        app_mark_running_slot_bad || true
+        if rollback_update_ok; then
+            log "rollback_update issued; mount will use the corrected slot this boot"
+            # Only clear the counter once the revert actually succeeded. A failed
+            # rollback must keep the exhausted counter so the next boot re-attempts
+            # it immediately instead of handing the bad slot a fresh trial budget.
+            trials_reset
+        else
+            log "WARN: rollback_update failed -- keeping the exhausted counter to retry next boot"
+        fi
+        return 0
+    fi
+
+    if trials_set "$_trials" "$_target"; then
+        log "app update pending for slot ${_target:-unknown}, trials now $_trials"
+    else
+        log "ERROR: the application trial counter could not be written -- the budget cannot erode, so a wedging update will not revert on its own"
+    fi
+}
+
+# Whether a slot holds something that could be mounted at all. Its exit
+# contract is deliberately NOT cmd_mount's: that one answers 0 for every
+# refusal so a boot is never failed, and a check inheriting that would report
+# "fine" for an image which is not there.
+#
+# Presence only. It says the payload and its three sidecars exist and are not
+# empty -- not that the image verifies. dm-verity settles that at mount time,
+# and only for the blocks actually read, so no cheap check can promise more.
+VERIFY_SLOT_OK=0
+VERIFY_SLOT_UNUSABLE=3
+VERIFY_SLOT_UNKNOWN=2
+
+cmd_verify_slot() { # cmd_verify_slot <A|B>
+    case "${1:-}" in
+        A|a) _v_img="$IMG_DIR/app_a.squashfs" ;;
+        B|b) _v_img="$IMG_DIR/app_b.squashfs" ;;
+        *)
+            log "verify-slot: unknown slot '${1:-}'"
+            return "$VERIFY_SLOT_UNKNOWN"
+            ;;
+    esac
+
+    if [ ! -s "$_v_img" ]; then
+        log "verify-slot: $_v_img missing or empty"
+        return "$VERIFY_SLOT_UNUSABLE"
+    fi
+    for _v_s in verity roothash roothash.p7s; do
+        if [ ! -s "$_v_img.$_v_s" ]; then
+            log "verify-slot: sidecar $_v_img.$_v_s missing or empty"
+            return "$VERIFY_SLOT_UNUSABLE"
+        fi
+    done
+    return "$VERIFY_SLOT_OK"
+}
+
+cmd_mount() {
+    mountpoint -q "$APP_MOUNT" 2>/dev/null && { log "already mounted"; return 0; }
+
+    slot=$(fw_printenv -n application 2>/dev/null)
+    case "$slot" in
+        A|a) img="$IMG_DIR/app_a.squashfs" ;;
+        B|b) img="$IMG_DIR/app_b.squashfs" ;;
+        *)
+            log "cannot determine active app slot (application='$slot') -- not mounting"
+            return 0
+            ;;
+    esac
+
+    if [ ! -f "$img" ]; then
+        log "$img not present -- nothing to mount yet"
+        return 0
+    fi
+    for s in verity roothash roothash.p7s; do
+        if [ ! -s "$img.$s" ]; then
+            log "sidecar $img.$s missing/empty -- refusing to mount an unverifiable image"
+            return 0
+        fi
+    done
+
+    # Verify the roothash's detached signature against the pinned app-purpose
+    # leaf cert. -noverify (skip chain trust) + -nointern (ignore certs
+    # embedded in the signature, match ONLY -certfile) follows the
+    # PKCS7_NOINTERN|NOVERIFY discipline systemd's own image verifier
+    # uses: match the pinned LEAF signer, do not chain-verify.
+    # Capture the root hash from openssl's OWN verified output, not from a
+    # separate re-read of $img.roothash afterwards: re-opening the file after
+    # the signature check would leave a window for it to be swapped for a hash
+    # matching a malicious image between verify and the veritysetup call. The
+    # temp file lives on /data (the only writable partition this early) and
+    # holds a public hash. Fail closed (return 0, leaving the mount empty) if it
+    # cannot be created.
+    mkdir -p "$CONTAINER_BASE"
+    _rh=$(mktemp "$CONTAINER_BASE/.roothash.XXXXXX") || { log "cannot create temp file to verify roothash for $img"; return 0; }
+    if ! openssl smime -verify -noverify -nointern -certfile "$VERITY_CERT" \
+            -in "$img.roothash.p7s" -inform DER -content "$img.roothash" \
+            -out "$_rh" 2>/dev/null; then
+        log "roothash signature verification FAILED for $img -- refusing to mount"
+        rm -f "$_rh"
+        return 0
+    fi
+    roothash=$(cat "$_rh") || { log "cannot read verified roothash for $img"; rm -f "$_rh"; return 0; }
+    rm -f "$_rh"
+
+    # Track whether THIS invocation created the loop device, so the late
+    # failure paths below detach only a loop device we own (an already-open
+    # mapper device keeps its existing backing loop).
+    devname="fus-app-$slot"
+    loopdev=""
+    if [ ! -e "/dev/mapper/$devname" ]; then
+        loopdev=$(losetup -f --show -r "$img") || { log "losetup failed for $img"; return 0; }
+        if ! veritysetup open "$loopdev" "$devname" "$img.verity" "$roothash"; then
+            log "veritysetup open FAILED for $img -- refusing to mount (integrity check failed)"
+            losetup -d "$loopdev" 2>/dev/null || true
+            return 0
+        fi
+    fi
+
+    mkdir -p "$CURRENT" "$OVERLAY_UPPER" "$OVERLAY_WORK"
+    if ! mount -o ro,nodev,nosuid "/dev/mapper/$devname" "$CURRENT"; then
+        log "mount of verity device /dev/mapper/$devname at $CURRENT FAILED"
+        veritysetup close "$devname" 2>/dev/null || true
+        if [ -n "$loopdev" ]; then losetup -d "$loopdev" 2>/dev/null || true; fi
+        return 0
+    fi
+
+    # Reset the persistent overlay scratch when the active app slot has changed
+    # since the last mount: a slot flip means a different app image is now the
+    # lowerdir, and carrying over the previous image's upper writes would both
+    # stale-shadow the new image and let a bad update's writes bleed onto the
+    # image a rollback returns to. Real durable app state has its own home
+    # outside this ephemeral overlay. Must happen BEFORE the merge below.
+    if [ "$(last_slot_get)" != "$slot" ]; then
+        log "active app slot changed to $slot -- resetting overlay scratch"
+        # Remove and recreate rather than globbing the contents away: a glob
+        # never matches a name beginning with a dot, so a hidden file or
+        # directory survives and does exactly what this reset exists to
+        # prevent. It also leaves the work directory genuinely empty, which is
+        # what overlayfs expects of it.
+        rm -rf "${OVERLAY_UPPER:?}" "${OVERLAY_WORK:?}"
+        mkdir -p "$OVERLAY_UPPER" "$OVERLAY_WORK" || true
+        # Say so if the reset did not take: on a read-only or full /data the
+        # removal fails, the directories keep their contents, and the merge
+        # below would silently carry the previous image's writes across.
+        if [ -n "$(ls -A "$OVERLAY_UPPER" 2>/dev/null)" ] || \
+           [ -n "$(ls -A "$OVERLAY_WORK" 2>/dev/null)" ]; then
+            log "WARN: the overlay scratch is not empty after the reset -- the previous image's writes may shadow this one"
+        fi
+        # Marked here, not on confirm: an update that never gets confirmed
+        # still mounted and wrote to this slot's overlay this boot, so the
+        # marker must track what was actually mounted, not what was
+        # accepted -- otherwise an unconfirmed slot's writes could bleed
+        # into the slot a later rollback returns to.
+        last_slot_set "$slot"
+    fi
+
+    # No noexec here (unlike the /data backing mount): the app runs FROM this
+    # merge, and the loop-mounted squashfs's own exec permission is
+    # independent of /data's backing-file mount flags (see fus-update-layout.inc).
+    # nosuid,nodev still apply: the merged tree must never introduce setuid
+    # binaries or device nodes through its writable upper layer.
+    if mount -t overlay overlay \
+            -o "lowerdir=$CURRENT,upperdir=$OVERLAY_UPPER,workdir=$OVERLAY_WORK,nosuid,nodev" \
+            "$APP_MOUNT"; then
+        log "mounted $img (slot $slot) via OverlayFS at $APP_MOUNT"
+    else
+        log "OverlayFS merge onto $APP_MOUNT FAILED"
+        umount "$CURRENT" 2>/dev/null || true
+        veritysetup close "$devname" 2>/dev/null || true
+        if [ -n "$loopdev" ]; then losetup -d "$loopdev" 2>/dev/null || true; fi
+    fi
+}
+
+cmd_trials_reset() {
+    trials_reset
+}
+
+case "${1:-}" in
+    bootguard)     cmd_bootguard ;;
+    mount)         cmd_mount ;;
+    trials-reset)  cmd_trials_reset ;;
+    verify-slot)   cmd_verify_slot "${2:-}" ;;
+    *) echo "usage: $0 {bootguard|mount|trials-reset|verify-slot <A|B>}" >&2; exit 2 ;;
+esac

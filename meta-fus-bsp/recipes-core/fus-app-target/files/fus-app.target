@@ -1,0 +1,8 @@
+[Unit]
+Description=Application filesystem ready at the app mount point
+# passive synchronization point decoupling the application from how the
+# app filesystem is delivered: the mode-specific mount provider and the
+# boot-time update bookkeeping (fus-update-confirm.service) order Before=
+# this target, so reaching it means the app filesystem is ready and
+# pending update state is reconciled. an application orders
+# After=/Requires= this target and stays mode-agnostic.

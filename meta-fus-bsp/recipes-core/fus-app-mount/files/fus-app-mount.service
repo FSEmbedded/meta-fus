@@ -1,0 +1,20 @@
+[Unit]
+Description=Mount the active A/B application slot at @@APP_MOUNT@@
+DefaultDependencies=no
+# Order after udev started AND coldplug events were issued, so the
+# by-partlabel symlinks are being created; the script also polls for the
+# device as a bounded safety net.
+After=systemd-udevd.service systemd-udev-trigger.service
+# Provide the mode-agnostic app-mount readiness point: the application
+# service waits on fus-app.target, and this mount must complete before the
+# target is reached.
+Before=local-fs.target fus-app.target
+ConditionPathIsDirectory=@@APP_MOUNT@@
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=@@SBINDIR@@/fus-app-mount
+
+[Install]
+WantedBy=local-fs.target

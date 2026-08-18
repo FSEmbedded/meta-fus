@@ -1,0 +1,25 @@
+[Unit]
+Description=Container app-update boot-attempt guard (pre-mount trial countdown + revert)
+Documentation=file:/usr/bin/fus-app-container-runtime
+DefaultDependencies=no
+# fw_printenv/fs-updater need the eMMC boot-partition offset corrected first.
+After=fus-uboot-env-setup.service
+RequiresMountsFor=@@DATA_MOUNT@@
+# Runs BEFORE the mount unit so a revert changes what gets mounted this boot.
+Before=fus-app-container-mount.service
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# systemd disables the start timeout entirely for Type=oneshot, and this unit
+# sits at the head of the ordering that ends at the application: it calls the
+# updater and fw_printenv, whose writer takes a BLOCKING lock, so a stuck call
+# would hold the whole chain with no end. Bound it explicitly, for the reason
+# fus-update-confirm.service already gives for itself.
+TimeoutStartSec=60
+ExecStart=/usr/bin/fus-app-container-runtime bootguard
+
+[Install]
+WantedBy=multi-user.target
