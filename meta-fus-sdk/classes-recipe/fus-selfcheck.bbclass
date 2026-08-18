@@ -353,6 +353,50 @@ the writable /etc overlay can freeze it and it would beat ${nonarch_libdir}/rauc
     :
 }
 
+# Assert the hardened D-Bus policy for the stock RAUC bus name is the one that
+# actually ships, and that it ships in the read-only location. The upstream
+# file allows the default context to send to the bus name, which reaches every
+# method including Mark and InstallBundle -- verified as an
+# accepted InstallBundle from an unprivileged caller. Two ways to lose that
+# hardening silently, both caught here: the replacement does not land (upstream
+# text survives), or a copy is also installed under ${sysconfdir}, where the
+# writable /etc overlay can freeze a stale version that outlives the image.
+# Wire as a rauc do_install[postfuncs].
+fus_selfcheck_dbus_policy() {
+    pol="${D}${datadir}/dbus-1/system.d/de.pengutronix.rauc.conf"
+    [ -f "$pol" ] || bbfatal "fus-selfcheck(dbus-policy): $pol not installed"
+
+    # The default-context block is the whole question: it must refuse, and the
+    # upstream file is recognised by it allowing there instead.
+    block=$(sed -n '/<policy context="default">/,/<\/policy>/p' "$pol")
+    printf '%s\n' "$block" | grep -q 'deny send_destination' || \
+        bbfatal "fus-selfcheck(dbus-policy): no deny in the default-context block of $pol \
+(the upstream permissive policy was not replaced)"
+    printf '%s\n' "$block" | grep -q 'allow send_destination' && \
+        bbfatal "fus-selfcheck(dbus-policy): the default-context block of $pol still allows \
+send_destination; that reaches every method from any local account"
+
+    # Root must keep both: own alone does not grant method reachability. Scoped
+    # to the root block for the same reason the default block is: the file's own
+    # comments quote the upstream rules verbatim to explain them, so an
+    # unscoped grep matches the explanation and passes while the real rule is
+    # gone -- a check that checks nothing.
+    rootblock=$(sed -n '/<policy user="root">/,/<\/policy>/p' "$pol")
+    printf '%s\n' "$rootblock" | grep -q 'allow own="de.pengutronix.rauc"' || \
+        bbfatal "fus-selfcheck(dbus-policy): the root block of $pol does not let root own \
+the bus name"
+    printf '%s\n' "$rootblock" | grep -q 'allow send_destination="de.pengutronix.rauc"' || \
+        bbfatal "fus-selfcheck(dbus-policy): the root block of $pol does not let root send \
+to the bus name; the boot-time mark-good and confirm chain would be locked out"
+
+    # A second copy under /etc would be shadowable and would defeat the move.
+    [ -e "${D}${sysconfdir}/dbus-1/system.d/de.pengutronix.rauc.conf" ] && \
+        bbfatal "fus-selfcheck(dbus-policy): a copy is still installed under \
+${sysconfdir}/dbus-1/system.d; /etc is a writable overlay and can freeze it"
+
+    :
+}
+
 # assert a container-mode app squashfs ships all 3 verity sidecars, keyed on
 # the full squashfs filename ("$img.verity" etc., as the runtime mount verb
 # looks them up), not on the stem.
