@@ -1,0 +1,38 @@
+# short-description: A/B update image for eMMC, kernel-in-rootfs, no app slots
+# long-description:
+# WIC template for the F&S A/B update standard image with BOOT_MODE=rootfs and
+# a non-slot app mode (the minimal 3-partition "everything in the rootfs" image).
+#
+# There are NO BOOT_A/B partitions: the kernel + DTBs live in /boot inside the
+# read-only squashfs rootfs slot, and U-Boot loads them from there (squashfs+zstd
+# enabled via fus-ab-bootrootfs.cfg). The rootfs slots are therefore partitions
+# 1 and 2; .rootfs_part_A/B=1/2 in the U-Boot env redirect matches this.
+#
+#   ┌────────┬────────┬──────┐
+#   │ Root_A │ Root_B │ data │
+#   │ squash │ squash │ ext4 │
+#   └────────┴────────┴──────┘
+#
+# Slot mapping (RAUC): rootfs.0/.1 = Root_A/B and carry the bootname (no parent,
+# no boot slot). /data is the persistent partition (overlayfs-etc upper/work +
+# RAUC data; app baked into the rootfs in app=rootfs mode).
+#
+# U-Boot lives in the eMMC HW partitions (boot0/boot1), flashed out of band.
+# Each part directive must be a single physical line (no backslash continuation).
+
+# Slot A — rootfs (read-only squashfs; kernel + DTBs baked under /boot)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Slot B — rootfs (mirror)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Persistent data — created empty; overlayfs-etc preinit creates its
+# overlay-etc/{upper,work} dirs on first boot. Sized small in the image.
+# NOT expanded by anything in this layer: no resize2fs, no systemd-repart, no
+# growfs and no sgdisk run at flash or at first boot, so this size is the size
+# the device keeps and the remainder of the eMMC stays unpartitioned. Raising
+# FUS_UPDATE_SIZE_DATA_MIB reaches freshly flashed devices only; on a device in
+# the field the backup GPT has to be relocated before this partition can grow.
+part --ondisk mmcblk --fstype=ext4 --part-name ${FUS_UPDATE_PARTLABEL_DATA} --align 8192 --size ${FUS_UPDATE_SIZE_DATA_MIB}M
+
+bootloader --ptable gpt

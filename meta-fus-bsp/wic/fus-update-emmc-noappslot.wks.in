@@ -1,0 +1,41 @@
+# short-description: A/B update image layout for eMMC, no app slots
+# long-description:
+# WIC template for the F&S A/B update standard image in the non-slot app
+# modes (every FUS_UPDATE_APP_MODE except "slot").
+#
+# Identical to fus-update-emmc.wks.in but without the App_A/App_B partitions:
+# in container mode the application lives as a verity-checked squashfs file on
+# the persistent /data partition; in rootfs mode it is baked into the rootfs
+# squashfs. The OS A/B layout (boot + rootfs slots) is unchanged either way.
+#
+#   ┌────────┬────────┬────────┬────────┬──────┐
+#   │ BOOT_A │ BOOT_B │ Root_A │ Root_B │ data │
+#   │ vfat   │ vfat   │ squash │ squash │ ext4 │
+#   └────────┴────────┴────────┴────────┴──────┘
+#
+# U-Boot lives in the eMMC HW partitions (boot0/boot1), flashed out of band.
+# Each part directive must be a single physical line (no backslash continuation).
+
+# Slot A — boot (kernel + DTBs), populated from IMAGE_BOOT_FILES at image time
+part --source bootimg-partition --ondisk mmcblk --fstype=vfat --part-name ${FUS_UPDATE_PARTLABEL_BOOT_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_BOOT_MIB}M
+
+# Slot B — boot (mirror of Slot A at image time; RAUC writes the inactive slot on update)
+part --source bootimg-partition --ondisk mmcblk --fstype=vfat --part-name ${FUS_UPDATE_PARTLABEL_BOOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_BOOT_MIB}M
+
+# Slot A — rootfs (read-only squashfs; compressor from fus-update.bbclass)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Slot B — rootfs (mirror)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Persistent data — created empty; holds the overlayfs-etc upper/work dirs, the
+# RAUC data directory AND (container mode) the application image store.
+# Sized small in the image.
+# NOT expanded by anything in this layer: no resize2fs, no systemd-repart, no
+# growfs and no sgdisk run at flash or at first boot, so this size is the size
+# the device keeps and the remainder of the eMMC stays unpartitioned. Raising
+# FUS_UPDATE_SIZE_DATA_MIB reaches freshly flashed devices only; on a device in
+# the field the backup GPT has to be relocated before this partition can grow.
+part --ondisk mmcblk --fstype=ext4 --part-name ${FUS_UPDATE_PARTLABEL_DATA} --align 8192 --size ${FUS_UPDATE_SIZE_DATA_MIB}M
+
+bootloader --ptable gpt

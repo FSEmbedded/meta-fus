@@ -1,0 +1,16 @@
+[Unit]
+Description=Persistent data partition
+DefaultDependencies=no
+Conflicts=umount.target
+Before=local-fs.target umount.target
+After=systemd-fsck@dev-disk-by\x2dpartlabel-@@PARTLABEL@@.service
+Wants=systemd-fsck@dev-disk-by\x2dpartlabel-@@PARTLABEL@@.service
+
+[Mount]
+What=/dev/disk/by-partlabel/@@PARTLABEL@@
+Where=@@WHERE@@
+Type=@@FSTYPE@@
+Options=@@OPTIONS@@
+
+[Install]
+WantedBy=local-fs.target

@@ -1,0 +1,54 @@
+# short-description: A/B update image layout for eMMC (no bootloader inside WIC)
+# long-description:
+# WIC template for the F&S A/B update standard image.
+#
+# U-Boot lives in the eMMC HW partitions (boot0/boot1) and is flashed
+# out of band. This WIC describes the GPT on the eMMC userdata HW
+# partition only.
+#
+# Layout (sizes + names from conf/include/fus-update-layout.inc):
+#   ┌────────┬────────┬────────┬────────┬───────┬───────┬──────┐
+#   │ BOOT_A │ BOOT_B │ Root_A │ Root_B │ App_A │ App_B │ data │
+#   │ vfat   │ vfat   │ squash │ squash │ squash│ squash│ ext4 │
+#   └────────┴────────┴────────┴────────┴───────┴───────┴──────┘
+#
+# Slot mapping (RAUC): boot.0/.1 = BOOT_A/B, rootfs.0/.1 = Root_A/B,
+# appfs.0/.1 = App_A/B (mounted read-only at /opt/fus-app by fus-app-mount).
+# /data is the persistent partition (overlayfs-etc upper/work + RAUC data).
+#
+# Slots are addressed by GPT partition name (--part-name) — what
+# /dev/disk/by-partlabel/ exposes — referenced by RAUC, overlayfs-etc and
+# the data mount. squashfs cannot carry a filesystem label, so --part-name
+# (not --label) is used uniformly across all slots.
+#
+# Each part directive must be a single physical line: the WIC kickstart
+# parser does not support backslash line continuation.
+
+# Slot A — boot (kernel + DTBs), populated from IMAGE_BOOT_FILES at image time
+part --source bootimg-partition --ondisk mmcblk --fstype=vfat --part-name ${FUS_UPDATE_PARTLABEL_BOOT_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_BOOT_MIB}M
+
+# Slot B — boot (mirror of Slot A at image time; RAUC writes the inactive slot on update)
+part --source bootimg-partition --ondisk mmcblk --fstype=vfat --part-name ${FUS_UPDATE_PARTLABEL_BOOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_BOOT_MIB}M
+
+# Slot A — rootfs (read-only squashfs; compressor from fus-update.bbclass)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Slot B — rootfs (mirror)
+part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
+
+# Slot A — application (raw copy of the standalone app slot image; RAUC writes the inactive slot on update)
+part --source rawcopy --sourceparams="file=fus-app-image-${MACHINE}.squashfs" --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
+
+# Slot B — application (mirror of Slot A at image time)
+part --source rawcopy --sourceparams="file=fus-app-image-${MACHINE}.squashfs" --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
+
+# Persistent data — created empty; overlayfs-etc preinit creates its
+# overlay-etc/{upper,work} dirs on first boot. Sized small in the image.
+# NOT expanded by anything in this layer: no resize2fs, no systemd-repart, no
+# growfs and no sgdisk run at flash or at first boot, so this size is the size
+# the device keeps and the remainder of the eMMC stays unpartitioned. Raising
+# FUS_UPDATE_SIZE_DATA_MIB reaches freshly flashed devices only; on a device in
+# the field the backup GPT has to be relocated before this partition can grow.
+part --ondisk mmcblk --fstype=ext4 --part-name ${FUS_UPDATE_PARTLABEL_DATA} --align 8192 --size ${FUS_UPDATE_SIZE_DATA_MIB}M
+
+bootloader --ptable gpt
