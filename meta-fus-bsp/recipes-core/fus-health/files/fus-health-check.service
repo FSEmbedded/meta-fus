@@ -1,0 +1,19 @@
+[Unit]
+Description=Application health check (gates boot-complete.target)
+# Ordered before boot-complete.target; if this fails the target is not reached,
+# so rauc-mark-good (Requires=boot-complete.target) does NOT run and the U-Boot
+# trial counter (BOOT_x_LEFT) is left to expire -> revert.
+Before=boot-complete.target
+After=fus-app.target
+Wants=fus-app.target
+
+[Service]
+Type=oneshot
+Environment=FUS_HEALTH_DIR=@@HEALTH_DIR@@
+ExecStart=/usr/bin/fus-health-check
+
+[Install]
+# RequiredBy (strong) — NOT WantedBy: a failed probe must make boot-complete.target
+# fail so rauc-mark-good (Requires=boot-complete.target) does not run. Matches systemd's
+# own systemd-boot-check-no-failures.service.
+RequiredBy=boot-complete.target

@@ -414,6 +414,17 @@ must identify the app it ships."
 # commit/reject decision. runs over the system rootfs (the launcher package
 # ships the probe), so wire it from the image class.
 fus_selfcheck_health_probe() {
+    # The premise is an application whose health somebody has to judge. An image
+    # that ships no application runtime has no such dimension -- nothing mounts an
+    # app, nothing reverts one, and the external caller this probe informs has no
+    # decision to make -- so demanding a probe there asks for a signal about
+    # nothing. Same shape as the install-door check further down, which skips when
+    # the image carries no updater service. An image that DOES carry the runtime
+    # and no probe is still the defect this check exists for.
+    if [ ! -x "${IMAGE_ROOTFS}${bindir}/fus-app-container-runtime" ]; then
+        bbnote "fus-selfcheck: no application runtime in this image -- skipping the app-health probe assertion"
+        return
+    fi
     if [ -z "$(find "${IMAGE_ROOTFS}${FUS_UPDATE_HEALTH_DIR}" -type f 2>/dev/null | head -n1)" ]; then
         bbfatal "fus-selfcheck: no app-health probe under ${FUS_UPDATE_HEALTH_DIR} \
 in ${IMAGE_ROOTFS}. In container mode the probe is the only app-health signal \

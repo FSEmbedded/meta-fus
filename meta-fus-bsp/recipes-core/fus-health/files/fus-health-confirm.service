@@ -1,0 +1,8 @@
+[Unit]
+Description=Reboot if the boot was not confirmed healthy in time
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'systemctl is-active --quiet boot-complete.target || \
+  { logger -t fus-health "boot not confirmed -> rebooting to let the trial counter revert"; \
+    systemctl reboot; }'

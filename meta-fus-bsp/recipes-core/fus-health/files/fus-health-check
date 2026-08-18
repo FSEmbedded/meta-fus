@@ -1,0 +1,17 @@
+#!/bin/sh
+# Run every executable probe in the health.d dir; fail if any probe fails.
+# A passing run lets boot-complete.target be reached -> rauc-mark-good runs.
+set -u
+DIR="${FUS_HEALTH_DIR:-/etc/fus-app/health.d}"
+[ -d "$DIR" ] || { logger -t fus-health "no $DIR -> healthy (nothing to check)"; exit 0; }
+rc=0
+for p in "$DIR"/*; do
+    [ -x "$p" ] || continue
+    if "$p"; then
+        logger -t fus-health "probe OK: $(basename "$p")"
+    else
+        logger -t fus-health "probe FAILED: $(basename "$p")"
+        rc=1
+    fi
+done
+exit "$rc"

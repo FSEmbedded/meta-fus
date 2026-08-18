@@ -1,0 +1,9 @@
+[Unit]
+Description=Deadline for confirming a healthy boot
+
+[Timer]
+OnBootSec=@@HEALTH_TIMEOUT@@
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
