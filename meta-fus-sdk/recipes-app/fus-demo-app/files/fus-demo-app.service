@@ -1,0 +1,53 @@
+[Unit]
+Description=Example application (runs the payload from @@APP_MOUNT@@)
+# the payload is reached at the app mount in every mode; all providers
+# order before fus-app.target, so depend on the target.
+Requires=fus-app.target
+After=fus-app.target
+# skip cleanly (not "failed") when no app is present yet.
+ConditionPathExists=@@APP_BINDIR@@/fus-demo-app
+
+[Service]
+Type=notify
+# all (not main): readiness is signalled via systemd-notify, a child of
+# the main shell, so main-only access would reject its READY.
+NotifyAccess=all
+Restart=no
+ExecStart=@@APP_BINDIR@@/fus-demo-app
+
+# hardening: the app is an unprivileged read-only payload; drop everything
+# it does not need.
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+# the payload neither networks nor does anything privileged, so confine
+# further.
+PrivateNetwork=yes
+PrivateUsers=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=~@resources @privileged
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RemoveIPC=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

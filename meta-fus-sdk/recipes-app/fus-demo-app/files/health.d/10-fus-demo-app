@@ -1,0 +1,8 @@
+#!/bin/sh
+# App-specific probe: the demo app must be active. With the fault flag the unit
+# fails to start -> not active -> unhealthy -> (slot/rootfs) revert.
+if systemctl is-active --quiet fus-demo-app.service; then
+    exit 0
+fi
+logger -t fus-health "fus-demo-app not active -> unhealthy"
+exit 1

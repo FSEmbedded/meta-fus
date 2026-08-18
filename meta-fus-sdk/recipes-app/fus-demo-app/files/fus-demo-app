@@ -1,0 +1,14 @@
+#!/bin/sh
+# Example application payload: a long-running Type=notify service with a
+# fault-injection switch, so a degraded application and the platform's
+# response to one can be demonstrated. Touch the flag on the active slot's
+# /data and reboot to make this exit unhealthy.
+ver="@@VERSION@@"
+src=$(findmnt -no SOURCE @@APP_MOUNT@@ 2>/dev/null || echo "not a mount")
+if [ -e /data/fus-app-fault ]; then
+    echo "fus-demo-app v${ver}: FAULT INJECTED (/data/fus-app-fault) -> exiting unhealthy"
+    exit 1
+fi
+echo "fus-demo-app v${ver} running from @@APP_MOUNT@@ (${src})"
+systemd-notify --ready --status="healthy"
+exec sleep infinity
