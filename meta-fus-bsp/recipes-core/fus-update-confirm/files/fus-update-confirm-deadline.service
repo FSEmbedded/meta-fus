@@ -1,0 +1,6 @@
+[Unit]
+Description=Reboot if a pending update was not confirmed in time
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/fus-update-confirm deadline

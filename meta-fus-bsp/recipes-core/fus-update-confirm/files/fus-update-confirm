@@ -1,0 +1,380 @@
+#!/bin/sh
+# fus-update-confirm -- mode-invariant confirm door for pending fs-updater
+# update states.
+#
+# An EXTERNAL caller (script, integrator application, or a human) decides
+# whether a rebooted-into update is good: this script never health-probes.
+# Only the fail-safe convergence stays automatic:
+#
+#   confirm  -- unattended boot-time entry point (fus-update-confirm.service).
+#               A pending app or firmware update is deliberately LEFT pending
+#               for the external commit/reject decision; already-decided
+#               states (rollback reboots taken, failed installs, a detected
+#               bootloader fallback past a firmware-bearing update that never
+#               booted) are finalized/acknowledged unconditionally, because
+#               there is nothing left to decide there.
+#   deadline -- reboot backstop (timer): a pending state must never sit
+#               forever; the reboot lets the attempt counters (app bootguard,
+#               U-Boot firmware bootcount) keep eroding toward an automatic
+#               rollback instead.
+#   commit   -- external-caller verb: accept the pending app or firmware
+#               update (fs-updater --commit_update).
+#   reject   -- external-caller verb: refuse it (fs-updater --rollback_update).
+#   fw-guard -- ExecCondition helper for rauc-mark-good: exit 1 (skip the
+#               unit) while the firmware dimension is pending-and-unconfirmed,
+#               exit 0 otherwise.
+set -u
+
+# Overridable so a test harness can stage the library from source without
+# installing it in the guest image.
+# shellcheck disable=SC1090  # runtime path; the library is linted on its own
+. "${FUS_PENDING_STATE_LIB:-/usr/lib/fus-update/pending-state.sh}"
+
+# Exit contract of the two caller-facing verbs. A caller decides on these,
+# not on the log. `confirm` and `deadline` are deliberately not part of it:
+# confirm is a oneshot unit's ExecStart, where an ordinary no-op boot must
+# not be recorded as a failed unit. 2 stays the dispatcher's usage error.
+RC_DONE=0
+RC_REFUSED=1
+RC_NOTHING_PENDING=3
+RC_NOT_SERVICEABLE=4
+RC_UPDATER_UNREACHABLE=5
+RC_TARGET_UNUSABLE=6
+
+# The updater's revert selects the other application slot without asking
+# whether that slot holds anything. Aimed at an empty one it produces a state
+# no verb settles -- the commit refuses without mount evidence, the revert
+# answers that a commit is required, and a fresh install is refused too. So ask
+# here, before the revert is issued.
+#
+# What this is not: a promise that the target mounts. It reports presence, and
+# dm-verity has the last word at mount time. It also guards this door only --
+# a caller reaching the updater directly bypasses it, which is why the real fix
+# belongs in the updater's revert path.
+reject_target_usable() {
+    command -v fus-app-container-runtime >/dev/null 2>&1 || return 0
+
+    _rt_slot=$(fw_printenv -n application 2>/dev/null)
+    case "$_rt_slot" in
+    A|a) _rt_target=B ;;
+    B|b) _rt_target=A ;;
+    *)   log "reject: cannot read the active application slot -- not checking what the revert would select"
+         return 0 ;;
+    esac
+
+    fus-app-container-runtime verify-slot "$_rt_target"
+    _rt_rc=$?
+    # Only the defined "unusable" answer refuses. An older runtime without the
+    # verb answers with its usage code, and a version skew must not read as a
+    # verdict about the payload.
+    if [ "$_rt_rc" = 3 ]; then
+        log "WARN: not rejecting -- the revert would select application slot $_rt_target, which holds no usable payload. Commit this update instead, then install a working one; a reject here would leave a state no verb can settle"
+        return 1
+    fi
+    return 0
+}
+
+cmd_confirm() {
+    # Diagnosis only; the exit status stays 0 either way, because this runs as
+    # a oneshot unit's ExecStart. Silence here would be the worst answer: with
+    # no state readable, every predicate below says "no" and the boot looks
+    # like a device with nothing to do.
+    if ! updater_reachable; then
+        log "ERROR: cannot run the updater -- no update state can be read this boot"
+        return 0
+    fi
+
+    # A firmware-bearing update is pending but the bootloader fell back to
+    # the proven slot: the update spent its boot attempts without being
+    # accepted -- it may never have reached userspace, or it may have run
+    # while nobody committed it -- so no external verdict is still coming.
+    # Left pending, the mark-good gate would keep
+    # withholding the counter reset and the deadline reboots would erode the
+    # PROVEN slot's boot budget toward a bootloader that stops booting.
+    # commit_update in this state settles back to the proven slot; it does
+    # not confirm the update. This check MUST come before the app/fw
+    # early returns below: app_update_pending claims rc 25, so placed only
+    # ahead of the firmware check it would never see a COMBINED app+fw
+    # fallback -- that state would leave through the app early return and
+    # keep walking toward the dead bootloader.
+    if fw_guard_pending && revert_boot_detected; then
+        # Capture the combined case before committing -- the commit clears
+        # the state.
+        _combined=0
+        app_fw_update_pending && _combined=1
+        log "confirm: bootloader fallback detected with an update pending -- auto-recovering (no external verdict involved)"
+        if commit_update_ok; then
+            if [ "$_combined" = 1 ]; then
+                # Backstop. The boot guard settles this case before the mount,
+                # so reaching it here means its attempt did not go through --
+                # and then the new app image is already mounted (the mount unit
+                # is ordered before this one). Without a reboot the device
+                # would idle on proven firmware paired with an application
+                # never validated against it, with nothing pending and nothing
+                # watching it. The reboot enacts the selector the library
+                # already chose; it does not form a verdict. A firmware-only
+                # fallback leaves the app dimension untouched and needs no
+                # reboot. No trial-counter reset here: bootguard resets the
+                # counter itself on the next boot once the state is settled,
+                # and a reset here would only add a second writer to that file.
+                log "confirm: combined fallback recovered -- rebooting to run the restored application pairing"
+                if systemctl reboot; then
+                    :
+                else
+                    log "ERROR: reboot request failed -- the state is already settled, so nothing re-drives it: the never-booted app image stays mounted over the reverted firmware until the next power cycle"
+                fi
+            fi
+        else
+            log "WARN: commit_update failed for a fallback-recovered update"
+        fi
+        return 0
+    fi
+
+    if app_update_pending; then
+        log "confirm: app update pending -- leaving pending for external confirm"
+        return 0
+    fi
+
+    if fw_update_pending; then
+        log "confirm: firmware update pending -- leaving pending for external confirm"
+        return 0
+    fi
+
+    if fw_rollback_pending; then
+        # The firmware rollback's reboot already happened; only its bookkeeping
+        # is left. commit_update is the finalize verb here (it adopts the
+        # switched boot order, restores counters and clears the state) -- not
+        # another rollback, and no health probe, because the revert decision
+        # was already made before this state was set.
+        log "confirm: firmware rollback reboot already taken -- finalizing"
+        if commit_update_ok; then
+            :
+        else
+            log "WARN: commit_update failed for a pending firmware rollback"
+        fi
+        return 0
+    fi
+
+    if app_rollback_pending; then
+        # Same finalize contract as the firmware rollback above, on the app
+        # dimension -- no health probe here, the revert decision was already
+        # made before this state was set.
+        log "confirm: application rollback already decided -- finalizing"
+        if commit_update_ok; then
+            :
+        else
+            log "WARN: commit_update failed for a pending application rollback"
+        fi
+        return 0
+    fi
+
+    if app_fw_rollback_pending; then
+        log "confirm: combined application and firmware rollback already decided -- finalizing"
+        if commit_update_ok; then
+            :
+        else
+            log "WARN: commit_update failed for a pending combined rollback"
+        fi
+        return 0
+    fi
+
+    if update_failed_pending; then
+        log "confirm: acknowledging a failed update so the next install is admitted"
+        if commit_update_ok; then
+            :
+        else
+            log "WARN: commit_update failed to acknowledge a failed update"
+        fi
+        return 0
+    fi
+
+    if app_update_indeterminate; then
+        # The backstop re-drives this one in the same boot, so reporting an
+        # idle device here would contradict the reboot that follows it.
+        log "an application update is pending but no image is mounted -- left for the boot attempts to settle"
+        return 0
+    fi
+
+    if app_rollback_indeterminate; then
+        # The revert was decided and enacted before this state was written: the
+        # active slot is already switched and no boot changes that back, so an
+        # unmountable image leaves nothing to validate -- only bookkeeping to
+        # finish, which the commit does on that evidence.
+        #
+        # This branch used to name the state and stop, because the library
+        # refused to finalize without a mount. Every verb refused then, so the
+        # device parked with nothing that led out. The image itself is still
+        # broken and still needs attention; what changes is that the update
+        # state no longer holds the device hostage to it.
+        log "confirm: an application rollback is pending and no image is mounted -- finalizing on the switch that already happened; the image still needs attention"
+        if commit_update_ok; then
+            :
+        else
+            log "WARN: commit_update failed for a pending application rollback with nothing mounted"
+        fi
+        return 0
+    fi
+
+    if update_reboot_outstanding; then
+        # The install is on the device and its reboot did not take effect, so
+        # the bootloader never started the target. Nothing here settles it and
+        # nothing should -- another reboot reaches the same place. Naming it is
+        # what is left; silence would report an idle device while an installed
+        # update waits, and the state machine refuses the next install until
+        # this one is resolved.
+        log "WARN: an update is installed but its reboot did not take effect -- the target was not started; no verb here settles that"
+        return 0
+    fi
+
+    log "confirm: nothing pending -- nothing to do"
+}
+
+cmd_deadline() {
+    # Reboot backstop for a confirm that hung or never scheduled, for ANY
+    # pending dimension -- an unconfirmed update state must never sit forever.
+    # The reboot re-drives the confirm path; for an app update it also lets the
+    # next boot's bootguard count a trial attempt.
+    #
+    # What bounds the reboot differs per code, and for one group nothing does.
+    #
+    # Bounded: a pending firmware update (the mark-good gate holds, so the boot
+    # budget erodes until the bootloader falls back) and a pending application
+    # update, mounted or not (the boot guard spends a trial per reboot and
+    # reverts when the budget runs out).
+    #
+    # NOT bounded: a failed update and every decided rollback. The timer fires
+    # for them only when confirm's settle failed, and if that failure persists
+    # nothing stops the loop -- the mark-good gate covers the firmware
+    # dimension only, so it lets mark-good through for these codes and the boot
+    # budget is restored on every boot. Pinned by the fw-guard cases in the
+    # contract test. Whether to cap the retries, widen the gate, or leave it is
+    # an open decision; what must not stand is a comment claiming a bound that
+    # is not there.
+    #
+    # The rollback-side sibling of the unmounted-update code is deliberately
+    # absent from the set: its revert already switched the active slot, so
+    # re-driving it would mount the same unmountable image every boot, without
+    # end. The confirm settles that code at boot now, so there is nothing here
+    # for the backstop to re-drive in the first place.
+    if app_update_pending || fw_update_pending || fw_rollback_pending || \
+       app_rollback_pending || app_fw_rollback_pending || update_failed_pending || \
+       app_update_indeterminate; then
+        log "update still unconfirmed at the health-timeout deadline -- rebooting"
+        systemctl reboot
+    fi
+}
+
+cmd_commit() {
+    if ! updater_reachable; then
+        log "ERROR: cannot run the updater -- the state is unknown, which is not the same as idle"
+        return "$RC_UPDATER_UNREACHABLE"
+    fi
+    # Read once and branch on the value: asking twice invites two answers.
+    _state=$(updater_state_rc)
+
+    if rc_in_set "$_state" "$APP_PENDING_CODES"; then
+        if commit_update_ok; then
+            # Best-effort: images without the container runtime (e.g. rootfs
+            # mode) have no trial counter to reset.
+            if command -v fus-app-container-runtime >/dev/null 2>&1; then
+                fus-app-container-runtime trials-reset \
+                    || log "WARN: the update is committed but the trial counter was not reset"
+            fi
+            log "commit: app update committed"
+            return "$RC_DONE"
+        fi
+        log "WARN: commit_update failed for a pending app update"
+        return "$RC_REFUSED"
+    fi
+
+    if [ "$_state" = "$FW_PENDING_CODE" ]; then
+        if commit_update_ok; then
+            log "commit: firmware update committed"
+            return "$RC_DONE"
+        fi
+        log "WARN: commit_update failed for a pending firmware update"
+        return "$RC_REFUSED"
+    fi
+
+    if [ "$_state" = "$IDLE_CODE" ]; then
+        log "commit: nothing pending -- no-op"
+        return "$RC_NOTHING_PENDING"
+    fi
+
+    log "commit: state $_state is not one this verb settles"
+    return "$RC_NOT_SERVICEABLE"
+}
+
+cmd_reject() {
+    if ! updater_reachable; then
+        log "ERROR: cannot run the updater -- the state is unknown, which is not the same as idle"
+        return "$RC_UPDATER_UNREACHABLE"
+    fi
+    _state=$(updater_state_rc)
+
+    if rc_in_set "$_state" "$APP_PENDING_CODES"; then
+        # Only the app-only state. The combined one settles through a path that
+        # asks nothing about mounts, so it cannot strand this way -- and
+        # refusing there would block the only firmware revert a device with an
+        # unusable application slot has left.
+        if [ "$_state" != "$APP_FW_PENDING_CODE" ] && ! reject_target_usable; then
+            return "$RC_TARGET_UNUSABLE"
+        fi
+        if rollback_update_ok; then
+            # Best-effort: images without the container runtime (e.g. rootfs
+            # mode) have no trial counter to reset.
+            if command -v fus-app-container-runtime >/dev/null 2>&1; then
+                fus-app-container-runtime trials-reset \
+                    || log "WARN: the update is rejected but the trial counter was not reset"
+            fi
+            log "reject: app update rejected"
+            return "$RC_DONE"
+        fi
+        log "WARN: rollback_update failed for a pending app update"
+        return "$RC_REFUSED"
+    fi
+
+    if [ "$_state" = "$FW_PENDING_CODE" ]; then
+        if rollback_update_ok; then
+            log "reject: firmware update rolled back"
+            return "$RC_DONE"
+        fi
+        log "WARN: rollback_update failed for a pending firmware update"
+        return "$RC_REFUSED"
+    fi
+
+    if [ "$_state" = "$IDLE_CODE" ]; then
+        log "reject: nothing pending -- no-op"
+        return "$RC_NOTHING_PENDING"
+    fi
+
+    log "reject: state $_state is not one this verb settles"
+    return "$RC_NOT_SERVICEABLE"
+}
+
+cmd_fw_guard() {
+    # ExecCondition contract: exit 1 skips the unit's ExecStart, exit 0
+    # proceeds. Runs on every boot, so no logging in the common case.
+    #
+    # Deliberately WITHOUT the reachability check the caller-facing verbs
+    # carry: an unreadable state makes the predicate answer "not pending" and
+    # mark-good runs. Gating instead would withhold the counter reset on every
+    # boot of a healthy device and erode its budget toward a revert -- a worse
+    # failure than resetting once for a firmware state that could not be read.
+    # The package only reaches images whose door is the updater, and it depends
+    # on that CLI, so an unrunnable one is a broken image, not a mode.
+    if fw_guard_pending; then
+        exit 1
+    else
+        exit 0
+    fi
+}
+
+case "${1:-}" in
+    confirm)  cmd_confirm ;;
+    deadline) cmd_deadline ;;
+    commit)   cmd_commit ;;
+    reject)   cmd_reject ;;
+    fw-guard) cmd_fw_guard ;;
+    *) echo "usage: $0 {confirm|deadline|commit|reject|fw-guard}" >&2; exit 2 ;;
+esac

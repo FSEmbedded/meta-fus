@@ -1,0 +1,23 @@
+[Unit]
+Description=Confirm a pending update (external caller drives commit/reject) or finalize a rollback
+# the container mount must come first: finalizing an app rollback needs
+# the mounted image as evidence that the revert boot happened; asked
+# earlier the query answers only "indeterminate". outside container mode
+# the mount unit does not exist and the ordering is inert.
+After=fus-uboot-env-setup.service fus-app-container-bootguard.service
+After=fus-app-container-mount.service
+# ordered before the application sync point: a fallback-triggered recovery
+# reboot must happen before the app starts, so an unvalidated pairing is
+# never executed. inert on images without this target.
+Before=fus-app.target
+RequiresMountsFor=@@DATA_MOUNT@@
+
+[Service]
+Type=oneshot
+# systemd disables the start timeout for Type=oneshot; a hanging updater
+# call would then block application start forever, so bound it explicitly.
+TimeoutStartSec=60
+ExecStart=/usr/bin/fus-update-confirm confirm
+
+[Install]
+WantedBy=multi-user.target

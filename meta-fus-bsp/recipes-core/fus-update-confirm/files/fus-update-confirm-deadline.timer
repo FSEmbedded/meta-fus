@@ -1,0 +1,9 @@
+[Unit]
+Description=Deadline for confirming a pending update
+
+[Timer]
+OnBootSec=@@HEALTH_TIMEOUT@@
+AccuracySec=5s
+
+[Install]
+WantedBy=timers.target
