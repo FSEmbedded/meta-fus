@@ -1,0 +1,103 @@
+#!/bin/sh
+#
+# fus-fw-env-render: print the device lines of fw_env.config for one machine.
+#
+# Usage: fus-fw-env-render MEDIUM SIZE SECT NSECT OFFSET [OFFSET]
+#
+# Build-time helper of fus-update-fw-env. The device stays a placeholder
+# (@@BLK@@ for the eMMC base, @@MTD@@ for the MTD node): neither is known
+# before the board runs.
+#
+# Exit codes: 0 ok, 1 invalid input
+
+set -eu
+
+#######################################
+# Print an error to stderr and exit.
+# Arguments:
+#   Message
+#######################################
+die() {
+    printf 'fus-fw-env-render: %s\n' "$*" >&2
+    exit 1
+}
+
+#######################################
+# Fail unless the argument is a 0x-prefixed hex number.
+# Arguments:
+#   Value
+#######################################
+require_hex() {
+    case "$1" in
+        0x) die "not a hex number: $1" ;;
+        0x*[!0-9a-fA-F]*) die "not a hex number: $1" ;;
+        0x*) ;;
+        *) die "not a hex number: $1" ;;
+    esac
+}
+
+#######################################
+# Render the lines for the boot hardware partitions of an eMMC.
+# Arguments:
+#   Size, sector size, then one or two offsets
+#######################################
+render_emmc_boot() {
+    _rem_size="$1"
+    _rem_sect="$2"
+    shift 2
+    if [ "$#" -eq 1 ]; then
+        printf '%s\t%s\t%s\t%s\n' '@@BLK@@boot0' "$1" "${_rem_size}" "${_rem_sect}"
+    else
+        [ "$(($1))" -eq "$(($2))" ] \
+            || die "emmc-boot with two different offsets is not supported"
+        for _rem_part in boot0 boot1; do
+            printf '%s\t%s\t%s\t%s\n' "@@BLK@@${_rem_part}" "$1" "${_rem_size}" "${_rem_sect}"
+        done
+    fi
+    unset _rem_size _rem_sect _rem_part
+}
+
+#######################################
+# Render the lines for a NAND MTD partition.
+# Arguments:
+#   Size, erase size, erase blocks per copy, then one or two offsets
+#######################################
+render_nand() {
+    _rn_size="$1"
+    _rn_sect="$2"
+    _rn_nsect="$3"
+    shift 3
+    case "${_rn_nsect}" in
+        '' | *[!0-9]*) die "nand needs a decimal NSECT, got '${_rn_nsect}'" ;;
+        *) ;;
+    esac
+    for _rn_off in "$@"; do
+        printf '%s\t%s\t%s\t%s\t%s\n' '@@MTD@@' "${_rn_off}" "${_rn_size}" "${_rn_sect}" \
+            "${_rn_nsect}"
+    done
+    unset _rn_size _rn_sect _rn_nsect _rn_off
+}
+
+main() {
+    [ "$#" -ge 5 ] || die "usage: MEDIUM SIZE SECT NSECT OFFSET [OFFSET]"
+    _m_medium="$1"
+    _m_size="$2"
+    _m_sect="$3"
+    _m_nsect="$4"
+    shift 4
+    [ "$#" -le 2 ] || die "at most two offsets (single or redundant copy)"
+
+    require_hex "${_m_size}"
+    require_hex "${_m_sect}"
+    for _m_off in "$@"; do
+        require_hex "${_m_off}"
+    done
+
+    case "${_m_medium}" in
+        emmc-boot) render_emmc_boot "${_m_size}" "${_m_sect}" "$@" ;;
+        nand) render_nand "${_m_size}" "${_m_sect}" "${_m_nsect}" "$@" ;;
+        *) die "unknown medium '${_m_medium}' (emmc-boot | nand)" ;;
+    esac
+}
+
+main "$@"

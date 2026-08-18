@@ -57,6 +57,111 @@ fus_selfcheck_configs() {
     find "${B}" -maxdepth 2 -name .config -type f 2>/dev/null | sort
 }
 
+# Assert that FUS_ENV_* (fus-uboot-env.inc) matches the bootloader; wire as u-boot-fus
+# do_configure[postfuncs]. Boards in the list below take the address from the "emmc-boot"
+# env-start of nboot-info.dtsi (the defconfig is only their fallback), all others from it.
+FUS_SELFCHECK_ENV_NBOOT ?= "fsimx8mm fsimx8mn fsimx8mp fsimx8ulp fsimx91 fsimx93"
+fus_selfcheck_fw_env() {
+    configs=$(fus_selfcheck_configs)
+    [ -n "$configs" ] ||
+        bbfatal "fus-selfcheck: .config not found under ${B}; cannot verify FUS_ENV_*"
+    for config in $configs; do
+        bbnote "fus-selfcheck: checking FUS_ENV_* against $config"
+        fus_selfcheck_fw_env_one "$config"
+    done
+}
+
+fus_selfcheck_fw_env_one() {
+    config="$1"
+    have=$(sed -n 's/^CONFIG_ENV_SIZE=//p' "$config")
+    size="${FUS_ENV_SIZE}"
+    if [ -z "$have" ] || [ "$(printf '%d' "$have")" -ne "$(printf '%d' "$size")" ]; then
+        bbfatal "fus-selfcheck: FUS_ENV_SIZE $size != CONFIG_ENV_SIZE '$have'"
+    fi
+
+    copies=$(set -- ${FUS_ENV_OFFSETS}; echo $#)
+    if grep -q '^CONFIG_SYS_REDUNDAND_ENVIRONMENT=y$' "$config"; then want=2; else want=1; fi
+    [ "$copies" -eq "$want" ] ||
+        bbfatal "fus-selfcheck: FUS_ENV_OFFSETS has $copies copies, the bootloader $want"
+
+    if [ "${FUS_ENV_MEDIUM}" = nand ]; then
+        range=$(sed -n 's/^CONFIG_ENV_NAND_RANGE=//p' "$config")
+        if [ -n "$range" ]; then
+            sect="${FUS_ENV_SECT}"
+            nsect="${FUS_ENV_NSECT}"
+            # expr exits 1 when the result is 0 or empty, not only on a syntax error; || true
+            # keeps its stdout (still printed on that exit) while not tripping `set -e` here.
+            product=$(expr "$(printf '%d' "$sect")" \* "$(printf '%d' "$nsect")" || true)
+            if [ -z "$product" ] || [ "$(printf '%d' "$range")" -ne "$product" ]; then
+                bbfatal "fus-selfcheck: SECT * NSECT != CONFIG_ENV_NAND_RANGE $range"
+            fi
+        fi
+        return 0
+    fi
+
+    case " ${FUS_SELFCHECK_ENV_NBOOT} " in
+    *" ${MACHINE} "*)
+        dtsi="${S}/board/F+S/${MACHINE}/nboot/nboot-info.dtsi"
+        [ -f "$dtsi" ] ||
+            bbfatal "fus-selfcheck: $dtsi not found; cannot verify FUS_ENV_OFFSETS"
+        cells=$(awk '/emmc-boot[ \t]*\{/{f=1} f&&/env-start/{gsub(/.*<|>.*/,"");print;exit} f&&/\};/{exit}' \
+            "$dtsi")
+        [ -n "$cells" ] ||
+            bbfatal "fus-selfcheck: no env-start in the emmc-boot node of $dtsi"
+        # shellcheck disable=SC2086 # the cells are split on purpose
+        set -- $cells
+        first=$1
+        if [ $# -eq 1 ]; then second=$1; else second=$2; fi
+        set -- ${FUS_ENV_OFFSETS}
+        [ "$(printf '%d' "$first")" -eq "$(printf '%d' "$1")" ] ||
+            bbfatal "fus-selfcheck: FUS_ENV_OFFSETS '${FUS_ENV_OFFSETS}' != env-start '$cells'"
+        if [ $# -eq 2 ] && [ "$(printf '%d' "$second")" -ne "$(printf '%d' "$2")" ]; then
+            bbfatal "fus-selfcheck: FUS_ENV_OFFSETS '${FUS_ENV_OFFSETS}' != env-start '$cells'"
+        fi
+        ;;
+    *)
+        have=$(sed -n 's/^CONFIG_ENV_MMC_OFFSET=//p' "$config")
+        [ -n "$have" ] || have=$(sed -n 's/^CONFIG_ENV_OFFSET=//p' "$config")
+        set -- ${FUS_ENV_OFFSETS}
+        if [ -z "$have" ] || [ "$(printf '%d' "$have")" -ne "$(printf '%d' "$1")" ]; then
+            bbfatal "fus-selfcheck: FUS_ENV_OFFSETS '${FUS_ENV_OFFSETS}' != offset '$have'"
+        fi
+        ;;
+    esac
+}
+
+# Assert the slot-mode CONFIG_PREBOOT override targets the wks file's actual
+# Root_A partition index, not a value that drifted from it. Wire as a
+# u-boot-fus do_configure[postfuncs], only for FUS_UPDATE_BOOT_MODE=slot.
+fus_selfcheck_uboot_ab_env() {
+    configs=$(fus_selfcheck_configs)
+    [ -n "$configs" ] ||
+        bbfatal "fus-selfcheck: .config not found under ${B}; cannot verify the slot-mode CONFIG_PREBOOT override"
+    for config in $configs; do
+        bbnote "fus-selfcheck: checking the slot-mode CONFIG_PREBOOT in $config"
+        fus_selfcheck_uboot_ab_env_one "$config"
+    done
+}
+
+fus_selfcheck_uboot_ab_env_one() {
+    config="$1"
+    wks="${@bb.utils.which(d.getVar('BBPATH'), 'wic/' + ('fus-update-emmc.wks.in' if d.getVar('FUS_UPDATE_APP_MODE') == 'slot' else 'fus-update-emmc-noappslot.wks.in'))}"
+    [ -n "$wks" ] && [ -f "$wks" ] ||
+        bbfatal "fus-selfcheck: slot-mode wks file not found via BBPATH"
+
+    idx=$(awk '/^part /{n++} /--part-name \$\{FUS_UPDATE_PARTLABEL_ROOT_A\}/{print n; exit}' "$wks")
+    [ -n "$idx" ] || bbfatal "fus-selfcheck: no Root_A partition found in $wks"
+
+    preboot=$(sed -n 's/^CONFIG_PREBOOT="\(.*\)"$/\1/p' "$config")
+    case "$preboot" in
+    *".rootfs_part_A $idx"*) : ;;
+    *)
+        bbfatal "fus-selfcheck: FUS_UPDATE_BOOT_MODE=slot but CONFIG_PREBOOT does not \
+set .rootfs_part_A to $idx (the wks file's actual Root_A index). Got: $preboot"
+        ;;
+    esac
+}
+
 # Assert that externally-generated signing material exists (task-time, before
 # openssl would fail cryptically). Argument-taking: call it from a task
 # function, e.g. from a do_bundle:prepend:

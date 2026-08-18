@@ -1,0 +1,18 @@
+[Unit]
+Description=Render fw_env.config for this board's U-Boot environment
+DefaultDependencies=no
+After=local-fs.target
+Before=rauc.service rauc-mark-good.service
+ConditionPathExists=@@LIBDIR@@/fus-update/fw_env.config.in
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+RuntimeDirectory=fus-update
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/sbin/fus-uboot-env-setup
+
+[Install]
+WantedBy=multi-user.target
+# Ordered before RAUC so the updater always sees the correct env location.
+RequiredBy=rauc.service

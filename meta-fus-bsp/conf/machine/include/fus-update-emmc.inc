@@ -5,5 +5,8 @@
 # capability flag — query in recipes with bb.utils.contains
 MACHINE_FEATURES:append = " fus-update-ab"
 
+# location of the U-Boot environment block (fw_env.config, build-time check).
+require conf/machine/include/fus-uboot-env.inc
+
 # runtime packages are image-scoped (fus-update.bbclass / the image
 # recipes), not listed here.

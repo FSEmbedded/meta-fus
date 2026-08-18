@@ -1,0 +1,12 @@
+# Make the eMMC boot hardware partitions writable from userspace. Linux
+# marks mmcblkXbootN read-only by default (force_ro=1); fw_setenv — and
+# therefore RAUC's slot switching — needs write access. Generic over the
+# eMMC index because the same architecture can boot from different USDHC
+# controllers depending on the board.
+#
+# BOTH boot partitions, not just the first: the environment is redundant and
+# each store goes to the copy that is currently inactive, so the two are
+# written in turn. Covering only boot0 leaves every second store failing
+# whenever the setup service did not run -- which is exactly when nothing else
+# is there to make boot1 writable.
+SUBSYSTEM=="block", KERNEL=="mmcblk[0-9]boot[01]", ATTR{force_ro}="0"

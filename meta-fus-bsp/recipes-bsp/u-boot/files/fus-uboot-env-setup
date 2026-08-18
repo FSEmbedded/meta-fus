@@ -1,0 +1,217 @@
+#!/bin/sh
+#
+# fus-uboot-env-setup: render /run/fus-update/fw_env.config for THIS board.
+#
+# The build ships a template with placeholders; the eMMC index (mmcblkN) or
+# the MTD node (mtdN) is only known once the board runs. /etc/fw_env.config is
+# a symlink to the rendered file, so nothing under the persistent /etc overlay
+# ever holds a location that a later image could not correct.
+#
+# Exit codes: 0 ok (also when the block does not read back), 1 no location could be rendered
+
+set -eu
+
+readonly TEMPLATE='@@LIBDIR@@/fus-update/fw_env.config.in'
+readonly RUN_CONFIG='/run/fus-update/fw_env.config'
+readonly ETC_CONFIG='/etc/fw_env.config'
+readonly MEDIUM='@@MEDIUM@@'
+readonly MTD_NAME='@@MTD_NAME@@'
+readonly PROC_MTD='/proc/mtd'
+readonly DEV_DIR='/dev'
+readonly SYS_BLOCK='/sys/block'
+readonly BDINFO_BOOT_DEV='/sys/bdinfo/boot_dev'
+
+#######################################
+# Print an error to stderr and exit.
+# Arguments:
+#   Message
+#######################################
+die() {
+    printf 'fus-uboot-env-setup: %s\n' "$*" >&2
+    exit 1
+}
+
+#######################################
+# Point /etc/fw_env.config at the rendered file. A regular file left by an
+# older image sits in the persistent overlay and would shadow the symlink.
+#######################################
+link_etc_config() {
+    if [ -L "${ETC_CONFIG}" ] && [ "$(readlink "${ETC_CONFIG}")" = "${RUN_CONFIG}" ]; then
+        return 0
+    fi
+    rm -f "${ETC_CONFIG}"
+    ln -s "${RUN_CONFIG}" "${ETC_CONFIG}"
+}
+
+#######################################
+# eMMC base name from bdinfo's active-boot-device report, mapped via the SoC's
+# DT mmc* aliases (MMC1/2/3 -> mmcblk0/1/2; deterministic per the alias chain,
+# not just an observed convention). Only present on a bootloader new enough to
+# publish it; existence-checked as a safety net, not as the actual guarantee.
+# Outputs:
+#   Base name, e.g. mmcblk2
+# Returns:
+#   0 if found and existing, 1 otherwise (absent, undecodable, or gone)
+#######################################
+get_emmc_base_from_bdinfo() {
+    _gebb_dev="$(cat "${BDINFO_BOOT_DEV}" 2> /dev/null)" || return 1
+    case "${_gebb_dev}" in
+        MMC1) _gebb_base=mmcblk0 ;;
+        MMC2) _gebb_base=mmcblk1 ;;
+        MMC3) _gebb_base=mmcblk2 ;;
+        *)
+            unset _gebb_dev
+            return 1
+            ;;
+    esac
+    if [ -e "${DEV_DIR}/${_gebb_base}boot0" ]; then
+        printf '%s\n' "${_gebb_base}"
+        unset _gebb_dev _gebb_base
+        return 0
+    fi
+    unset _gebb_dev _gebb_base
+    return 1
+}
+
+#######################################
+# Name of the eMMC that carries the environment: the one holding the rootfs,
+# else bdinfo's active boot device, else the first one exposing boot hardware
+# partitions.
+# Outputs:
+#   Base name, e.g. mmcblk2
+# Returns:
+#   0 if found, 1 otherwise (SD card or user-area boot)
+#######################################
+get_emmc_base() {
+    _geb_src="$(findmnt -no SOURCE / 2> /dev/null)" || _geb_src=''
+    _geb_base=''
+    case "${_geb_src}" in
+        /dev/mmcblk*p*)
+            _geb_base="${_geb_src#/dev/}"
+            _geb_base="${_geb_base%p[0-9]*}"
+            # The rootfs sits on a card or on an mmc without boot partitions: that is an
+            # SD boot, not a reason to look for another eMMC.
+            if [ ! -e "${DEV_DIR}/${_geb_base}boot0" ]; then
+                unset _geb_src _geb_base
+                return 1
+            fi
+            ;;
+        *) ;;
+    esac
+    if [ -z "${_geb_base}" ]; then
+        _geb_base="$(get_emmc_base_from_bdinfo)" || _geb_base=''
+    fi
+    if [ -z "${_geb_base}" ]; then
+        for _geb_node in "${SYS_BLOCK}"/mmcblk*boot0; do
+            [ -e "${_geb_node}" ] || continue
+            _geb_base="${_geb_node##*/}"
+            _geb_base="${_geb_base%boot0}"
+            break
+        done
+    fi
+    if [ -n "${_geb_base}" ] && [ -e "${DEV_DIR}/${_geb_base}boot0" ]; then
+        printf '%s\n' "${_geb_base}"
+        unset _geb_src _geb_base _geb_node
+        return 0
+    fi
+    unset _geb_src _geb_base _geb_node
+    return 1
+}
+
+#######################################
+# Fail unless the eMMC boots from a boot hardware partition. Every eMMC exposes
+# boot0/boot1; only an enabled boot partition (PARTITION_CONFIG bits 5:3 = 1 or 2)
+# makes the bootloader keep its environment there, otherwise it uses the user area.
+# Arguments:
+#   eMMC base name
+#######################################
+require_boot_partition() {
+    _rbp_cfg="$(mmc extcsd read "${DEV_DIR}/$1" 2> /dev/null \
+        | sed -n 's/.*PARTITION_CONFIG: 0x\([0-9a-fA-F]*\)\].*/\1/p')"
+    [ -n "${_rbp_cfg}" ] || die "cannot read PARTITION_CONFIG of $1 (mmc extcsd read)"
+    case "$((0x${_rbp_cfg} >> 3 & 7))" in
+        1 | 2) ;;
+        *) die "$1 boots from the user area (PARTITION_CONFIG 0x${_rbp_cfg}); the environment" \
+            "is not in boot0/boot1. Enable a boot partition with the U-Boot command mmc partconf" ;;
+    esac
+    unset _rbp_cfg
+}
+
+#######################################
+# Make the boot hardware partitions writable; Linux sets force_ro=1.
+# Arguments:
+#   eMMC base name
+#######################################
+unlock_boot_partitions() {
+    for _ubp_part in boot0 boot1; do
+        _ubp_ro="${SYS_BLOCK}/${1}${_ubp_part}/force_ro"
+        if [ -w "${_ubp_ro}" ]; then
+            printf '0\n' > "${_ubp_ro}" || true
+        fi
+    done
+    unset _ubp_part _ubp_ro
+}
+
+#######################################
+# Name of the MTD partition that holds the environment.
+# Outputs:
+#   Node name, e.g. mtd4
+# Returns:
+#   0 if found, 1 otherwise
+#######################################
+get_mtd_node() {
+    _gmn_node="$(awk -v name="\"${MTD_NAME}\"" \
+        '$NF == name { sub(":", "", $1); print $1; exit }' "${PROC_MTD}" 2> /dev/null)" \
+        || _gmn_node=''
+    if [ -n "${_gmn_node}" ]; then
+        printf '%s\n' "${_gmn_node}"
+        unset _gmn_node
+        return 0
+    fi
+    unset _gmn_node
+    return 1
+}
+
+#######################################
+# Write the rendered config atomically.
+# Arguments:
+#   Placeholder, device path
+#######################################
+render_config() {
+    mkdir -p "${RUN_CONFIG%/*}"
+    sed -e "s|$1|$2|g" "${TEMPLATE}" > "${RUN_CONFIG}.tmp"
+    mv "${RUN_CONFIG}.tmp" "${RUN_CONFIG}"
+}
+
+main() {
+    link_etc_config
+    [ -f "${TEMPLATE}" ] || die "template ${TEMPLATE} is missing"
+
+    case "${MEDIUM}" in
+        emmc-boot)
+            _m_base="$(get_emmc_base)" \
+                || die "no eMMC with boot hardware partitions; booting from an SD card or the" \
+                    "user area is not supported"
+            require_boot_partition "${_m_base}"
+            unlock_boot_partitions "${_m_base}"
+            render_config '@@BLK@@' "${DEV_DIR}/${_m_base}"
+            ;;
+        nand)
+            _m_node="$(get_mtd_node)" || die "no MTD partition named ${MTD_NAME} in ${PROC_MTD}"
+            render_config '@@MTD@@' "${DEV_DIR}/${_m_node}"
+            ;;
+        *)
+            die "unknown medium '${MEDIUM}'"
+            ;;
+    esac
+
+    # Only a warning: a device with a damaged block must still come up so it can be
+    # repaired, and RAUC fails loudly on its own first access.
+    if ! fw_printenv > /dev/null 2>&1; then
+        printf 'fus-uboot-env-setup: warning: the U-Boot environment does not read back;' >&2
+        printf ' check %s against the bootloader\n' "${RUN_CONFIG}" >&2
+    fi
+    printf 'fus-uboot-env-setup: environment location rendered to %s\n' "${RUN_CONFIG}"
+}
+
+main "$@"
