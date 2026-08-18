@@ -64,3 +64,8 @@ CYCLONEDX_SPEC_VERSION ?= "1.6"
 # 372b152f94397b68dd9d9c4f5ee06b24c2c7fa1d, so keep runtime-only.
 CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "1"
 CYCLONEDX_EXTRA_RUNTIME_RECIPES += " u-boot-fus"
+
+# Policy: what every distro of this family guarantees. The A/B update
+# channel is what makes security updates deliverable over the support
+# period. `require` so a wrong path fails the parse.
+require conf/distro/include/fus-update-features.inc
