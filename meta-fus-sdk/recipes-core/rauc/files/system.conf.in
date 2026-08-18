@@ -1,0 +1,65 @@
+# RAUC system configuration for F&S A/B update standard image.
+#
+# The slot section is GENERATED per FUS_UPDATE_BOOT_MODE / FUS_UPDATE_APP_MODE by
+# rauc-conf.bbappend (this file holds only [system] + [keyring]); see the comment
+# right before the generated section below for the per-mode slot graph. In short:
+#   boot=slot   — boot.0/.1 (BOOT_A/B vfat, raw) carry the bootname; rootfs.0/.1
+#                 (Root_A/B squashfs) have parent=boot.x — the kernel is in the
+#                 vfat boot slot.
+#   boot=rootfs — no boot slot; rootfs.0/.1 carry the bootname (no parent) — the
+#                 kernel rides /boot inside the rootfs squashfs slot.
+#   app=slot      — appfs.0/.1 (App_A/B squashfs) parent the bootname slot.
+#   app=container — a single nominal appfs.0 slot on /data, parent-less (the
+#                   app.raucb install hook does the actual write, not RAUC).
+#
+# All slots are type=raw so the on-disk bytes equal the bundle image — the
+# precondition for the post-install read-back verification (install-check hook).
+# The bootloader lives in eMMC HW partitions boot0/boot1 and is updated out of
+# band — RAUC does not own a bootloader slot here.
+
+[system]
+compatible=@@COMPATIBLE@@
+bootloader=uboot
+data-directory=@@DATA_DIR@@
+# Accept only the verity bundle format. RAUC marks restricting the accepted
+# formats as recommended; we build and ship verity exclusively (local install
+# and hawkBit), so reject everything else. This also closes the door on the
+# large plain-format bundle issue. Explicit (not the relative "-plain") so no
+# future format is ever silently accepted on this device without review.
+bundle-formats=verity
+# Downgrade protection: reject bundles whose version is lower than this
+# floor (date-based, YYYYMMDD). Set per release; the image bakes its own
+# build date so it never accepts a bundle older than itself.
+min-bundle-version=@@MIN_BUNDLE_VERSION@@
+
+[keyring]
+# Absolute on purpose. RAUC resolves a relative keyring against the directory
+# of the config file it loaded, so a copy of this file that ends up somewhere
+# else -- the writable /etc overlay is the case that already happened -- would
+# start looking for its trust root beside that copy. An absolute path keeps
+# every reader on the one keyring the image ships.
+path=/usr/lib/rauc/ca.cert.pem
+# Our bundle signing cert carries the codeSigning EKU; without this RAUC
+# verifies against the default (smimesign) purpose and rejects it with
+# "unsuitable certificate purpose".
+check-purpose=codesign
+# Verify the signing certificate against the bundle's signing time instead
+# of the current clock, so a device with a dead/incorrect RTC still accepts
+# correctly-signed bundles (this is signature robustness, not anti-rollback).
+use-bundle-signing-time=true
+
+# The OS slot section is generated here by rauc-conf.bbappend, depending on
+# FUS_UPDATE_BOOT_MODE — the boot dimension changes the slot graph:
+#   slot   — [slot.boot.0/.1] (BOOT_A/B, raw, bootname=A/B) +
+#            [slot.rootfs.0/.1] (Root_A/B, raw, parent=boot.x). The kernel lives
+#            in the boot slot; bootname is on boot.x.
+#   rootfs — NO boot slot. [slot.rootfs.0/.1] (Root_A/B, raw, bootname=A/B, no
+#            parent). The kernel rides /boot inside the rootfs slot, so bootname
+#            moves onto rootfs.x — which also lets a rootfs-only bundle
+#            auto-activate (get_boot_mark_slot needs a bootname slot with no parent).
+# The application section is appended after the OS slots by rauc-conf.bbappend,
+# depending on FUS_UPDATE_APP_MODE:
+#   slot      — [slot.appfs.0]/[slot.appfs.1] (App_A/B, parent = the bootname slot:
+#               boot.x in boot=slot, rootfs.x in boot=rootfs)
+#   container — [slot.appfs.0] only, device=data partition, no parent (nominal:
+#               the app.raucb install hook does the actual file write, not RAUC)

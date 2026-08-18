@@ -277,11 +277,21 @@ point FUS_APP_CONTAINER_SIGN_KEY / FUS_APP_CONTAINER_SIGN_CERT at it."
 # assert the generated system.conf slot graph matches both mode dimensions
 # (boot and app). wire as a rauc-conf do_install[postfuncs].
 fus_selfcheck_systemconf() {
-    conf="${D}${sysconfdir}/rauc/system.conf"
+    conf="${D}${nonarch_libdir}/rauc/system.conf"
     [ -f "$conf" ] || bbfatal "fus-selfcheck: $conf not generated"
 
-    # boot dimension: where the bootname lives and what parents onto it.
+    # The config and its keyring must not ALSO ship under ${sysconfdir}: /etc is
+    # a writable overlay whose upper outlives the image, so a copy there can be
+    # frozen and would then win over every later one. Two copies also pass every
+    # content check below while the device honours the wrong file.
+    for stray in "${D}${sysconfdir}/rauc/system.conf" "${D}${sysconfdir}/rauc/ca.cert.pem"; do
+        [ -e "$stray" ] && bbfatal "fus-selfcheck: $stray is still installed; \
+the writable /etc overlay can freeze it and it would beat ${nonarch_libdir}/rauc"
+    done
+
+    # Boot dimension: where the bootname lives and what parents onto it.
     if [ "${FUS_UPDATE_BOOT_MODE}" = "rootfs" ]; then
+        # No boot slot; nothing may reference one; the rootfs slot carries bootname.
         grep -q '^\[slot\.boot\.' "$conf" && \
             bbfatal "fus-selfcheck(boot-rootfs): unexpected [slot.boot.*] in system.conf"
         grep -q '^parent=boot' "$conf" && \
@@ -295,11 +305,11 @@ fus_selfcheck_systemconf() {
             bbfatal "fus-selfcheck(boot-slot): rootfs slot has no parent=boot.* in system.conf"
     fi
 
-    # app dimension: appfs slot pair (slot), one nominal appfs slot
-    # (container), or no app section at all (rootfs).
+    # App dimension: the mode decides between an appfs slot pair (slot), a
+    # nominal single appfs slot (container), or no app section at all (rootfs).
     case "${FUS_UPDATE_APP_MODE}" in
         slot)
-            # the bootname-carrying slot is the appfs parent in both boot modes.
+            # The bootname-carrying slot is the appfs parent in BOTH boot modes.
             if [ "${FUS_UPDATE_BOOT_MODE}" = "rootfs" ]; then
                 want="rootfs"
             else
@@ -319,8 +329,9 @@ fus_selfcheck_systemconf() {
                 bbfatal "fus-selfcheck(app-rootfs): unexpected app section in system.conf (the app rides the rootfs slot)"
             ;;
         container)
-            # one nominal, parent-less raw slot on the data partition; not
-            # part of the bootname parent chain.
+            # One nominal, parent-less raw slot on the data partition (see
+            # rauc-conf.bbappend) — not part of the bootname parent chain,
+            # and not a slot pair like app-slot.
             grep -q '^\[slot\.appfs\.0\]' "$conf" || \
                 bbfatal "fus-selfcheck(app-container): [slot.appfs.0] missing in system.conf"
             sed -n '/^\[slot\.appfs\.0\]/,/^\[/p' "$conf" | grep -q '^parent=' && \
@@ -333,7 +344,9 @@ fus_selfcheck_systemconf() {
                 bbfatal "fus-selfcheck(app-container): unexpected [artifacts.*] repository in system.conf"
             ;;
         *)
-            # a new app mode must wire its assertion here explicitly.
+            # Unreachable today (the layout include validates the enum), but a
+            # NEW app mode must wire its system.conf assertion here consciously
+            # instead of silently skipping it.
             bbfatal "fus-selfcheck: no app-dimension assertion wired for FUS_UPDATE_APP_MODE='${FUS_UPDATE_APP_MODE}'"
             ;;
     esac
