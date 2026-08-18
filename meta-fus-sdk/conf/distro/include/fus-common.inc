@@ -31,6 +31,11 @@ KERNEL_MODULE_PACKAGE_SUFFIX = "${@legitimize_package_name(d.getVar('KERNEL_VERS
 
 INHERIT:append ?= " image-buildinfo create-spdx cyclonedx-export"
 
+# cyclonedx-export silently skips the unpatched-vulnerability export if the
+# NVD database was never fetched; inherit_defer pulls in cve-check but not
+# this dependency. Gate on the same switch, off by default.
+do_populate_cyclonedx[depends] += "${@bb.utils.contains('CYCLONEDX_INCLUDE_UNPATCHED_VULNS', '1', 'cve-update-nvd2-native:do_unpack', '', d)}"
+
 # do not use ptest for qtbase and qtdeclarative.
 # set to 0 in local.conf to use
 DISABLE_PTEST:pn-qtbase ??= "1"
@@ -64,6 +69,11 @@ CYCLONEDX_SPEC_VERSION ?= "1.6"
 # 372b152f94397b68dd9d9c4f5ee06b24c2c7fa1d, so keep runtime-only.
 CYCLONEDX_RUNTIME_PACKAGES_ONLY ?= "1"
 CYCLONEDX_EXTRA_RUNTIME_RECIPES += " u-boot-fus"
+
+# the class defaults to one shared export dir, so two images -- or one image
+# for two machines -- built in the same TMPDIR collide on the bom/vex files.
+# keep the export next to the image it describes: per machine and per image.
+CYCLONEDX_EXPORT_DIR = "${DEPLOY_DIR_IMAGE}/cyclonedx-export/${IMAGE_BASENAME}"
 
 # Policy: what every distro of this family guarantees. The A/B update
 # channel is what makes security updates deliverable over the support

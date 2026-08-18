@@ -156,9 +156,11 @@ else
 	fi
 
 	echo >> conf/local.conf
-	add_config "# Switch to Debian packaging and include package-management in the image"
+	add_config "# Switch to Debian packaging"
 	add_config "PACKAGE_CLASSES = \"package_deb\""
-	add_config "EXTRA_IMAGE_FEATURES += \"package-management\""
+	# The update images have a read-only rootfs and refuse package-management;
+	# enabling it here would fail every image build.
+	#add_config "EXTRA_IMAGE_FEATURES += \"package-management\""
 
 	if [ ! -e $BUILD_DIR/conf/bblayers.conf.org ]; then
 		cp $BUILD_DIR/conf/bblayers.conf $BUILD_DIR/conf/bblayers.conf.org

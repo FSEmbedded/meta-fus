@@ -81,7 +81,7 @@ print_usage()
 	echo "In the build directory, you can use bitbake to build."
 	echo
 	echo "Examples:"
-	echo "  bitbake fus-image-std        Build F&S standard image (Weston)"
-	echo "  bitbake fus-image-qt6        Build F&S Qt6 image"
+	echo "  bitbake fusys-image-eval     Build F&S evaluation image (Weston, A/B update)"
+	echo "  bitbake fusys-image-core     Build the minimal hardened production base"
 	echo
 }
