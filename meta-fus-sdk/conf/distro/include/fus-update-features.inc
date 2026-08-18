@@ -96,3 +96,7 @@ FUS_UPDATE_HAWKBIT_TENANT ?= "DEFAULT"
 FUS_UPDATE_HAWKBIT_TARGET ?= "${MACHINE}-01"
 FUS_UPDATE_HAWKBIT_TOKEN  ?= ""
 FUS_UPDATE_HAWKBIT_SSL    ?= "false"
+# with SSL on, the server certificate is verified against the CA bundle in
+# the image. a server with a self-signed or private-CA certificate needs
+# that CA in the image, or this set to "false" for a lab setup.
+FUS_UPDATE_HAWKBIT_SSL_VERIFY ?= "true"

@@ -1,0 +1,22 @@
+# rauc-hawkbit-updater configuration for the F&S A/B update standard
+# image, templated by the bbappend from the FUS_UPDATE_HAWKBIT_* variables.
+# with an empty hawkbit_server the file is inert and the service stays
+# disabled. secrets (auth_token) are not baked into the layer: provide the
+# server and per-target token out of band.
+
+[client]
+hawkbit_server            = @@SERVER@@
+ssl                       = @@SSL@@
+ssl_verify                = @@SSL_VERIFY@@
+tenant_id                 = @@TENANT@@
+target_name               = @@TARGET@@
+auth_token                = @@TOKEN@@
+bundle_download_location  = /tmp/bundle.raucb
+retry_wait                = 60
+connect_timeout           = 20
+timeout                   = 60
+log_level                 = message
+
+[device]
+product                   = @@MACHINE@@
+model                     = @@MACHINE@@

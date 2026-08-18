@@ -1,0 +1,9 @@
+#!/bin/sh
+# Test double for the fs-updater CLI. FAKE_FSUP_EXIT selects the exit
+# code; the special value "signal" simulates abnormal termination.
+# Arguments are ignored -- only the exit path is under test.
+case "${FAKE_FSUP_EXIT:-}" in
+    signal) kill -KILL "$$" ;;
+    ''|*[!0-9]*) echo "FAKE_FSUP_EXIT is not a number" >&2; exit 125 ;;
+    *) exit "$FAKE_FSUP_EXIT" ;;
+esac
