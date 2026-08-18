@@ -1,8 +1,8 @@
 #!/bin/sh
-
+set -u
 
 # Directory for RDP keys (default path for FreeRDP)
-KEY_DIR="/etc/freerdp/keys/"
+KEY_DIR="/etc/freerdp/keys"
 KEY_NAME="server"
 
 PRIV_KEY="$KEY_DIR/$KEY_NAME.key"
@@ -34,6 +34,8 @@ if pgrep -f $WESTON > /dev/null; then
 
 else
     echo "Starting Weston with RDP backend..."
-    $WESTON --backend=rdp-backend.so --rdp-tls-cert=$PUB_KEY --rdp-tls-key=$PRIV_KEY --modules=systemd-notify.so --log /var/log/weston.log &
+    nohup "$WESTON" --backend=rdp-backend.so --rdp-tls-cert="$PUB_KEY" --rdp-tls-key="$PRIV_KEY" --modules=systemd-notify.so --log /var/log/weston.log >/dev/null 2>&1 &
 fi
+# Give weston a moment to start before this script (run interactively, not
+# from a service unit) returns control to the caller.
 sleep 1

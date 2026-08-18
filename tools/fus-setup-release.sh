@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
 	case $1 in
 		-h|--help)
 			print_usage
-			exit 0
+			return 1
 			;;
 		-b)
 			BUILD_DIR="$2"
@@ -99,16 +99,17 @@ while [[ $# -gt 0 ]]; do
 		*)    # unknown option
 			echo "Unknown option: $1"
 			print_usage
-			exit 0
+			return 1
 			;;
 	esac
 done
 }
 
-parse_arguments "$@"
+# A non-zero return asks to stop: leave the sourced script, not the shell
+parse_arguments "$@" || { set +e; return 0 2>/dev/null || exit 0; }
 
 if [ -z "$BUILD_DIR" ]; then
-   	BUILD_DIR=build-$MACHINE-$DISTRO
+	BUILD_DIR=build-$MACHINE-$DISTRO
 fi
 
 BUILD_DIR_REALPATH="${PWD}/$BUILD_DIR"
@@ -116,7 +117,7 @@ BUILD_DIR_REALPATH="${PWD}/$BUILD_DIR"
 if [ -z "$OEROOT_DIR" ]; then
 	OEROOT_DIR=${PWD}/sources/poky
 	if [ -e "${PWD}/sources/oe-core" ]; then
-    	OEROOT_DIR=${PWD}/sources/oe-core
+		OEROOT_DIR=${PWD}/sources/oe-core
 	fi
 fi
 # Path to fsl-setup-release.sh script
@@ -129,8 +130,9 @@ if [ -d "$BUILD_DIR" ] && [ "$FORCE" != "1" ]; then
 else
 
 	if [ -z "$DISTRO" ] || [ -z "$MACHINE" ]; then
-	   	print_usage
-		exit 0
+		print_usage
+		set +e
+		return 0 2>/dev/null || exit 0
 	fi
 	DISTRO="$DISTRO" MACHINE="$MACHINE" . ./$FSL_SETUP_RELEASE  "$BUILD_DIR"
 
@@ -141,16 +143,17 @@ else
 	if [ ! -e $BUILD_DIR/conf/local.conf ]; then
 		echo -e "\n ERROR - No build directory is set yet. Run the 'setup-environment' script before running this script to create " $BUILD_DIR
 		echo -e "\n"
-		return 1
+		set +e
+		return 1 2>/dev/null || exit 1
 	fi
 
 	# On the first script run, backup the local.conf file
 	# Consecutive runs, it restores the backup and changes are appended on this one.
 	if [ ! -e $BUILD_DIR/conf/local.conf.org ]; then
 		cp $BUILD_DIR/conf/local.conf $BUILD_DIR/conf/local.conf.org
-else
+	else
 		cp $BUILD_DIR/conf/local.conf.org $BUILD_DIR/conf/local.conf
-fi
+	fi
 
 	echo >> conf/local.conf
 	add_config "# Switch to Debian packaging and include package-management in the image"

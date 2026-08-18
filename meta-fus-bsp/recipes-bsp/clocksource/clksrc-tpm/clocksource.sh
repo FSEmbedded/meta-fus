@@ -16,23 +16,21 @@ case $1 in
         ;;
     *)
         echo "Usage: $0 [suspend|wakeup]"
-        exit 0
+        exit 1
         ;;
 esac
 
-grep -q $SET_CLKSRC $SYSFS_CLKSRC_PATH/available_clocksource
-if [ $? -ne 0 ]; then
+if ! grep -q "$SET_CLKSRC" "$SYSFS_CLKSRC_PATH/available_clocksource"; then
     echo "Error: Clock Source $SET_CLKSRC not found in available_clocksource"
-    exit 0
+    exit 1
 fi
 
-echo $SET_CLKSRC > $SYSFS_CLKSRC_PATH/current_clocksource
-if [ $? -ne 0 ]; then
+if ! echo "$SET_CLKSRC" > "$SYSFS_CLKSRC_PATH/current_clocksource"; then
     echo "Error: Failed to set $SET_CLKSRC as current Clock Source"
-    exit 0
+    exit 1
 fi
 
-if [ "$1" == "wakeup" ] && [ ! -f /dev/rtc0 ]; then
+if [ "$1" = "wakeup" ] && [ -c /dev/rtc0 ]; then
     echo sync system-time
     /usr/sbin/hwclock -s
 fi
