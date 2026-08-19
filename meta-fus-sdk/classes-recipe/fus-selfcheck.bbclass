@@ -274,8 +274,10 @@ point FUS_APP_CONTAINER_SIGN_KEY / FUS_APP_CONTAINER_SIGN_CERT at it."
     fi
 }
 
-# assert the generated system.conf slot graph matches both mode dimensions
-# (boot and app). wire as a rauc-conf do_install[postfuncs].
+# Assert that the GENERATED system.conf slot graph matches BOTH mode
+# dimensions, so a wrong parent=/bootname or a missing/misplaced app section
+# (which would silently break A/B activation or the app delivery) fails the
+# build, not a non-booting board. Wire as a rauc-conf do_install[postfuncs].
 fus_selfcheck_systemconf() {
     conf="${D}${nonarch_libdir}/rauc/system.conf"
     [ -f "$conf" ] || bbfatal "fus-selfcheck: $conf not generated"
@@ -397,10 +399,17 @@ ${sysconfdir}/dbus-1/system.d; /etc is a writable overlay and can freeze it"
     :
 }
 
-# assert a container-mode app squashfs ships all 3 verity sidecars, keyed on
-# the full squashfs filename ("$img.verity" etc., as the runtime mount verb
-# looks them up), not on the stem.
+# Assert that a just-built container-mode app squashfs ships with all 3
+# verity-sidecar files, IMAGE-keyed (the full squashfs filename plus a
+# suffix, e.g. fus-app-container.squashfs.verity) — matching the naming the
+# already-shipped fus-app-container-runtime `mount` verb looks up
+# ("$img.verity"/"$img.roothash"/"$img.roothash.p7s" for $img = the renamed
+# squashfs path), NOT stem-keyed (fus-app-container.verity, without
+# ".squashfs" in the middle). A missing/empty sidecar would otherwise only
+# surface at boot, when the `mount` verb refuses to mount an unverifiable
+# image and the device silently runs without the app. Argument-taking:
 #   fus_selfcheck_container_artifact <deploy-dir> <image-filename>
+# (image-filename includes the .squashfs extension, e.g. "fus-app-container-1.0.squashfs")
 fus_selfcheck_container_artifact() {
     _out="$1"
     _img="$2"
@@ -417,11 +426,22 @@ alongside $_img."
     done
 }
 
-# assert the app payload is complete and self-describing: every binary in
-# FUS_UPDATE_APP_BINARIES present and executable, etc/app_version non-empty,
-# etc/app-release IMAGE_ID matching FUS_UPDATE_APP_ID. runs over
-# ${IMAGE_ROOTFS} of whatever rootfs carries the payload; files are located
-# by name because the install prefix differs per app mode.
+# Assert the app payload tree is complete and self-describing before the rootfs
+# that carries it leaves the build. App-agnostic: the binaries, the id and the
+# version come from FUS_UPDATE_APP_* / etc, so a "bring your own app" payload is
+# held to the same contract as the reference app. Three guards, each catching a
+# class that otherwise only surfaces in the field:
+#   - every binary in FUS_UPDATE_APP_BINARIES is present and executable (the app
+#     would ship without its program);
+#   - etc/app_version is non-empty (the app-only update path reports the running
+#     app version across a slot switch from it);
+#   - etc/app-release is present and its IMAGE_ID matches FUS_UPDATE_APP_ID
+#     (promotes the metadata from convention to an enforced identity contract).
+# Runs over ${IMAGE_ROOTFS} of whatever rootfs carries the payload: the app
+# image in slot/container, the main rootfs in rootfs mode. The install
+# prefix follows FUS_UPDATE_APP_MODE (empty for slot/container, the app mount for
+# rootfs), so locate files by name rather than a fixed path — a hardcoded
+# /etc/... or /opt/fus-app/etc/... would false-fire in the other modes.
 fus_selfcheck_app_payload() {
     for _bin in ${FUS_UPDATE_APP_BINARIES}; do
         _p="$(find "${IMAGE_ROOTFS}" -type f -name "$_bin" -perm -u+x 2>/dev/null | head -n1)"
@@ -453,10 +473,15 @@ must identify the app it ships."
     fi
 }
 
-# assert at least one app-health probe exists under FUS_UPDATE_HEALTH_DIR.
-# container mode only: the probe is the sole health signal for the external
-# commit/reject decision. runs over the system rootfs (the launcher package
-# ships the probe), so wire it from the image class.
+# Assert at least one app-health probe is installed under the health directory.
+# Scoped to the mode where the probe is monitor-only, not boot-gating
+# (container): the app's own revert is driven by fus-app-container-runtime's
+# boot-attempt counter, not the probe verdict, and committing/rejecting a
+# pending update is an external caller's decision (fus-update-confirm). The
+# probe is that external caller's only health signal, so with NO probe there
+# is nothing to base that decision on. Runs over the SYSTEM rootfs — the
+# launcher package ships the probe into the main image, not the app image —
+# so it is wired from the image class, not the app-image build.
 fus_selfcheck_health_probe() {
     # The premise is an application whose health somebody has to judge. An image
     # that ships no application runtime has no such dimension -- nothing mounts an
@@ -478,9 +503,13 @@ in the launcher package."
     fi
 }
 
-# assert the staged botan pkg-config contract is botan-2.x: meta-oe ships
-# botan 3.x and only a version-pinning bbappend keeps 2.x in the sysroot.
-# wire as a do_configure prefunc of the consuming recipe.
+# Assert the staged botan pkg-config contract is botan-2.x. The lib links
+# botan-2 (CMake resolves botan-2.pc); meta-oe ships botan 3.x and only a
+# version-pinning bbappend keeps 2.19.x in the sysroot. If a meta-oe
+# upgrade orphans that bbappend, the failure can surface as an
+# unrelated-looking CMake error -- or a future botan-3 .pc could satisfy a
+# loosened find and change the crypto ABI underneath the updater. Wire as
+# a do_configure prefunc of the consuming recipe.
 fus_selfcheck_botan2() {
     pc="${STAGING_LIBDIR}/pkgconfig/botan-2.pc"
     if [ ! -f "$pc" ]; then
@@ -493,11 +522,17 @@ The updater stack requires botan 2.x; a botan-3-only sysroot cannot satisfy it."
     fi
 }
 
-# assert the generated lib config header matches the layer's device paths:
-# FUS_LIB_APP_IMG_STORE == FUS_UPDATE_APP_IMG_DIR (no trailing slash; cmake
-# strips it) and FUS_LIB_RAUC_SCRATCH == FSUP_RAUC_SCRATCH (must be on the
-# persistent data partition or streaming staging lands in tmpfs). wire as a
-# do_configure postfunc of the lib recipe.
+# Assert the GENERATED lib config header carries the layer's device paths --
+# not the recipe text, the generated artifact. This catches a drift class:
+# a recipe change accidentally baking a directory that no longer matches the
+# layer's configured FUS_UPDATE_APP_IMG_DIR / FSUP_RAUC_SCRATCH, which would
+# silently make the lib read/write the wrong device path at install time. The
+# baked FUS_LIB_APP_IMG_STORE value carries no trailing slash: CMake strips it
+# from the PATH-typed cache variable, and the consuming code path joins file
+# names onto it with a slash-tolerant path join, so the value must equal
+# FUS_UPDATE_APP_IMG_DIR exactly (no trailing slash). FUS_LIB_RAUC_SCRATCH must
+# live on the persistent data partition or v2 streaming staging lands in tmpfs.
+# Wire as a do_configure postfunc of the lib recipe.
 FUS_SELFCHECK_LIB_CONFIG_H ?= "${B}/include/fus_updater_lib/config.h"
 fus_selfcheck_lib_paths() {
     hdr="${FUS_SELFCHECK_LIB_CONFIG_H}"
@@ -512,12 +547,216 @@ fus_selfcheck_lib_paths() {
     fi
 }
 
-# pin the fs-updater cli's process-exit ABI at the point of consumption: the
-# hawkBit bridge backend and the shared pending-state predicates branch on
-# these exact numbers across a process boundary, and the numbers are defined
-# in a different repository. fail the consumer's build when a re-pinned
-# SRCREV no longer carries them. wire as a do_configure postfunc of the CLI
-# recipe.
+# Pin the library's persisted state ABI at the point of consumption.
+# These values are not an internal enum: they are written as-is into the
+# U-Boot environment, so they outlive the process, the image and the
+# generation that wrote them. A device flashed with an older image can be
+# read by a newer one and vice versa, and out-of-tree consumers read the
+# raw numbers -- the library's own header warns about
+# that dependency but nothing enforces it. Renumbering would therefore not
+# break a build, it would silently reinterpret the recorded state of
+# devices already in the field.
+#
+# All values are pinned, including the sentinel, because the guarantee that
+# matters is the whole numbering, not the subset this layer happens to
+# branch on today. The numbers are defined in a DIFFERENT repository: fail
+# the CONSUMER's build when a re-pinned SRCREV no longer carries them.
+# Wire as a do_configure prefunc of the library recipe -- it reads the
+# source header, which exists from do_unpack on.
+fus_selfcheck_lib_state_values() {
+    hdr="${S}/src/handle_update/updateDefinitions.h"
+    [ -f "$hdr" ] || bbfatal "fus-selfcheck: $hdr not found; the persisted state ABI cannot be verified"
+
+    _pin() {
+        if ! sed -n "/enum class UBootBootstateFlags /,/}/p" "$hdr" | \
+                grep -Eq "$1[[:space:]]*=[[:space:]]*$2(,|[[:space:]]|$)"; then
+            bbfatal "fus-selfcheck: persisted state ABI drift: UBootBootstateFlags::$1 != $2 \
+in $hdr. This value is stored in the U-Boot environment, so changing it reinterprets the \
+recorded state of devices already flashed; re-pin only after confirming the new numbering \
+against every reader, including out-of-tree consumers."
+        fi
+    }
+
+    _pin NO_UPDATE_REBOOT_PENDING        0
+    _pin FW_UPDATE_REBOOT_FAILED         1
+    _pin INCOMPLETE_FW_UPDATE            2
+    _pin INCOMPLETE_APP_UPDATE           3
+    _pin INCOMPLETE_APP_FW_UPDATE        4
+    _pin FAILED_FW_UPDATE                5
+    _pin FAILED_APP_UPDATE               6
+    _pin ROLLBACK_FW_REBOOT_PENDING      7
+    _pin ROLLBACK_APP_REBOOT_PENDING     8
+    _pin ROLLBACK_APP_FW_REBOOT_PENDING  9
+    _pin INCOMPLETE_FW_ROLLBACK          10
+    _pin INCOMPLETE_APP_ROLLBACK         11
+    _pin INCOMPLETE_APP_FW_ROLLBACK      12
+    # Sentinel: never written as a state, but a reader that maps an unknown
+    # value onto it must agree with the writer on where the valid range ends.
+    _pin UNKNOWN_STATE                   13
+}
+
+# Hold every state value to a declared flow status, at the point of consumption.
+# fus_selfcheck_lib_state_values() above pins the NUMBERS; this pins whether a
+# defined flow still writes each of them. The two facts have different owners:
+# the library declares a `flow:` marker per enumerator, and this function counts
+# the writers in its sources. A value declared live that nothing writes, or a
+# value declared reserved that something writes, fails the build -- so the
+# question "does this state belong to a flow?" is answered while the build is
+# green instead of at the next audit.
+#
+# Why the consumer asks: the values no flow writes are not spare numbers. Readers
+# outside that repository branch on the raw numbers, and this layer's confirm
+# chain keeps a predicate for each rollback family. A flow quietly returning or
+# disappearing changes which of those predicates can ever fire, and nothing in
+# the component's own build would say so.
+#
+# to_string() is the only path from an enumerator into the U-Boot environment,
+# so counting its call sites counts the writers -- but only while that stays
+# true. The guard below fails if any write of the variable bypasses it, because
+# a bypass would make every count read zero and the gate would pass by seeing
+# nothing. Wire as a do_configure prefunc of the library recipe.
+fus_selfcheck_state_flows() {
+    hdr="${S}/src/handle_update/updateDefinitions.h"
+    [ -f "$hdr" ] || bbfatal "fus-selfcheck: $hdr not found; the state flow status cannot be verified"
+
+    # Non-vacuity: every persist of the variable must go through to_string(),
+    # otherwise the writer counts below are blind. The argument is regularly
+    # wrapped onto the next line, so the test is a three-line window, not the
+    # matching line alone -- a line-only test reports every wrapped call.
+    bypass=$(grep -rl 'addVariable("update_reboot_state"' "${S}/src" | while read -r _f; do
+        awk -v F="$_f" '
+            { l[NR] = $0 }
+            END {
+                for (i = 1; i <= NR; i++) {
+                    if (l[i] ~ /addVariable\("update_reboot_state"/) {
+                        w = l[i] " " l[i+1] " " l[i+2]
+                        if (w !~ /to_string/) printf "%s:%d\n", F, i
+                    }
+                }
+            }' "$_f"
+    done)
+    if [ -n "$bypass" ]; then
+        bbfatal "fus-selfcheck: a write of update_reboot_state bypasses to_string(), so \
+counting to_string() call sites no longer counts the writers and this check would pass \
+by seeing nothing. Offending site(s): $bypass"
+    fi
+
+    # to_string() and its argument are regularly split across lines, so the file
+    # is joined before matching. A line-based count reports zero for a value that
+    # IS written, and a zero then agrees with a wrong 'reserved' declaration --
+    # two errors cancelling into a green check.
+    #
+    # to_string(flag ? X : Y) writes both arms and is split into one call each.
+    # A condition that is not a plain identifier stays unsplit and counts as
+    # zero writers, which fails a live value instead of passing it.
+    _match_writes() {
+        find "${S}/src" \( -name '*.cpp' -o -name '*.h' \) -print | while read -r _f; do
+            tr '\n' ' ' < "$_f" | \
+                sed -E 's/to_string\( *[A-Za-z0-9_]+ *\? *((update_definitions::)?UBootBootstateFlags::[A-Za-z0-9_]+) *: *((update_definitions::)?UBootBootstateFlags::[A-Za-z0-9_]+) *\)/to_string(\1) to_string(\3)/g' | \
+                grep -oE "to_string\( *(update_definitions::)?UBootBootstateFlags::$1"
+        done
+    }
+
+    _count_writers() {
+        _match_writes "$1([^A-Za-z0-9_]|$)" | grep -c . || true
+    }
+
+    _sum=0
+
+    _flow() {
+        _name="$1"
+        _want="$2"
+
+        _decl=$(sed -n "/enum class UBootBootstateFlags /,/};/p" "$hdr" | \
+                sed -n "s/.*\<$_name\> *= *[0-9]\+,\? *\/\* flow: \([a-z-]\+\) \*\/.*/\1/p")
+        if [ -z "$_decl" ]; then
+            bbfatal "fus-selfcheck: UBootBootstateFlags::$_name carries no 'flow:' marker in \
+$hdr. Every value must declare whether a flow still writes it."
+        fi
+        if [ "$_decl" != "$_want" ]; then
+            bbfatal "fus-selfcheck: state flow drift: UBootBootstateFlags::$_name is declared \
+'$_decl' but this layer expects '$_want'. A status change is a statement about which \
+confirm-chain predicates can still fire; re-pin here only together with that review."
+        fi
+
+        _writers=$(_count_writers "$_name")
+        _sum=$(expr "$_sum" + "$_writers")
+
+        case "$_want" in
+        live)
+            if [ "$_writers" -eq 0 ]; then
+                bbfatal "fus-selfcheck: UBootBootstateFlags::$_name is declared live but no \
+flow writes it. Either a flow was removed -- then declare it reserved or legacy-inbound and \
+review the predicates keyed on its exit codes -- or the write moved and this count is wrong."
+            fi
+            ;;
+        reserved | legacy-inbound | sentinel)
+            if [ "$_writers" -ne 0 ]; then
+                bbfatal "fus-selfcheck: UBootBootstateFlags::$_name is declared '$_want' but \
+$_writers flow(s) write it. A state that is written again must be declared live, and the \
+confirm-chain predicates keyed on its exit codes must be re-read before that lands."
+            fi
+            ;;
+        *)
+            bbfatal "fus-selfcheck: unknown flow status '$_want' for UBootBootstateFlags::$_name"
+            ;;
+        esac
+    }
+
+    _flow NO_UPDATE_REBOOT_PENDING        live
+    # Superseded flow: an older generation wrote it, so a device can still carry
+    # it and the library migrates it. Nothing writes it now.
+    _flow FW_UPDATE_REBOOT_FAILED         legacy-inbound
+    _flow INCOMPLETE_FW_UPDATE            live
+    _flow INCOMPLETE_APP_UPDATE           live
+    _flow INCOMPLETE_APP_FW_UPDATE        live
+    _flow FAILED_FW_UPDATE                live
+    _flow FAILED_APP_UPDATE               live
+    _flow ROLLBACK_FW_REBOOT_PENDING      live
+    _flow ROLLBACK_APP_REBOOT_PENDING     live
+    _flow ROLLBACK_APP_FW_REBOOT_PENDING  live
+    # Superseded flow: the commit path wrote these three before the reboot until
+    # that write was removed, and apply deliberately does not promote into them,
+    # so a device flashed by that generation can carry one but nothing writes them
+    # again. No confirm-chain predicate loses its reach by that: each rollback
+    # family's two codes are also produced by the live rollback state of the same
+    # dimension, so all six stay reachable.
+    _flow INCOMPLETE_FW_ROLLBACK          legacy-inbound
+    _flow INCOMPLETE_APP_ROLLBACK         legacy-inbound
+    _flow INCOMPLETE_APP_FW_ROLLBACK      legacy-inbound
+    _flow UNKNOWN_STATE                   sentinel
+
+    # Non-vacuity for the counter itself. Every per-value count above used a
+    # pattern naming one enumerator; this counts every to_string() call on the
+    # enumeration whatever it names. A shortfall means the counter is narrower
+    # than its subject -- some call site matches the broad form and no specific
+    # one -- and then every count above is too low and this whole check reads
+    # clean by seeing less than there is.
+    _total=$(_match_writes "[A-Za-z0-9_]+" | grep -c . || true)
+    if [ "$_sum" != "$_total" ]; then
+        bbfatal "fus-selfcheck: the writer counter is blind: the per-value counts add up to \
+$_sum but there are $_total to_string() calls on UBootBootstateFlags. Some call site is not \
+matched by any per-value pattern, so the flow statuses above were checked against numbers \
+that are too low. Fix the matcher before trusting this check."
+    fi
+}
+
+# Pin the fs-updater CLI's process-exit ABI at the point of consumption.
+# Two meta-fus components branch on these exact numbers across a process
+# boundary: the hawkBit bridge backend (install verdict: 0/4/8/48 success,
+# 47 watchdog, everything else failure) and the shared pending-state
+# predicates behind the confirm door and the container bootguard, which
+# key on the reboot-state family, the rollback-reboot family, and the
+# success codes of the commit, rollback and state-set verbs -- every
+# number those predicates compare against is pinned here, because the
+# predicates are the only thing standing between a renumbered enum and a
+# device that finalizes the wrong state. The numbers
+# are defined in a DIFFERENT repository; its own test suite pins the
+# untyped-install->48 classifier mapping but not every numeric value. Fail
+# the CONSUMER's build loudly when a re-pinned SRCREV no longer carries
+# the expected numbers, instead of letting a renumbered enum invert
+# install verdicts in the field. Wire as a do_configure postfunc of the
+# CLI recipe.
 fus_selfcheck_cli_exit_codes() {
     hdr="${S}/src/cli/fs_updater_error.h"
     [ -f "$hdr" ] || bbfatal "fus-selfcheck: $hdr not found; the process-exit contract cannot be verified"
@@ -551,25 +790,50 @@ number; re-verify BOTH against the new header before re-pinning the SRCREV."
     _pin UPDATER_UPDATE_REBOOT_STATE INCOMPLETE_FW_ROLLBACK         31
     _pin UPDATER_UPDATE_REBOOT_STATE INCOMPLETE_APP_ROLLBACK        32
     _pin UPDATER_UPDATE_REBOOT_STATE INCOMPLETE_APP_FW_ROLLBACK     33
-    # accepted at boot as "pending, mount state unanswerable".
+    # Accepted at boot as "pending, mount state unanswerable".
     _pin UPDATER_UPDATE_REBOOT_STATE UPDATE_REBOOT_STATE_INDETERMINATE 55
-    # not accepted at boot; pinned only so it stays distinct from the
-    # accepted set.
+    # Deliberately NOT accepted there, and compared against by name since the
+    # confirm run learned to settle it: pending-state.sh carries it as
+    # APP_ROLLBACK_INDETERMINATE_CODE and the confirm branches on it. What the
+    # boot guard needs is that it stays DISTINCT from the accepted set --
+    # renumbered onto one of those, a pending rollback would start spending
+    # application boot attempts on a state that refuses them, and the deadline's
+    # deliberate exclusion of it would stop applying with it.
     _pin UPDATER_UPDATE_REBOOT_STATE ROLLBACK_APP_REBOOT_INDETERMINATE 57
-    # verb success codes; none is 0, the CLI never returns 0 for them.
+    # Not a state: what the client answers when it died on an exception instead
+    # of reporting one. The boot guard branches on this exact number to leave
+    # the application trial counter alone when it was told nothing, so it is
+    # held like the codes above rather than left to be discovered in the field.
+    _pin UPDATER_FATAL UNHANDLED_EXCEPTION 124
+    # Success codes of the verbs the predicates drive. None of these is 0 --
+    # the CLI never returns 0 for them -- so a wrong number here reads as
+    # failure and silently strands the state it was meant to settle.
     _pin UPDATER_UPDATE_ROLLBACK_STATE UPDATE_ROLLBACK_SUCCESSFUL 12
     _pin UPDATER_COMMIT_STATE          UPDATE_COMMIT_SUCCESSFUL   16
     _pin UPDATER_COMMIT_STATE          UPDATE_NOT_NEEDED          17
     _pin UPDATER_SETGET_UPDATE_STATE   GETSET_STATE_SUCCESSFUL    52
-    # settles an install whose target was never activated; pinned so it
-    # stays outside the predicates' success set (16/17).
+    # A commit that settled an install whose target was never activated. What
+    # the predicates need is that it stays OUTSIDE their success set: numbered
+    # into 16/17 it would report a discarded update as a confirmed one, and the
+    # device would be recorded as running firmware it never booted.
     _pin UPDATER_COMMIT_STATE          STALLED_INSTALL_SETTLED    58
+    # A commit that consumed a durable state no current flow writes -- a device
+    # that arrived carrying it from a superseded firmware, or from an edited
+    # environment. Unlike 58 nothing was discarded, so the boot-time confirm
+    # counts it as settled; what it must not become is 16 or 17, because then a
+    # fleet could no longer see that one of its devices came in from an older
+    # generation.
+    _pin UPDATER_COMMIT_STATE          LEGACY_STATE_MIGRATED      59
 }
 
-# assert neither unit in the hawkBit -> fs-updater handoff sets PrivateTmp:
-# the bundle is handed over as a /tmp path string, so both units must see
-# the same /tmp. also asserts the updater's data-mount ordering drop-in
-# survived image assembly. wire as a ROOTFS_POSTPROCESS_COMMAND.
+# Cross-unit /tmp visibility gate for the hawkBit -> fs-updater handoff:
+# the bridge downloads the bundle to a /tmp path and hands the PATH
+# STRING to the updater service over D-Bus -- only works while BOTH units
+# see the same /tmp. A later hardening pass adding PrivateTmp= to either
+# unit would break the handoff silently: the download "succeeds", the
+# install never finds the file. Also asserts the updater's data-mount
+# ordering drop-in survived image assembly. Wire as a
+# ROOTFS_POSTPROCESS_COMMAND of the image shipping both units.
 fus_selfcheck_install_door() {
     _unitdir="${IMAGE_ROOTFS}${systemd_system_unitdir}"
     for u in fs-updater.service rauc-hawkbit-updater.service; do
@@ -580,7 +844,9 @@ fus_selfcheck_install_door() {
             fi
         done
     done
-    # the drop-in is fs-updater-specific; skip images without the service.
+    # The data-mount ordering drop-in is fs-updater-specific; only images that
+    # ship fs-updater.service need it. A container-mode image without the updater
+    # service has nothing to order, so skip rather than fail spuriously.
     if [ -f "$_unitdir/fs-updater.service" ]; then
         _dropin="$_unitdir/fs-updater.service.d/10-fus-data-mount.conf"
         [ -f "$_dropin" ] || bbfatal "fus-selfcheck: $_dropin missing -- fs-updater.service must order after the persistent data mount"
@@ -588,10 +854,13 @@ fus_selfcheck_install_door() {
     fi
 }
 
-# assert the deployed rootfs squashfs fits the A/B slot: the bundle-only
-# build path strips the wic fstypes, so wic's own size check never runs.
-# wire as a do_image_squashfs postfunc. arithmetic via expr, not $(( )):
-# bitbake's shell parser fails at parse time on arithmetic expansion.
+# Assert the deployed rootfs squashfs still fits the A/B slot it is written to.
+# wic already refuses an oversized partition, but the bundle-only build path
+# strips every wic fstype, so a bundle can be produced with no size check at all
+# -- and that one only fails on the device, mid-install. Check the artifact the
+# bundle actually carries instead. Wire as a do_image_squashfs postfunc.
+# Arithmetic via expr, not $(( )): bitbake's shell parser does not implement
+# arithmetic expansion and fails the whole recipe at parse time on it.
 fus_selfcheck_rootfs_slot_fit() {
     _max=$(expr ${FUS_UPDATE_SIZE_ROOT_MIB} \* 1048576)
     for _img in "${IMGDEPLOYDIR}"/*.squashfs; do
@@ -606,19 +875,28 @@ makes bundles incompatible with already-deployed devices."
     done
 }
 
-# assert two unit orderings the confirm door depends on; losing either fails
-# as a race, not an error:
-#   1. rauc-mark-good after fus-update-confirm: the gate's ExecCondition
-#      asks about the very state the confirm run settles.
-#   2. fus-update-confirm after the container mount unit: finalizing an app
-#      rollback needs the mounted image; asked earlier the query answers
-#      only "indeterminate" and the rollback stays unfinalized.
-# wire as a ROOTFS_POSTPROCESS_COMMAND of any image built for the fsupdater
-# door.
+# Assert the two boot orderings the confirm door rests on survived image
+# assembly. Both are a single line in a unit file, and losing either one fails
+# as a race rather than as an error: the units still start, the answer just
+# stops being a function of the device's state.
+#
+#   1. The mark-good gate must run after the confirm run. Confirm settles the
+#      very state the ExecCondition asks about, and both units are pulled into
+#      the same boot transaction, so unordered the gate's verdict depends on
+#      which unit wins. Nothing transitive substitutes: the health-check chain
+#      that would otherwise separate them is monitor-only in container mode.
+#   2. Where the container mount unit is shipped, confirm must run after it.
+#      Finalizing an application rollback needs the mounted image as evidence
+#      that the revert boot happened; asked earlier the query only answers
+#      "indeterminate", which no predicate claims, so the rollback would be
+#      left unfinalized and the deadline would reboot instead.
+#
+# Wire as a ROOTFS_POSTPROCESS_COMMAND of any image built for the fsupdater
+# door -- this is a door property, not an app-mode one.
 fus_selfcheck_confirm_ordering() {
     _unitdir="${IMAGE_ROOTFS}${systemd_system_unitdir}"
 
-    # an After= line may list several units, so match the token, not the line.
+    # An After= line may list several units, so match the token, not the line.
     _ordered_after() {
         grep -E '^[[:space:]]*After[[:space:]]*=' "$1" 2>/dev/null | \
             grep -qE "(=|[[:space:]])$2([[:space:]]|\$)"
@@ -642,11 +920,11 @@ verdict becomes timing-dependent."
 Asked before the mount, the reboot-state query answers indeterminate, no predicate claims that \
 answer, and a pending application rollback is left for the deadline to reboot on."
 
-        # the other half of the same sandwich: the boot guard settles a
-        # firmware fallback under a combined update before the mount, so the
-        # proven firmware is never paired with the application the failed
-        # update brought. ordered the other way round, the mount wins that
-        # race and the pairing runs for a whole boot.
+        # The other half of the same sandwich. The boot guard settles a
+        # firmware fallback under a combined update before the mount, so that
+        # the proven firmware is never paired with the application the failed
+        # update brought. Ordered the other way round, the mount wins that race
+        # and the pairing runs for a whole boot.
         _guard="$_unitdir/fus-app-container-bootguard.service"
         [ -f "$_guard" ] || bbfatal "fus-selfcheck: $_guard missing on an image shipping the container mount unit. \
 An After= naming a unit that is not installed is a silent no-op, so the ordering below would \

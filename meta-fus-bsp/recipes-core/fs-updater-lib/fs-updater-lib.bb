@@ -55,4 +55,6 @@ FILES:${PN}-dev += "${includedir}/fs_update_framework/*"
 
 inherit fus-selfcheck
 do_configure[prefuncs] += "fus_selfcheck_botan2"
+do_configure[prefuncs] += "fus_selfcheck_lib_state_values"
+do_configure[prefuncs] += "fus_selfcheck_state_flows"
 do_configure[postfuncs] += "fus_selfcheck_lib_paths"
