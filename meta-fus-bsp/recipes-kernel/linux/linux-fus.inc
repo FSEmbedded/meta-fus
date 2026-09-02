@@ -10,7 +10,7 @@ SUMMARY = "Linux Kernel for F&S i.MX6/7/8/9-based boards and modules"
 
 DEPENDS += "lzop-native bc-native"
 
-COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
+COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93|mx95)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 

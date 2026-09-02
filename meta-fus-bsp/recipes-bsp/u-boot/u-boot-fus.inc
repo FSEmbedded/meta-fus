@@ -25,7 +25,7 @@ CVE_PRODUCT = "u-boot"
 B = "${WORKDIR}/build"
 
 UBOOT_MAKE_TARGET ??= "all"
-COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93)"
+COMPATIBLE_MACHINE = "(mx6|vf60|mx7ulp|mx8|mx93|mx95)"
 
 # Necessary ???
 # FIXME: Allow linking of 'tools' binaries with native libraries

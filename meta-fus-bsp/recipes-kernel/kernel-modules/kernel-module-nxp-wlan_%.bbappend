@@ -11,6 +11,7 @@ SRC_URI += " \
 "
 
 SOC_FAMILY                    = "INVALID"
+SOC_FAMILY:mx95-generic-bsp   = "mx95"
 SOC_FAMILY:mx93-generic-bsp   = "mx93"
 SOC_FAMILY:mx8ulp-generic-bsp   = "mx93"
 SOC_FAMILY:mx8-generic-bsp   = "mx8"
