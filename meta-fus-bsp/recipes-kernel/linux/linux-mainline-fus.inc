@@ -18,8 +18,6 @@ SRC_URI = "git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/;branc
 
 PV = "${LINUX_VERSION}"
 
-S = "${WORKDIR}/git"
-
 # We need to pass it as param since kernel might support more then one
 # machine, with different entry points
 KERNEL_EXTRA_ARGS += "LOADADDR=${UBOOT_ENTRYPOINT}"

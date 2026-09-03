@@ -70,9 +70,10 @@ do_compile:prepend() {
 	#Copy Firmware files into NXP-Firmware
 	if ${NEED_ATF}; then
 		mkdir -p ${S}/${FIRMWARE_DIR}
-		cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/${FIRMWARE_DIR}/bl31.bin
 		if ${NEED_OPTEE}; then
 			cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin-optee ${S}/${FIRMWARE_DIR}/bl31-optee.bin
+		else
+			cp ${DEPLOY_DIR_IMAGE}/bl31-${ATF_PLATFORM}.bin ${S}/${FIRMWARE_DIR}/bl31.bin
 		fi
 	fi
 
@@ -89,7 +90,7 @@ do_deploy:append() {
 
 	for config in ${UBOOT_CONFIG}; do
 		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
-		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
+		install -m 0644 ${B}/${config}_defconfig-${config}//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
 		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 	done
 }

@@ -8,7 +8,7 @@ include recipes-kernel/linux/cve-exclusion_6.6.inc
 # cve information as spdx
 do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
 
-SRCBRANCH="master"
+SRCBRANCH = "master"
 # v6.6.142-2.2.2-fus1.1
 SRCREV = "b30960239414632d8161564f705da13ca97f4c56"
 

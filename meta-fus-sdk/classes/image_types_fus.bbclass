@@ -9,8 +9,8 @@ do_rename_wic_image() {
 	cp ${IMAGE_NAME}.wic ${IMAGE_NAME}.sysimg
 	ln -sf ${IMAGE_NAME}.sysimg ${IMAGE_BASENAME}-${MACHINE}.sysimg
 	# remove old images
-	rm -f ${IMAGE_NAME}.wic
-	rm -f ${IMAGE_BASENAME}-${MACHINE}.wic
+	#rm -f ${IMAGE_NAME}.wic
+	#rm -f ${IMAGE_BASENAME}-${MACHINE}.wic
 	cd -
 }
 
@@ -20,9 +20,9 @@ do_rename_wic_gz_image() {
 	cp ${IMAGE_NAME}.wic ${IMAGE_NAME}.sysimg
 	ln -sf ${IMAGE_NAME}.sysimg ${IMAGE_BASENAME}-${MACHINE}.sysimg
 	ln -sf ${IMAGE_BASENAME}-${MACHINE}.sysimg emmc-${MACHINE}${IMAGE_NAME_SUFFIX}.sysimg
-	# remove old images
-	rm -f ${IMAGE_NAME}.wic
-	rm -f ${IMAGE_BASENAME}-${MACHINE}.wic.gz
+	# do not remove old images, they are used in do_create_image_spdx
+	#rm -f ${IMAGE_NAME}.wic
+	#rm -f ${IMAGE_BASENAME}-${MACHINE}.wic.gz
 	cd -
 }
 
