@@ -1,0 +1,5 @@
+# The label selects the medium and the filesystem type is pinned here: mounting
+# with the type a medium declares would hand a prepared image to any enabled
+# kernel filesystem driver, before any signature is involved.
+# ACTION is "add" only -- a change-event burst must not re-run the install.
+SUBSYSTEM=="block", ACTION=="add", ENV{DEVTYPE}=="partition", ENV{ID_FS_TYPE}=="vfat", ENV{ID_FS_LABEL}=="FUS-UPDATER", TAG+="systemd", ENV{SYSTEMD_WANTS}="fus-usb-update.service"

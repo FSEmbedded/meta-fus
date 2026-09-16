@@ -935,3 +935,36 @@ The guard decides which application slot this boot mounts -- both on trial exhau
 firmware fallback under a combined update -- and after the mount that decision comes too late."
     fi
 }
+
+
+# Assert that the removable-medium door's unit stays in the host mount
+# namespace and keeps its start rate limit off. Wire as a do_install[postfuncs]
+# in fus-usb-update.
+#
+# The wrapper stages the bundle under /tmp and hands the installer a PATH, not
+# a descriptor; the installer is a different process. A unit with its own
+# mount namespace therefore hands over a path that resolves to nothing there,
+# and the medium's own mount from ExecStartPre is invisible to the wrapper as
+# well -- the defect the predecessor layer's unit carries.
+#
+# The rate limit is measured, not assumed: consecutive FAILED starts count, and
+# a refusal exits non-zero, so two refused media inside the window make the
+# third insertion -- a correct medium -- produce no run and no record at all.
+fus_selfcheck_usb_door_unit() {
+    _unit="${D}${systemd_system_unitdir}/fus-usb-update.service"
+    [ -f "$_unit" ] || bbfatal "fus-selfcheck(usb-door): $_unit not installed"
+
+    if grep -Eq '^(PrivateTmp|PrivateMounts|ProtectHome|MountAPIVFS)=(yes|true|1|on|read-only|tmpfs)' "$_unit"; then
+        bbfatal "fus-selfcheck(usb-door): $_unit asks for a private mount namespace. \
+The staged bundle path is handed to the installer, a different process, and would not resolve \
+there; the medium's mount would be invisible too."
+    fi
+    if grep -Eq '^Root(Directory|Image)=' "$_unit"; then
+        bbfatal "fus-selfcheck(usb-door): $_unit reroots the unit; same defect as a private \
+mount namespace -- the path handed to the installer does not resolve in the installer's view."
+    fi
+    grep -q '^StartLimitIntervalSec=0' "$_unit" || \
+        bbfatal "fus-selfcheck(usb-door): $_unit does not set StartLimitIntervalSec=0. \
+A refusal exits non-zero, so a rate limit lets two refused media suppress the run for a third, \
+correct one -- with no journal line under the tag and no record entry."
+}

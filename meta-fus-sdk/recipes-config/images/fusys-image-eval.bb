@@ -86,6 +86,14 @@ IMAGE_INSTALL:append = " systemd-analyze"
 IMAGE_INSTALL:append            = " packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} rauc-hawkbit-updater"
 IMAGE_INSTALL:append:app-rootfs = " ${FUS_UPDATE_APP_PACKAGES}"
 
+# the removable-medium door. gated on the door this image is built with: the
+# package drives the updater CLI, and its recipe skips itself where that door
+# is the stock one -- installing it unconditionally would fail such a build on
+# a missing package instead of leaving the feature out. kept per-image rather
+# than in the update base: an image carrying it installs a signed bundle from a
+# labelled medium with nobody logged in.
+IMAGE_INSTALL:append = "${@bb.utils.contains('FUS_UPDATE_INSTALL_DOOR', 'fsupdater', ' fus-usb-update', '', d)}"
+
 set_fus_release_version() {
 
     if [ -n "${FUS_RELEASE_VERSION}" ]; then

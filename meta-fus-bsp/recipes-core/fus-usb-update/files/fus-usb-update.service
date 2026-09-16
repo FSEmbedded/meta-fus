@@ -1,0 +1,59 @@
+[Unit]
+Description=Automatic update from removable medium
+# The confirm run settles the boot's update state; without this ordering the
+# idle precondition below would race it on a cold plug.
+After=fs-updater.service fus-update-confirm.service
+Wants=fs-updater.service
+# The deadline oneshot must not queue while this one is still activating: the
+# pending state holds for most of a write, not only at its end, and a
+# cold-plugged medium can be mid-copy when the deadline elapses.
+Before=fus-update-confirm-deadline.service
+RequiresMountsFor=/data /tmp
+# The medium is never bound to: withdrawing it must not kill an install midway.
+ConditionPathExists=/dev/disk/by-label/FUS-UPDATER
+# No start rate limit, measured rather than assumed: consecutive successful
+# runs are not counted, consecutive failed ones are, and a refusal exits
+# non-zero. Two refused media inside the window would make the third insertion
+# -- a correct medium -- produce no run, no journal line under the tag and no
+# record. The loop breakers sit in the wrapper: the idle check and the record
+# kept per bundle hash.
+StartLimitIntervalSec=0
+
+[Service]
+Type=oneshot
+# Blocking on purpose: --no-block returns once the mount job is queued, and
+# ExecStart would then look at an empty directory and report nothing to do.
+# --fsck=no: the mount is read-only and buys nothing from a repair pass, while
+# the default (fsck=yes) would run a root-privileged vfat parser in *repair*
+# mode against attacker-controlled bytes, outside this unit's sandbox, before
+# the signature is ever checked.
+ExecStartPre=/usr/bin/systemd-mount --collect --type=vfat --fsck=no \
+    --options=ro,nosuid,nodev,noexec,fmask=0022,dmask=0022 \
+    /dev/disk/by-label/FUS-UPDATER /run/fus-usb-update
+# The CLI stops watching after this and answers "still running", which costs
+# the insertion its outcome. The unit's own timeout below still bounds the run.
+Environment=FSUP_INSTALL_WAIT_MS=1800000
+ExecStart=/usr/libexec/fus-usb-update.sh /run/fus-usb-update
+ExecStopPost=-/usr/bin/systemd-umount /run/fus-usb-update
+# The updater carries the no-progress timeout; a shorter one here would kill
+# this wrapper mid-install and leave the device without an explanation.
+TimeoutStartSec=1h
+TimeoutStopSec=30
+SyslogIdentifier=fus-usb-update
+Nice=10
+NoNewPrivileges=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# No mount namespace (the selfcheck above forbids one), otherwise as tight as
+# a root unit that parses attacker-controlled bytes (rauc info, pre-signature)
+# can be made without touching that: no network, no kernel module/log/clock
+# access, no writable+executable memory, D-Bus is the only IPC it needs.
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
