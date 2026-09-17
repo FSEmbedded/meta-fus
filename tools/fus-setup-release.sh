@@ -115,8 +115,8 @@ BUILD_DIR_REALPATH="${PWD}/$BUILD_DIR"
 
 if [ -z "$OEROOT_DIR" ]; then
 	OEROOT_DIR=${PWD}/sources/poky
-	if [ -e "${PWD}/sources/oe-core" ]; then
-    	OEROOT_DIR=${PWD}/sources/oe-core
+	if [ -e "${PWD}/sources/openembedded-core/" ]; then
+    	OEROOT_DIR=${PWD}/sources/openembedded-core
 	fi
 fi
 # Path to fsl-setup-release.sh script
