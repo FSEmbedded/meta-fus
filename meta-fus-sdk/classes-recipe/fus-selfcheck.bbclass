@@ -504,12 +504,10 @@ in the launcher package."
 }
 
 # Assert the staged botan pkg-config contract is botan-2.x. The lib links
-# botan-2 (CMake resolves botan-2.pc); meta-oe ships botan 3.x and only a
-# version-pinning bbappend keeps 2.19.x in the sysroot. If a meta-oe
-# upgrade orphans that bbappend, the failure can surface as an
-# unrelated-looking CMake error -- or a future botan-3 .pc could satisfy a
-# loosened find and change the crypto ABI underneath the updater. Wire as
-# a do_configure prefunc of the consuming recipe.
+# botan-2 (CMake resolves botan-2.pc); meta-oe ships botan 3.x, so this
+# recipe's legacy-images PACKAGECONFIG needs its own version-pinning
+# bbappend to stage 2.x. Wire as a do_configure prefunc, only when that
+# PACKAGECONFIG is enabled -- otherwise botan is not staged at all.
 fus_selfcheck_botan2() {
     pc="${STAGING_LIBDIR}/pkgconfig/botan-2.pc"
     if [ ! -f "$pc" ]; then
@@ -544,6 +542,37 @@ fus_selfcheck_lib_paths() {
     if ! grep -qxF "#define FUS_LIB_RAUC_SCRATCH \"${FSUP_RAUC_SCRATCH}\"" "$hdr"; then
         bbfatal "fus-selfcheck: FUS_LIB_RAUC_SCRATCH in $hdr does not equal \
 '${FSUP_RAUC_SCRATCH}'. Got: $(grep FUS_LIB_RAUC_SCRATCH "$hdr")"
+    fi
+}
+
+# Assert the generated lib config header was configured with the legacy
+# image formats compiled out, catching a PACKAGECONFIG drift that would
+# silently leave botan linked into an image that believes it shipped
+# without it. Wire as a do_configure postfunc, only when legacy-images is
+# NOT set.
+fus_selfcheck_lib_legacy_off() {
+    hdr="${FUS_SELFCHECK_LIB_CONFIG_H}"
+    [ -f "$hdr" ] || bbfatal "fus-selfcheck: generated lib config header missing: $hdr"
+    if ! grep -qxF "#define FUS_LEGACY_IMAGE_SUPPORT 0" "$hdr"; then
+        bbfatal "fus-selfcheck: $hdr was not configured with legacy image support off \
+(expected '#define FUS_LEGACY_IMAGE_SUPPORT 0'). Got: \
+$(grep FUS_LEGACY_IMAGE_SUPPORT "$hdr" || echo 'no such define')"
+    fi
+}
+
+# Assert the installed library binary carries no botan NEEDED entry, since
+# the header check above cannot see a stale build artifact or an
+# unrelated link path pulling botan in regardless of the cmake option.
+# readelf, not nm: the release build is LTO'd and stripped, so symbols are
+# gone but a dynamic NEEDED entry would still show. Wire as a do_install
+# postfunc, only when legacy-images is NOT set.
+fus_selfcheck_no_botan_needed() {
+    so="${D}${libdir}/libfs_updater.so.1"
+    [ -f "$so" ] || bbfatal "fus-selfcheck: installed library not found: $so; \
+the NEEDED check cannot run"
+    if readelf -d "$so" | grep -q 'NEEDED.*libbotan'; then
+        bbfatal "fus-selfcheck: $so links libbotan although legacy image support \
+is off; check the PACKAGECONFIG wiring in the lib recipe."
     fi
 }
 

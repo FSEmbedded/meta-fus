@@ -80,6 +80,11 @@ FUS_UPDATE_INSTALL_DOOR             ?= "fsupdater"
 FUS_UPDATE_INSTALL_DOOR:app-slot      = "stock"
 FUS_UPDATE_INSTALL_DOOR:app-container = "fsupdater"
 
+# gates fs-updater-lib's raw application image / F&S container support (and
+# the botan-2 dependency they need); off by default, this layer only ships
+# RAUC-verity bundles.
+FUS_UPDATE_LEGACY_IMAGES       ?= "0"
+
 # bundle boot-slot token, globally parsed so both bundle recipes see it.
 # empty in boot=rootfs: the kernel rides the rootfs slot.
 FUS_BUNDLE_BOOT_SLOT            = "boot"
@@ -108,6 +113,10 @@ python () {
         bb.fatal("app=slot has no fs-updater state actor; FUS_UPDATE_INSTALL_DOOR must stay 'stock'")
     if mode == 'container' and door != 'fsupdater':
         bb.fatal("app=container requires the fs-updater door (staged-but-never-activated installs otherwise)")
+
+    legacy = d.getVar('FUS_UPDATE_LEGACY_IMAGES')
+    if legacy not in ('0', '1'):
+        bb.fatal("FUS_UPDATE_LEGACY_IMAGES='%s' is invalid; use 0 or 1" % legacy)
 }
 
 # container mode: all app paths live under one base dir on the persistent

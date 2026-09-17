@@ -28,7 +28,6 @@ PV = "${FUS_COMPONENT_VERSION}+git${SRCPV}"
 
 DEPENDS = " \
     libubootenv \
-    botan \
     jsoncpp \
     zlib \
     boost \
@@ -36,6 +35,11 @@ DEPENDS = " \
     systemd \
     pkgconfig-native \
 "
+
+# raw application image / F&S container support and the botan-2 it needs;
+# off by default, this layer only ships RAUC-verity bundles.
+PACKAGECONFIG ??= "${@bb.utils.contains('FUS_UPDATE_LEGACY_IMAGES', '1', 'legacy-images', '', d)}"
+PACKAGECONFIG[legacy-images] = "-DFUS_LEGACY_IMAGE_SUPPORT=ON,-DFUS_LEGACY_IMAGE_SUPPORT=OFF,botan"
 
 EXTRA_OECMAKE += "-Dupdate_version_type=string"
 # align the lib's compiled-in device paths with this layer's layout
@@ -54,7 +58,9 @@ EXTRA_OECMAKE += "-DFUS_SOURCE_ID=${SRCREV}"
 FILES:${PN}-dev += "${includedir}/fs_update_framework/*"
 
 inherit fus-selfcheck
-do_configure[prefuncs] += "fus_selfcheck_botan2"
+do_configure[prefuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', 'fus_selfcheck_botan2', '', d)}"
 do_configure[prefuncs] += "fus_selfcheck_lib_state_values"
 do_configure[prefuncs] += "fus_selfcheck_state_flows"
 do_configure[postfuncs] += "fus_selfcheck_lib_paths"
+do_configure[postfuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', '', 'fus_selfcheck_lib_legacy_off', d)}"
+do_install[postfuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', '', 'fus_selfcheck_no_botan_needed', d)}"

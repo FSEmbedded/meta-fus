@@ -31,7 +31,6 @@ inherit cmake pkgconfig
 
 DEPENDS = " \
     libubootenv \
-    botan \
     jsoncpp \
     zlib \
     boost \
@@ -41,6 +40,9 @@ DEPENDS = " \
     bash-completion \
     pkgconfig-native \
 "
+# botan is only staged -- and only needed here -- when the sibling library
+# recipe was built with the raw application image / F&S container formats.
+DEPENDS += "${@bb.utils.contains('FUS_UPDATE_LEGACY_IMAGES', '1', 'botan', '', d)}"
 
 EXTRA_OECMAKE += "-Dupdate_version_type=string"
 EXTRA_OECMAKE += "-DBUILD_DBUS_SUPPORT=ON"
