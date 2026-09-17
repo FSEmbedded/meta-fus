@@ -1,5 +1,5 @@
 ATF_SRC = "git://github.com/FSEmbedded/atf-fus;protocol=https"
 SRC_URI = "${ATF_SRC};branch=${SRCBRANCH}"
-SRCBRANCH = "master"
-PV = "v2.10-fus1.4"
-SRCREV = "7fa36182ed12594509899da8184ee39b2a64b087"
+SRCBRANCH = "atf-fus-2.14"
+PV = "v2.14-fus1.0"
+SRCREV = "ae00faf231460f7ea622c679bcaded398fc9a070"
