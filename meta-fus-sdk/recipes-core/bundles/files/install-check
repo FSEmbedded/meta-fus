@@ -26,16 +26,22 @@ hash_bytes() {
     } | sha256sum | awk '{ print $1 }'
 }
 
-case "$1" in
-slot-post-install)
-    # locate the just-installed image inside the mounted bundle: prefer the
-    # name RAUC exports, fall back to the single image of this slot's class.
+# Locates the image a RAUC stage names, inside the mounted bundle; leaves it
+# in $img ('' if not found or not contained). Shared by both RAUC stages.
+#
+# Containment is checked on the resolved result, not on RAUC_IMAGE_NAME's
+# shape, in this order: reject any '..' segment, require a literal
+# RAUC_BUNDLE_MOUNT_POINT/ prefix, reject a symlink. A prefix check alone is
+# unsound against '..'; and -f (used below) follows a symlink to whatever it
+# targets, so a symlink entry inside the mount can still name a file outside
+# it.
+locate_bundle_image() { # locate_bundle_image <glob-fallback:0|1>
     img=""
     if [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_BUNDLE_MOUNT_POINT:-}/${RAUC_IMAGE_NAME}" ]; then
         img="${RAUC_BUNDLE_MOUNT_POINT}/${RAUC_IMAGE_NAME}"
     elif [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_IMAGE_NAME}" ]; then
         img="${RAUC_IMAGE_NAME}"
-    else
+    elif [ "$1" -eq 1 ]; then
         # rootfs and appfs are both *.squashfs, so match the specific image
         # basenames, not a bare glob. the OS-image prefix covers every
         # image of this layer.
@@ -45,6 +51,26 @@ slot-post-install)
             boot)   img=$(ls "${RAUC_BUNDLE_MOUNT_POINT}"/*.vfat 2>/dev/null | head -n1) ;;
         esac
     fi
+
+    case "$img" in
+    */../*|*/..|../*|..) img="" ;;
+    esac
+    _lbi_mp=${RAUC_BUNDLE_MOUNT_POINT:-}
+    _lbi_mp=${_lbi_mp%/}
+    if [ -z "$_lbi_mp" ]; then
+        img=""
+    else
+        case "$img" in
+        "$_lbi_mp"/*) : ;;
+        *) img="" ;;
+        esac
+    fi
+    [ -n "$img" ] && [ -L "$img" ] && img=""
+}
+
+case "$1" in
+slot-post-install)
+    locate_bundle_image 1
 
     if [ -z "$img" ] || [ ! -f "$img" ]; then
         echo "verify[$RAUC_SLOT_NAME]: cannot locate bundle image (RAUC_IMAGE_NAME='${RAUC_IMAGE_NAME:-}')" >&2
@@ -81,12 +107,7 @@ slot-install)
     # that fs-updater-lib later renames into app_<slot>.squashfs on commit.
     # dumb and terminal: no U-Boot access, no fs-updater invocation. the
     # destination is substituted from @@FUS_APP_IMG_DIR@@ at build time.
-    img=""
-    if [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_BUNDLE_MOUNT_POINT:-}/${RAUC_IMAGE_NAME}" ]; then
-        img="${RAUC_BUNDLE_MOUNT_POINT}/${RAUC_IMAGE_NAME}"
-    elif [ -n "${RAUC_IMAGE_NAME:-}" ] && [ -f "${RAUC_IMAGE_NAME}" ]; then
-        img="${RAUC_IMAGE_NAME}"
-    fi
+    locate_bundle_image 0
     if [ -z "$img" ]; then
         echo "slot-install[$RAUC_SLOT_NAME]: cannot locate bundle image (RAUC_IMAGE_NAME='${RAUC_IMAGE_NAME:-}')" >&2
         exit 1
@@ -102,10 +123,18 @@ slot-install)
     mkdir -p "$dest_dir"
     rm -f "$dest_dir/.incoming.squashfs" "$dest_dir/.incoming.squashfs.verity" \
           "$dest_dir/.incoming.squashfs.roothash" "$dest_dir/.incoming.squashfs.roothash.p7s"
-    cp "$img" "$dest_dir/.incoming.squashfs"
-    cp "$img.verity" "$dest_dir/.incoming.squashfs.verity"
-    cp "$img.roothash" "$dest_dir/.incoming.squashfs.roothash"
-    cp "$img.roothash.p7s" "$dest_dir/.incoming.squashfs.roothash.p7s"
+    # Each copy is checked; a full or read-only /data must fail the install
+    # loudly, not leave a truncated .incoming set that reads as staged. On
+    # any failure the partial set is removed rather than left half-written --
+    # a silent success here would corrupt the app slot on the next commit.
+    for s in '' .verity .roothash .roothash.p7s; do
+        if ! cp "$img$s" "$dest_dir/.incoming.squashfs$s"; then
+            echo "slot-install[$RAUC_SLOT_NAME]: failed to stage $img$s" >&2
+            rm -f "$dest_dir/.incoming.squashfs" "$dest_dir/.incoming.squashfs.verity" \
+                  "$dest_dir/.incoming.squashfs.roothash" "$dest_dir/.incoming.squashfs.roothash.p7s"
+            exit 1
+        fi
+    done
     sync
     echo "slot-install[$RAUC_SLOT_NAME]: staged $img (+ 3 sidecars) to $dest_dir/.incoming.squashfs" >&2
     ;;
