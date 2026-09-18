@@ -4,7 +4,7 @@
 LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
-inherit kernel
+inherit kernel-yocto kernel
 
 SUMMARY = "Linux Kernel for F&S i.MX6/7/8/9-based boards and modules"
 
@@ -37,21 +37,6 @@ do_extraunpack () {
 }
 addtask do_extraunpack after do_unpack before do_patch
 
-kernel_do_configure:prepend() {
-
-	if [ -e ${UNPACKDIR}/custom_defconfig ]; then
-		install -m 0644 ${UNPACKDIR}/custom_defconfig ${WORKDIR}/defconfig
-	else
-		install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
-	fi
-	if [ -e ${WORKDIR}/*.cfg ]; then
-		# Apply config fragments
-		for file in "${WORKDIR}"/*.cfg; do
-			cat "$file" >> ${WORKDIR}/defconfig
-		done
-	fi
-}
-
 kernel_do_configure:append() {
 	rm -f ${B}/.scmversion ${S}/.scmversion
 }
@@ -66,3 +51,19 @@ kernel_do_deploy:append:mx8m-nxp-bsp() {
 	rm -f Image-${MACHINE}.bin
 	cd -
 }
+
+
+# Tell to kernel class that we would like to use our defconfig to configure the kernel.
+# Otherwise, the --allnoconfig would be used per default which leads to mis-configured
+# kernel.
+#
+# This behavior happens when a defconfig is provided, the kernel-yocto configuration
+# uses the filename as a trigger to use a 'allnoconfig' baseline before merging
+# the defconfig into the build.
+#
+# If the defconfig file was created with make_savedefconfig, not all options are
+# specified, and should be restored with their defaults, not set to 'n'.
+# To properly expand a defconfig like this, we need to specify: KCONFIG_MODE="--alldefconfig"
+# in the kernel recipe include.
+KCONFIG_MODE = "--alldefconfig"
+
