@@ -39,7 +39,7 @@ NEED_OPTEE = "${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'true', 'false',
 NEED_ATF = "${@bb.utils.contains_any('UBOOT_MAKE_TARGET', 'uboot.fs uboot-atf.fs', 'true', 'false', d)}"
 UBOOT_FILE = "${UBOOT_MAKE_TARGET}"
 
-FIRMWARE_DIR = "board/F+S/NXP-Firmware/${MACHINE}"
+FIRMWARE_DIR = "board/F+S/NXP-Firmware/${UBOOT_CONFIG_BASENAME}"
 
 inherit deploy
 
@@ -86,10 +86,10 @@ do_compile:prepend() {
 do_deploy:append() {
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/
 	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/
-	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
+	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${UBOOT_CONFIG_BASENAME}
 
 	for config in ${UBOOT_CONFIG}; do
-		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
+		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${UBOOT_CONFIG_BASENAME}
 		install -m 0644 ${B}/${config}_defconfig-${config}//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
 		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 	done
