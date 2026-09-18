@@ -50,7 +50,7 @@ POKY_DEFAULT_DISTRO_FEATURES_IMX_REMOVE:mx6-nxp-bsp ?= "wayland vulkan"
 POKY_DEFAULT_DISTRO_FEATURES_IMX_REMOVE:mx7-nxp-bsp ?= "wayland vulkan"
 DISTRO_FEATURES:remove = "pulseaudio"
 
-include conf/distro/include/cve-extra-exclusions.inc
+include conf/distro/include/fus-cve-exclusions.inc
 
 # SPDX_ORG = "F&S Elektronik Systeme GmbH (info@fs-net.de)"
 SPDX_PRETTY ?= "1"
