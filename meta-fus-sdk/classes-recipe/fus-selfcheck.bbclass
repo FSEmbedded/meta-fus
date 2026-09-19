@@ -567,9 +567,14 @@ $(grep FUS_LEGACY_IMAGE_SUPPORT "$hdr" || echo 'no such define')"
 # gone but a dynamic NEEDED entry would still show. Wire as a do_install
 # postfunc, only when legacy-images is NOT set.
 fus_selfcheck_no_botan_needed() {
-    so="${D}${libdir}/libfs_updater.so.1"
+    [ -n "${FUS_LIB_SOVERSION}" ] || bbfatal "fus-selfcheck: FUS_LIB_SOVERSION is not set"
+    so="${D}${libdir}/libfs_updater.so.${FUS_LIB_SOVERSION}"
     [ -f "$so" ] || bbfatal "fus-selfcheck: installed library not found: $so; \
 the NEEDED check cannot run"
+    if ! readelf -d "$so" | grep -q "SONAME.*\[libfs_updater.so.${FUS_LIB_SOVERSION}\]"; then
+        bbfatal "fus-selfcheck: $so does not carry the SONAME libfs_updater.so.${FUS_LIB_SOVERSION}; \
+the pinned library and FUS_LIB_SOVERSION have to move together."
+    fi
     if readelf -d "$so" | grep -q 'NEEDED.*libbotan'; then
         bbfatal "fus-selfcheck: $so links libbotan although legacy image support \
 is off; check the PACKAGECONFIG wiring in the lib recipe."

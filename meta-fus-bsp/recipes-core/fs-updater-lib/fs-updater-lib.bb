@@ -18,6 +18,9 @@ inherit cmake pkgconfig
 # the sibling CLI recipe's exit-code selfcheck fails the build if the pinned
 # pair does not implement the expected contract.
 SRCREV ?= "ab60a8e5248b3ca08f56737882ebe08ed493a857"
+# Shared-object version of the pinned library; the install check asserts it.
+# Moves together with SRCREV.
+FUS_LIB_SOVERSION ?= "1"
 
 FSUPLIB_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-lib.git;protocol=https"
 FSUPLIB_GIT_BRANCH ?= "master"
