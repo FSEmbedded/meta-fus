@@ -1,11 +1,6 @@
 # Copyright (C) 2024 F&S Elektronik Systeme GmbH
 # Released under the MIT license (see COPYING.MIT for the terms)
 
-# Enable building of examples
-PACKAGECONFIG += " \
-    examples \
-"
-
 # The function do_install_ptest_base needs big amount of RAM
 # Conditionally disable the do_install_ptest_base task with default value 1 for qtdeclarative
 # use python call because of warning (See YP bug #13808)
