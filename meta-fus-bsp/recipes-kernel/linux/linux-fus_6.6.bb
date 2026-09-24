@@ -10,7 +10,7 @@ do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
 
 SRCBRANCH="master"
 # v6.6.147-2.2.2-fus1.0
-SRCREV = "4f28516ba808cd34cee5705f2fe82d3dfe08092f"
+SRCREV = "8a79f86a72d825cf28756349b6a23d1d9db383ef"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
