@@ -64,6 +64,7 @@ inherit fus-selfcheck
 do_configure[prefuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', 'fus_selfcheck_botan2', '', d)}"
 do_configure[prefuncs] += "fus_selfcheck_lib_state_values"
 do_configure[prefuncs] += "fus_selfcheck_state_flows"
+do_configure[prefuncs] += "fus_selfcheck_component_version"
 do_configure[postfuncs] += "fus_selfcheck_lib_paths"
 do_configure[postfuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', '', 'fus_selfcheck_lib_legacy_off', d)}"
 do_install[postfuncs] += "${@bb.utils.contains('PACKAGECONFIG', 'legacy-images', '', 'fus_selfcheck_no_botan_needed', d)}"

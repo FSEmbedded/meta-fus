@@ -73,4 +73,5 @@ do_install:append:app-rootfs() {
 }
 
 inherit fus-selfcheck
+do_configure[prefuncs] += "fus_selfcheck_component_version"
 do_configure[postfuncs] += "fus_selfcheck_cli_exit_codes"

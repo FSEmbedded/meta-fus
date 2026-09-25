@@ -25,6 +25,10 @@ PV = "${FUS_COMPONENT_VERSION}+git${SRCPV}"
 
 inherit cmake pkgconfig systemd
 
+# the packaged version has to be the one the source declares.
+inherit fus-selfcheck
+do_configure[prefuncs] += "fus_selfcheck_component_version"
+
 DEPENDS = " \
     fs-updater-lib \
     systemd \

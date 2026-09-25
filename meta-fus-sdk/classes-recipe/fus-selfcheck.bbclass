@@ -860,6 +860,50 @@ number; re-verify BOTH against the new header before re-pinning the SRCREV."
     _pin UPDATER_COMMIT_STATE          LEGACY_STATE_MIGRATED      59
 }
 
+# Assert that the version this recipe packages is the version the source
+# declares. The two are written in different places by different hands: the
+# recipe's PV goes into the package feed and into what the device reports
+# through its package manager, while project(... VERSION ...) goes into the
+# binary and, for the CLI, into what --version prints. Nothing else connects
+# them -- there is no find_package version constraint, no SOVERSION, no test
+# that pins the number, and no consumer that compares it. A component whose
+# two numbers disagree therefore ships, and the disagreement surfaces only if
+# somebody happens to compare the two outputs on a board.
+#
+# Because every component in a release derives its PV from the same variable,
+# checking each one against its own source also holds them to each other: a
+# repository whose source was not bumped with the rest fails here rather than
+# reaching an image alongside components that were.
+#
+# Wire as a do_configure[prefuncs]. ${S} carries the fetched source from
+# do_unpack on, so the declaration is readable before configure runs.
+fus_selfcheck_component_version() {
+    cml="${S}/CMakeLists.txt"
+    [ -f "$cml" ] || bbfatal "fus-selfcheck: $cml not found; the packaged version \
+cannot be checked against the one the source declares"
+
+    src_ver=$(sed -n 's/.*project([[:space:]]*[A-Za-z0-9_-]*[[:space:]]*VERSION[[:space:]]*\([0-9][0-9.]*\).*/\1/p' \
+        "$cml" | head -1)
+    if [ -z "$src_ver" ]; then
+        bbfatal "fus-selfcheck: no project(... VERSION ...) in $cml; \
+this check cannot confirm what the source declares"
+    fi
+
+    # PV carries the source revision after a '+', which identifies the build;
+    # the part before it is the version this check is about. It has to be
+    # substituted whole and trimmed afterwards: a parameter expansion written
+    # into the braces is not a variable reference the build system recognises,
+    # so it survives into the task script, where the name it reads is unset and
+    # the check silently compares against nothing.
+    pv="${PV}"
+    pv_prefix=${pv%%+*}
+    if [ "$src_ver" != "$pv_prefix" ]; then
+        bbfatal "fus-selfcheck: version drift: the recipe packages $pv_prefix, \
+$cml declares $src_ver. Move both in one change -- the package feed and the \
+binary are read by different people and must not disagree."
+    fi
+}
+
 # Cross-unit /tmp visibility gate for the hawkBit -> fs-updater handoff:
 # the bridge downloads the bundle to a /tmp path and hands the PATH
 # STRING to the updater service over D-Bus -- only works while BOTH units
