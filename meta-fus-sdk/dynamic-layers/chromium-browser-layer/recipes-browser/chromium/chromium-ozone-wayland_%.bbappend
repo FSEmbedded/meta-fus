@@ -75,9 +75,11 @@ GN_ARGS:append:imx-nxp-bsp = " \
 DEPENDS:append = " pulseaudio"
 
 CHROMIUM_EXTRA_ARGS_ENABLE_ANGLE = ""
+CHROMIUM_EXTRA_ARGS_ENABLE_ANGLE:mx91-nxp-bsp = "--use-gl=angle --use-angle=gles-egl"
 CHROMIUM_EXTRA_ARGS_ENABLE_ANGLE:mx93-nxp-bsp = "--use-gl=angle --use-angle=gles-egl"
 CHROMIUM_EXTRA_ARGS_ENABLE_ANGLE:mx943-nxp-bsp = "--use-gl=angle --use-angle=gles-egl"
 
+CHROMIUM_EXTRA_ARGS:remove:mx91-nxp-bsp = "--use-gl=egl"
 CHROMIUM_EXTRA_ARGS:remove:mx93-nxp-bsp = "--use-gl=egl"
 CHROMIUM_EXTRA_ARGS:remove:mx943-nxp-bsp = "--use-gl=egl"
 
