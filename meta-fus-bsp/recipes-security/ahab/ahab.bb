@@ -41,7 +41,7 @@ python __anonymous () {
         d.setVarFlag(t, "nostamp", "1")
 }
 
-do_configure[depends] += " linux-fus:do_deploy "
+do_configure[depends] += " linux-fus:do_deploy u-boot-fus:do_deploy "
 do_configure() {
 	if [ ! -f ${DL_DIR}/crts.tar.gz ]; then
 		bbfatal "crts.tar.gz not found, exiting!"
