@@ -83,14 +83,14 @@ do_compile:prepend() {
 }
 
 do_deploy:append() {
-	install -d ${DEPLOY_DIR_IMAGE}/Firmware/
-	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/
-	install -d ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
+	install -d ${DEPLOYDIR}/Firmware/
+	install -d ${DEPLOYDIR}/Firmware/NXP-Firmware/
+	install -d ${DEPLOYDIR}/Firmware/NXP-Firmware/${MACHINE}
 
 	for config in ${UBOOT_CONFIG}; do
-		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOY_DIR_IMAGE}/Firmware/NXP-Firmware/${MACHINE}
-		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOY_DIR_IMAGE}/Firmware/uboot-${config}-${PV}.fs
-		cd ${DEPLOY_DIR_IMAGE}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
+		install -m 0644 ${S}/${FIRMWARE_DIR}/* ${DEPLOYDIR}/Firmware/NXP-Firmware/${MACHINE}
+		install -m 0644 ${B}/${config}_defconfig//${UBOOT_FILE} ${DEPLOYDIR}/Firmware/uboot-${config}-${PV}.fs
+		cd ${DEPLOYDIR}/Firmware/ && ln -sf uboot-${config}-${PV}.fs ./uboot-${config}.fs; cd -
 	done
 }
 
