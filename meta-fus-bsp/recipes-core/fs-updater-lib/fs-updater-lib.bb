@@ -22,7 +22,7 @@ SRCREV ?= "ab60a8e5248b3ca08f56737882ebe08ed493a857"
 # Moves together with SRCREV.
 FUS_LIB_SOVERSION ?= "1"
 
-FSUPLIB_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-lib.git;protocol=https"
+FSUPLIB_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-lib;protocol=https"
 FSUPLIB_GIT_BRANCH ?= "master"
 SRC_URI = "${FSUPLIB_SRC_URI};branch=${FSUPLIB_GIT_BRANCH}"
 

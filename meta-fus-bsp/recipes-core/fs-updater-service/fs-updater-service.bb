@@ -16,7 +16,7 @@ WARN_QA:append = " version-going-backwards"
 
 # v2.4.0, in lockstep with the library and the client (FUS_COMPONENT_VERSION).
 SRCREV ?= "6f97c3437c7a809e18714bca68fa1175017a0756"
-FSUPSERVICE_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-service.git;protocol=https"
+FSUPSERVICE_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-service;protocol=https"
 FSUPSERVICE_GIT_BRANCH ?= "master"
 SRC_URI = "${FSUPSERVICE_SRC_URI};branch=${FSUPSERVICE_GIT_BRANCH}"
 

@@ -11,7 +11,7 @@ FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 # carry the expected contract.
 SRCREV ?= "a760601da874bc2560d7388af9f140c5795799e3"
 
-FSUPCLI_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-cli.git;protocol=https"
+FSUPCLI_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-cli;protocol=https"
 FSUPCLI_GIT_BRANCH ?= "master"
 SRC_URI = " \
     ${FSUPCLI_SRC_URI};branch=${FSUPCLI_GIT_BRANCH} \
