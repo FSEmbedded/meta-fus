@@ -10,7 +10,7 @@ do_deploy[depends] += " linux-fus-debug:do_deploy_spdx"
 
 SRCBRANCH="master"
 # v6.6.147-2.2.2-fus1.0
-SRCREV = "8a79f86a72d825cf28756349b6a23d1d9db383ef"
+SRCREV = "62bcc6f58d725e9dd0611ec540d748e91837159e"
 
 # LINUX_VERSION define should match to the kernel version referenced by SRC_URI and
 # should be updated once patchlevel is merged.
@@ -26,4 +26,5 @@ KBUILD_DEFCONFIG:mx8mn-nxp-bsp = "fsimx8_defconfig"
 KBUILD_DEFCONFIG:mx8mp-nxp-bsp = "fsimx8_defconfig"
 KBUILD_DEFCONFIG:mx8ulp-nxp-bsp = "fsimx8ulp_defconfig"
 KBUILD_DEFCONFIG:mx93-nxp-bsp = "fsimx93_defconfig"
+KBUILD_DEFCONFIG:mx91-nxp-bsp = "fsimx93_defconfig"
 
