@@ -83,3 +83,6 @@ require conf/distro/include/fus-update-features.inc
 # If image is activated, we need to install the package containing the signed
 # Kernel and devicetrees
 IMAGE_INSTALL:append = "${@bb.utils.contains('DISTRO_FEATURES', 'fus-image-signing', ' linux-fus-signed-images', '', d)}"
+
+FS_KERNEL_HARDENING ??= "1"
+FS_KERNEL_DEBUG ??= "0"

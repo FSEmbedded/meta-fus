@@ -50,16 +50,33 @@ kernel_do_configure:prepend() {
 		install -m 0644 ${WORKDIR}/custom_defconfig ${WORKDIR}/defconfig
 	else
 		install -m 0644 ${S}/arch/${ARCH}/configs/${KBUILD_DEFCONFIG} ${WORKDIR}/defconfig
-	fi
-	if [ -e ${WORKDIR}/*.cfg ]; then
-		# Apply config fragments
-		for file in "${WORKDIR}"/*.cfg; do
-			cat "$file" >> ${WORKDIR}/defconfig
-		done
+        if [ "${FS_KERNEL_HARDENING}" = "1" ]; then
+            install -m 0644 ${S}/arch/${ARCH}/configs/fshardening.config  ${WORKDIR}/fshardening.cfg
+        else
+            rm -f ${WORKDIR}/fshardening.cfg
+        fi
+        if [ "${FS_KERNEL_DEBUG}" = "1" ]; then
+            install -m 0644 ${S}/arch/${ARCH}/configs/fsdebug.config  ${WORKDIR}/fsdebug.cfg
+        else
+            rm -f ${WORKDIR}/fsdebug.cfg
+        fi
 	fi
 }
 
 kernel_do_configure:append() {
+
+    cfgs=""
+
+    for file in ${WORKDIR}/*.cfg; do
+        [ -e "$file" ] || continue
+        cfgs="$cfgs $file"
+    done
+
+    ${S}/scripts/kconfig/merge_config.sh \
+        ${B}/.config $cfgs
+
+    oe_runmake olddefconfig
+
 	rm -f ${B}/.scmversion ${S}/.scmversion
 }
 
