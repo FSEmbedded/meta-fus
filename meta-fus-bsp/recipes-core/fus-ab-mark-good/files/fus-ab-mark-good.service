@@ -1,0 +1,16 @@
+[Unit]
+Description=Confirm the booted A/B slot
+# Same gates as rauc-mark-good.service: only on an A/B boot, and only once
+# every unit required by boot-complete.target has succeeded.
+ConditionKernelCommandLine=rauc.slot
+DefaultDependencies=no
+Requires=boot-complete.target
+After=boot-complete.target fus-uboot-env-setup.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/fus-ab-mark-good
+
+[Install]
+WantedBy=multi-user.target

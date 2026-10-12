@@ -1,0 +1,39 @@
+#!/bin/sh
+#
+# fus-ab-mark-good: confirm the booted A/B slot without the update framework.
+#
+# Resets the slot's U-Boot boot-attempt counter to the budget, as rauc's
+# U-Boot backend does on mark-good. BOOT_ORDER is left as it is. The counter
+# is written only when it differs, so a settled board writes nothing.
+#
+# Exit codes: 0 ok, 1 no A/B slot on the kernel command line, otherwise the
+# failing fw_setenv's
+
+set -u
+
+FUS_PROC_CMDLINE="${FUS_PROC_CMDLINE:-/proc/cmdline}"
+# U-Boot's initial value for both counters.
+ATTEMPTS=3
+
+cmdline=
+read -r cmdline 2> /dev/null < "${FUS_PROC_CMDLINE}" || :
+slot=
+for tok in ${cmdline}; do
+    case "${tok}" in
+        rauc.slot=*) slot=${tok#rauc.slot=} ;;
+        *) ;;
+    esac
+done
+
+case "${slot}" in
+    A | a) slot=A ;;
+    B | b) slot=B ;;
+    *)
+        echo "fus-ab-mark-good: no A/B slot on the kernel command line ('${slot}')" >&2
+        exit 1
+        ;;
+esac
+
+var="BOOT_${slot}_LEFT"
+[ "$(fw_printenv -n "${var}" 2> /dev/null)" = "${ATTEMPTS}" ] && exit 0
+fw_setenv "${var}" "${ATTEMPTS}"
