@@ -47,7 +47,7 @@ SQUASHFS_EXTRA_IMAGECMD ?= "-comp ${SQUASHFS_COMPRESSOR} -Xcompression-level 19"
 # pins the same certificate.
 
 # Rebuild when the signing material changes (external, not a SRC_URI input).
-do_image[file-checksums] += "${FUS_APP_CONTAINER_SIGN_KEY}:False ${FUS_APP_CONTAINER_SIGN_CERT}:False"
+do_image[file-checksums] += "${@fus_file_checksums(d, 'FUS_APP_CONTAINER_SIGN_KEY', 'FUS_APP_CONTAINER_SIGN_CERT')}"
 
 fus_app_container_build() {
     set -e

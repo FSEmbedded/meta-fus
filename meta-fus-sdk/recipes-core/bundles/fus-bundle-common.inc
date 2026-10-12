@@ -89,9 +89,9 @@ RAUC_KEYRING_FILE ?= "${FUS_UPDATE_KEYRING_FILE}"
 RAUC_KEY_FILE     ?= "${FUS_UPDATE_SIGN_KEY_FILE}"
 RAUC_CERT_FILE    ?= "${FUS_UPDATE_SIGN_CERT_FILE}"
 
-# Rebuild if the keyring changes (cert+key are already tracked by
-# bundle.bbclass; the keyring is our addition).
-do_bundle[file-checksums] += "${RAUC_KEYRING_FILE}:False"
+# Rebuild when the signing material changes. meta-rauc lists cert and key as
+# ":False", which bitbake skips, so they are listed here by content as well.
+do_bundle[file-checksums] += "${@fus_file_checksums(d, 'RAUC_KEYRING_FILE', 'RAUC_KEY_FILE', 'RAUC_CERT_FILE')}"
 
 # Fail with clear guidance if the signing material is absent (task-time,
 # before signing), instead of a cryptic openssl error.

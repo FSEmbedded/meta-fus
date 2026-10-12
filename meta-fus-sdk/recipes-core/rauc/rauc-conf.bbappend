@@ -144,7 +144,7 @@ be trusted."
 FILES:${PN} += "${sysconfdir}/fw_version ${nonarch_libdir}/rauc"
 
 # Rebuild when the external keyring changes (it is not a SRC_URI input).
-do_install[file-checksums] += "${FUS_UPDATE_KEYRING_FILE}:False"
+do_install[file-checksums] += "${@fus_file_checksums(d, 'FUS_UPDATE_KEYRING_FILE')}"
 
 # Build-time guard: assert the GENERATED slot graph matches BOTH mode
 # dimensions (boot: parent=/bootname graph; app: appfs slots vs artifact repo

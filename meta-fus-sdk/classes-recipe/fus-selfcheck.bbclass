@@ -217,6 +217,21 @@ out of band first, e.g.: meta-fus-sdk/scripts/fus-update-gen-certs.sh"
     done
 }
 
+# [file-checksums] entries for signing material, which is no SRC_URI input.
+# An existing file is marked ":True", so its content is part of the task hash
+# and a rotated file reruns the task; bitbake skips ":False" entries, so a
+# missing file is only watched for appearing. Empty values and PKCS#11 URIs
+# give no entry. Usage:
+#   do_install[file-checksums] += "${@fus_file_checksums(d, 'VAR', ...)}"
+def fus_file_checksums(d, *names):
+    import os
+    entries = []
+    for name in names:
+        path = d.getVar(name) or ""
+        if path and not path.startswith("pkcs11:"):
+            entries.append("%s:%s" % (path, os.path.exists(path)))
+    return " ".join(entries)
+
 # The gate for a production build, and it points the way round from the obvious
 # one: it is not "production must not use dev keys" as a wish, it is a build
 # that CLAIMS to be production and is handed development material stopping right

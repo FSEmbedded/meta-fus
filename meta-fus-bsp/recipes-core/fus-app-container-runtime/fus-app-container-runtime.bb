@@ -56,7 +56,7 @@ SYSTEMD_SERVICE:${PN} = " \
 # directory, and this recipe does its own veritysetup-based verification.
 VERITY_CERT ?= "${FUS_APP_CONTAINER_SIGN_CERT}"
 # rebuild when the external, non-SRC_URI signing material rotates.
-do_install[file-checksums] += "${VERITY_CERT}:False"
+do_install[file-checksums] += "${@fus_file_checksums(d, 'VERITY_CERT')}"
 
 do_install() {
     fus_selfcheck_signing_material "fus-app-container-runtime (verity cert)" "${VERITY_CERT}"
