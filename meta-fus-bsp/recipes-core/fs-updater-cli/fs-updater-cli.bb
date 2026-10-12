@@ -27,7 +27,8 @@ PV = "${FUS_COMPONENT_VERSION}+git${SRCPV}"
 ERROR_QA:remove = "version-going-backwards"
 WARN_QA:append = " version-going-backwards"
 
-inherit cmake pkgconfig
+inherit cmake pkgconfig features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 DEPENDS = " \
     libubootenv \

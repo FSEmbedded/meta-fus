@@ -21,7 +21,8 @@ SRC_URI = " \
 S = "${WORKDIR}"
 
 # allarch: shell + units + a text cert, no arch-specific content.
-inherit allarch systemd fus-selfcheck
+inherit allarch systemd fus-selfcheck features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # Build-time contract test for the boot guard, host side; nothing test-related
 # is installed or shipped. The harness and the predicate library live with the

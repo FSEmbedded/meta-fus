@@ -15,7 +15,8 @@ SRC_URI = " \
 
 S = "${WORKDIR}"
 
-inherit systemd allarch fus-selfcheck
+inherit systemd allarch fus-selfcheck features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # The door delegates to the updater CLI, so this package only makes sense where
 # that door is the one the image was built with.

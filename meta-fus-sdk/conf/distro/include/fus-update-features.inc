@@ -10,7 +10,7 @@
 # visible to the non-image recipes that template against it.
 require conf/include/fus-update-layout.inc
 
-DISTRO_FEATURES:append = " overlayfs systemd rauc fus-update-ab"
+DISTRO_FEATURES:append = " overlayfs systemd rauc fus-update-ab fus-update"
 
 # A/B is in effect where the distro wants it and the machine can do it
 # (fus-update-ab in COMBINED_FEATURES; the machine side comes from
@@ -19,6 +19,12 @@ DISTRO_FEATURES:append = " overlayfs systemd rauc fus-update-ab"
 # it, or packages of one arch differ between machines. No DISTRO_FEATURES or
 # MACHINE_FEATURES assignment may carry it, or the override depends on itself.
 DISTROOVERRIDES:append = "${@'' if bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', True, False, d) else ':fus-no-ab'}"
+
+# The update framework runs on top of A/B: where A/B is not in effect, or the
+# distro drops "fus-update", the override "fus-no-update" is active, with the
+# same machine-arch-only rule. Computed from the features, not from the
+# override above, so neither override depends on the other.
+DISTROOVERRIDES:append = "${@'' if bb.utils.filter('COMBINED_FEATURES', 'fus-update-ab', d) and bb.utils.filter('DISTRO_FEATURES', 'fus-update', d) else ':fus-no-update'}"
 
 # switch init manager to systemd; overlayfs.bbclass requires systemd.
 VIRTUAL-RUNTIME_init_manager ?= "systemd"

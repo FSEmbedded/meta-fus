@@ -19,6 +19,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 # Before bundle, so the skip runs ahead of its slot resolution.
 inherit features_check bundle fus-selfcheck
 REQUIRED_COMBINED_FEATURES = "fus-update-ab"
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # Without the update policy the layout variables are empty, and the bundle
 # class then reports an unresolved slot name -- a message that points nowhere.

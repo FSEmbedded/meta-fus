@@ -14,7 +14,8 @@ SRC_URI = " \
 "
 S = "${WORKDIR}"
 
-inherit allarch systemd
+inherit allarch systemd features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 SYSTEMD_SERVICE:${PN} = "fus-health-check.service fus-health-confirm.timer"
 RDEPENDS:${PN} += "systemd rauc-mark-good"
 

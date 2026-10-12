@@ -23,7 +23,8 @@ SRC_URI = "${FSUPSERVICE_SRC_URI};branch=${FSUPSERVICE_GIT_BRANCH}"
 S = "${WORKDIR}/git"
 PV = "${FUS_COMPONENT_VERSION}+git${SRCPV}"
 
-inherit cmake pkgconfig systemd
+inherit cmake pkgconfig systemd features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # the packaged version has to be the one the source declares.
 inherit fus-selfcheck

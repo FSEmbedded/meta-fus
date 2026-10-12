@@ -17,7 +17,9 @@ NO_RECOMMENDATIONS = "1"
 # byte-deterministic so the post-install read-back verification works.
 IMAGE_FSTYPES            = "squashfs"
 
-inherit image fus-selfcheck
+inherit image fus-selfcheck features_check
+REQUIRED_COMBINED_FEATURES = "fus-update-ab"
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # app-payload contract check; slot mode has no squashfs+verity postprocess
 # class (unlike container), so wire it directly over this image's rootfs.

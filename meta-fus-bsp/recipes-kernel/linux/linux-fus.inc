@@ -63,6 +63,8 @@ kernel_do_configure:append() {
 # app image, squashfs rootfs, overlayfs /etc) where A/B is in effect; a
 # defconfig drift otherwise only shows up when the device fails to mount.
 FUS_SELFCHECK_KCONFIG = "CONFIG_DM_VERITY CONFIG_SQUASHFS CONFIG_OVERLAY_FS"
+# Verity serves the update framework only.
+FUS_SELFCHECK_KCONFIG:remove:fus-no-update = "CONFIG_DM_VERITY"
 do_configure[postfuncs] += "${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus_selfcheck_kconfig', '', d)}"
 
 # Rename kernel image to be confirmed with naming convention

@@ -9,7 +9,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 SRC_URI = "file://fus-app-mount file://fus-app-mount.service"
 S = "${WORKDIR}"
 
-inherit systemd allarch
+inherit systemd allarch features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 SYSTEMD_SERVICE:${PN} = "fus-app-mount.service"
 SYSTEMD_AUTO_ENABLE = "enable"

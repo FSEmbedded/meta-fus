@@ -22,7 +22,9 @@ NO_RECOMMENDATIONS = "1"
 # fus-app-container.bbclass postprocess step.
 IMAGE_FSTYPES = ""
 
-inherit image fus-app-container
+inherit image fus-app-container features_check
+REQUIRED_COMBINED_FEATURES = "fus-update-ab"
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # cyclonedx-export deploys a shared bom.json that would collide with the
 # system image's; the app payload's SBOM is covered by the combined image.

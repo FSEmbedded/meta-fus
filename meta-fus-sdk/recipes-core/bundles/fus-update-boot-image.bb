@@ -10,6 +10,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 inherit deploy nopackages features_check
 REQUIRED_COMBINED_FEATURES = "fus-update-ab"
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 require conf/include/fus-update-layout.inc
 

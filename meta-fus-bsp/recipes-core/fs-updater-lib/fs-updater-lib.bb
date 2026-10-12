@@ -12,7 +12,8 @@ SECTION = "libs"
 ERROR_QA:remove = "version-going-backwards"
 WARN_QA:append = " version-going-backwards"
 
-inherit cmake pkgconfig
+inherit cmake pkgconfig features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # v2.4.0. library, client and service move together (FUS_COMPONENT_VERSION);
 # the sibling CLI recipe's exit-code selfcheck fails the build if the pinned

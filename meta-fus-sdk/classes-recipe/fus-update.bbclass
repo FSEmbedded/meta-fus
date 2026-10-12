@@ -165,7 +165,11 @@ IMAGE_FEATURES:append           = " read-only-rootfs overlayfs-etc"
 
 # every fus-update image gets the A/B runtime floor; the example app and
 # the per-mode mechanism are image-level choices and not pulled here.
-IMAGE_INSTALL:append            = " packagegroup-fus-update-base"
+# without the update framework the slot floor stays, and a small unit
+# confirms the booted slot in place of rauc-mark-good.
+FUS_UPDATE_RUNTIME = "packagegroup-fus-update-base"
+FUS_UPDATE_RUNTIME:fus-no-update = "packagegroup-fus-ab-base fus-ab-mark-good"
+IMAGE_INSTALL:append            = " ${FUS_UPDATE_RUNTIME}"
 
 # opt-in health layer, mode-invariant.
 IMAGE_INSTALL:append            = " ${@bb.utils.contains('FUS_UPDATE_HEALTH', '1', 'fus-health', '', d)}"
@@ -208,8 +212,9 @@ python __anonymous() {
 
     # distro policy — owned by fus-update-features.inc, not this class.
     distro_features = (d.getVar("DISTRO_FEATURES") or "").split()
-    missing_distro = [f for f in ("overlayfs", "systemd", "rauc")
-                      if f not in distro_features]
+    # rauc only where the update framework is in effect.
+    wanted_distro = ["overlayfs", "systemd"] + (["rauc"] if "fus-update" in distro_features else [])
+    missing_distro = [f for f in wanted_distro if f not in distro_features]
     if missing_distro:
         bb.fatal(
             "fus-update.bbclass: DISTRO_FEATURES missing %s. they come with "

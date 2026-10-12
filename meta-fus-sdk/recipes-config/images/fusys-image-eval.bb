@@ -94,10 +94,12 @@ IMAGE_INSTALL:append:app-rootfs = " ${FUS_UPDATE_APP_PACKAGES}"
 # labelled medium with nobody logged in.
 IMAGE_INSTALL:append = "${@bb.utils.contains('FUS_UPDATE_INSTALL_DOOR', 'fsupdater', ' fus-usb-update', '', d)}"
 
-# Without A/B the rootfs is writable: a package manager works, and the update
-# mechanism above has nothing to drive.
+# Without A/B the rootfs is writable: a package manager works, and the app
+# delivery above has nothing to drive. Without the update framework the update
+# clients have nothing to drive either.
 IMAGE_FEATURES:append:fus-no-ab = " package-management"
-IMAGE_INSTALL:remove:fus-no-ab = "packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} rauc-hawkbit-updater ${FUS_UPDATE_APP_PACKAGES} fus-usb-update"
+IMAGE_INSTALL:remove:fus-no-ab = "packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} ${FUS_UPDATE_APP_PACKAGES}"
+IMAGE_INSTALL:remove:fus-no-update = "rauc-hawkbit-updater fus-usb-update"
 
 set_fus_release_version() {
 

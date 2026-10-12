@@ -10,8 +10,8 @@ LICENSE = "MIT"
 # bare core image + the A/B machinery where A/B is in effect; elsewhere a
 # plain core image with the machine's own layout. fus-update.bbclass
 # enforces read-only-rootfs + overlayfs-etc and pulls the A/B runtime
-# floor. does not require the vendor evaluation image, so none of its
-# payload comes along.
+# floor, with RAUC on top where the update framework is on. does not
+# require the vendor evaluation image, so none of its payload comes along.
 inherit core-image
 # Plain inherit, not inherit_defer: the class must apply ahead of this
 # recipe's body and of the images that require it.

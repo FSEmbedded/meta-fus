@@ -27,7 +27,8 @@ SRC_URI = " \
 S = "${WORKDIR}"
 
 # allarch: shell + units only, no arch-specific content.
-inherit allarch systemd
+inherit allarch systemd features_check
+REQUIRED_DISTRO_FEATURES = "fus-update"
 
 # host-side contract tests; nothing test-related is installed or shipped. The
 # second one covers the verbs. Its boot-guard cases need the container runtime,
