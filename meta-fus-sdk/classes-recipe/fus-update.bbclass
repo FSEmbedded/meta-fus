@@ -114,9 +114,6 @@ ROOTFS_POSTPROCESS_COMMAND:append:app-container = " fus_selfcheck_health_probe;"
 ROOTFS_POSTPROCESS_COMMAND:append:app-container = " fus_selfcheck_install_door;"
 # door-gated, not mode-gated: rootfs mode takes the same confirm door.
 ROOTFS_POSTPROCESS_COMMAND:append = "${@bb.utils.contains('FUS_UPDATE_INSTALL_DOOR', 'fsupdater', ' fus_selfcheck_confirm_ordering;', '', d)}"
-# rootfs mode: the payload rides the main rootfs, so its contract is
-# checked here; the other modes assert it from their app-image build.
-ROOTFS_POSTPROCESS_COMMAND:append:app-rootfs    = " fus_selfcheck_app_payload;"
 
 # ── kernel + DTBs into rootfs /boot (boot mode rootfs only) ─────────
 # no BOOT_A/B partitions in this mode; U-Boot loads kernel and DTB from

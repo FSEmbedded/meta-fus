@@ -85,6 +85,9 @@ IMAGE_INSTALL:append = " systemd-analyze"
 # client.
 IMAGE_INSTALL:append            = " packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} rauc-hawkbit-updater"
 IMAGE_INSTALL:append:app-rootfs = " ${FUS_UPDATE_APP_PACKAGES}"
+# rootfs mode: the payload rides this rootfs, so its contract is
+# checked here; the other modes assert it from their app-image build.
+ROOTFS_POSTPROCESS_COMMAND:append:app-rootfs = " fus_selfcheck_app_payload;"
 
 # the removable-medium door. gated on the door this image is built with: the
 # package drives the updater CLI, and its recipe skips itself where that door
@@ -100,6 +103,7 @@ IMAGE_INSTALL:append = "${@bb.utils.contains('FUS_UPDATE_INSTALL_DOOR', 'fsupdat
 IMAGE_FEATURES:append:fus-no-ab = " package-management"
 IMAGE_INSTALL:remove:fus-no-ab = "packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} ${FUS_UPDATE_APP_PACKAGES}"
 IMAGE_INSTALL:remove:fus-no-update = "rauc-hawkbit-updater fus-usb-update"
+ROOTFS_POSTPROCESS_COMMAND:remove:fus-no-ab = "fus_selfcheck_app_payload;"
 
 set_fus_release_version() {
 
