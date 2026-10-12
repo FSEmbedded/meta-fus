@@ -16,7 +16,8 @@ SRC_URI = " \
 "
 S = "${WORKDIR}"
 
-inherit systemd
+inherit systemd features_check
+REQUIRED_COMBINED_FEATURES = "fus-update-ab"
 
 # the template bakes the machine's FUS_ENV_* values.
 PACKAGE_ARCH = "${MACHINE_ARCH}"

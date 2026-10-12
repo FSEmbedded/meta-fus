@@ -7,12 +7,15 @@ application. Product images `require` this and add their own application. The \
 build-wide hardening (security flags) comes with the distro."
 LICENSE = "MIT"
 
-# bare core image + the A/B machinery. fus-update.bbclass enforces
-# read-only-rootfs + overlayfs-etc and pulls the A/B runtime floor. does
-# not require the vendor evaluation image, so none of its payload comes
-# along.
+# bare core image + the A/B machinery where A/B is in effect; elsewhere a
+# plain core image with the machine's own layout. fus-update.bbclass
+# enforces read-only-rootfs + overlayfs-etc and pulls the A/B runtime
+# floor. does not require the vendor evaluation image, so none of its
+# payload comes along.
 inherit core-image
-inherit fus-update
+# Plain inherit, not inherit_defer: the class must apply ahead of this
+# recipe's body and of the images that require it.
+inherit ${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus-update', '', d)}
 
 IMAGE_LINGUAS = ""
 

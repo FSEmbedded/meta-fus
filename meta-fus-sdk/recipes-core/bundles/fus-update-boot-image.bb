@@ -8,7 +8,8 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 # and the install can be verified by read-back. partition size comes from
 # the shared layout contract.
 
-inherit deploy nopackages
+inherit deploy nopackages features_check
+REQUIRED_COMBINED_FEATURES = "fus-update-ab"
 
 require conf/include/fus-update-layout.inc
 

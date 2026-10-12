@@ -5,6 +5,8 @@ LICENSE = "GPL-2.0-only"
 LIC_FILES_CHKSUM = "file://COPYING;md5=6bc538ed5bd9a7fc9398086aedcd7e46"
 
 inherit kernel
+# fus-selfcheck lives in meta-fus-sdk: inherit it only where A/B is in effect.
+inherit_defer ${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus-selfcheck', '', d)}
 
 SUMMARY = "Linux Kernel for F&S i.MX6/7/8/9-based boards and modules"
 
@@ -56,6 +58,12 @@ kernel_do_configure:prepend() {
 kernel_do_configure:append() {
 	rm -f ${B}/.scmversion ${S}/.scmversion
 }
+
+# assert the built .config carries the RAUC A/B prerequisites (dm-verity
+# app image, squashfs rootfs, overlayfs /etc) where A/B is in effect; a
+# defconfig drift otherwise only shows up when the device fails to mount.
+FUS_SELFCHECK_KCONFIG = "CONFIG_DM_VERITY CONFIG_SQUASHFS CONFIG_OVERLAY_FS"
+do_configure[postfuncs] += "${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus_selfcheck_kconfig', '', d)}"
 
 # Rename kernel image to be confirmed with naming convention
 # for iMX8M based boards

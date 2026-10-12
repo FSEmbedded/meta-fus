@@ -172,14 +172,14 @@ IMAGE_INSTALL:append            = " ${@bb.utils.contains('FUS_UPDATE_HEALTH', '1
 
 # ── validation ──────────────────────────────────────────────────────
 python __anonymous() {
-    # machine capability — owned by fus-update-emmc.inc, not this class. skip
+    # A/B in effect: the distro wants it and the machine can do it. skip
     # rather than fail: an anonymous fatal would stop every parse for the
     # machine, including builds this image has nothing to do with.
-    if not bb.utils.contains("MACHINE_FEATURES", "fus-update-ab", True, False, d):
+    if not bb.utils.contains("COMBINED_FEATURES", "fus-update-ab", True, False, d):
         raise bb.parse.SkipRecipe(
-            "machine %s does not declare update support -- the A/B update is available on the\n"
-            "eMMC boards whose machine conf requires conf/machine/include/fus-update-emmc.inc;\n"
-            "NAND boards are not supported" % d.getVar("MACHINE"))
+            "A/B update not in effect for machine %s -- it needs 'fus-update-ab' in\n"
+            "DISTRO_FEATURES (fus-update-features.inc) and in MACHINE_FEATURES\n"
+            "(conf/machine/include/fus-update-emmc.inc)" % d.getVar("MACHINE"))
 
     # image-level variables that must resolve to something non-empty, each with
     # the place that provides it. an empty value is nearly always a missing
