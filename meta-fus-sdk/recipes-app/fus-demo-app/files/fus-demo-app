@@ -1,8 +1,8 @@
 #!/bin/sh
 # Example application payload: a long-running Type=notify service with a
 # fault-injection switch, so a degraded application and the platform's
-# response to one can be demonstrated. Touch the flag on the active slot's
-# /data and reboot to make this exit unhealthy.
+# response to one can be demonstrated. Touch the flag in /data and
+# reboot to make this exit unhealthy.
 ver="@@VERSION@@"
 src=$(findmnt -no SOURCE @@APP_MOUNT@@ 2>/dev/null || echo "not a mount")
 if [ -e /data/fus-app-fault ]; then
@@ -11,4 +11,12 @@ if [ -e /data/fus-app-fault ]; then
 fi
 echo "fus-demo-app v${ver} running from @@APP_MOUNT@@ (${src})"
 systemd-notify --ready --status="healthy"
+# Running healthy is this app's verdict: commit whatever update is pending
+# (app, firmware or both). /data/fus-app-no-commit holds it for rollback tests.
+if [ -e /data/fus-app-no-commit ]; then
+    echo "fus-demo-app: commit held (/data/fus-app-no-commit)"
+else
+    echo "fus-demo-app: commit -> $(busctl call de.fsembedded.fsupdate1 \
+        /de/fsembedded/fsupdate1 de.fsembedded.fsupdate1 Commit 2>&1)"
+fi
 exec sleep infinity
