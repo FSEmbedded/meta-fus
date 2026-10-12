@@ -182,7 +182,8 @@ python __anonymous() {
     if not bb.utils.contains("COMBINED_FEATURES", "fus-update-ab", True, False, d):
         raise bb.parse.SkipRecipe(
             "A/B update not in effect for machine %s -- it needs 'fus-update-ab' in\n"
-            "DISTRO_FEATURES (fus-update-features.inc) and in MACHINE_FEATURES\n"
+            "DISTRO_FEATURES (fus-update-features.inc, off with FUS_UPDATE_AB = \"0\")\n"
+            "and in MACHINE_FEATURES "
             "(conf/machine/include/fus-update-emmc.inc)" % d.getVar("MACHINE"))
 
     # image-level variables that must resolve to something non-empty, each with

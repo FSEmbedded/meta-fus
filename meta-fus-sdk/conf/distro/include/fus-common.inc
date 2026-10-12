@@ -75,7 +75,7 @@ CYCLONEDX_EXTRA_RUNTIME_RECIPES += " u-boot-fus"
 # keep the export next to the image it describes: per machine and per image.
 CYCLONEDX_EXPORT_DIR = "${DEPLOY_DIR_IMAGE}/cyclonedx-export/${IMAGE_BASENAME}"
 
-# Policy: what every distro of this family guarantees. The A/B update
-# channel is what makes security updates deliverable over the support
-# period. `require` so a wrong path fails the parse.
+# Policy: the A/B update channel, which makes security updates deliverable
+# over the support period. On by default; FUS_UPDATE_AB and FUS_UPDATE turn
+# it off. `require` so a wrong path fails the parse.
 require conf/distro/include/fus-update-features.inc

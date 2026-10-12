@@ -95,6 +95,19 @@ python () {
     if mode not in ('slot', 'rootfs', 'container'):
         bb.fatal("FUS_UPDATE_APP_MODE='%s' is invalid; use slot, rootfs or container" % mode)
 
+    # The switches (fus-update-features.inc). Checked on every machine, so a
+    # local.conf that only works where A/B is in effect fails everywhere.
+    ab = bb.utils.to_boolean(d.getVar('FUS_UPDATE_AB'), True)
+    update = bb.utils.to_boolean(d.getVar('FUS_UPDATE'), True)
+    if update and not ab:
+        bb.fatal("FUS_UPDATE = \"1\" needs FUS_UPDATE_AB = \"1\": the update framework runs on the A/B slots")
+    if not update and mode != 'rootfs':
+        bb.fatal("FUS_UPDATE_APP_MODE='%s' needs the update framework; without it only "
+                 "'rootfs' is left (set FUS_UPDATE_APP_MODE = \"rootfs\" and "
+                 "FUS_UPDATE_BOOT_MODE = \"rootfs\")" % mode)
+    if not update and d.getVar('FUS_UPDATE_HEALTH') == '1':
+        bb.fatal("FUS_UPDATE_HEALTH = \"1\" needs the update framework (FUS_UPDATE = \"1\")")
+
     boot_mode = d.getVar('FUS_UPDATE_BOOT_MODE')
     if boot_mode not in ('slot', 'rootfs'):
         bb.fatal("FUS_UPDATE_BOOT_MODE='%s' is invalid; use slot or rootfs" % boot_mode)

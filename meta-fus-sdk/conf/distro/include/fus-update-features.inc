@@ -1,7 +1,7 @@
 # distro feature policy for the F&S A/B update configuration. required by every
-# distro of this family, so each one ships the update channel: that is what makes
-# security updates deliverable over the support period, and the DISTRO name then
-# identifies one known configuration in the build metadata.
+# distro of this family, so each one ships the update channel by default: that
+# is what makes security updates deliverable over the support period.
+# FUS_UPDATE_AB and FUS_UPDATE (end of this file) turn it off.
 #
 # a build on a foreign distro (the qemuarm64 oeqa multiconfig, for one) does not
 # get it that way and must require this file itself.
@@ -114,3 +114,18 @@ FUS_UPDATE_HAWKBIT_SSL    ?= "false"
 # the image. a server with a self-signed or private-CA certificate needs
 # that CA in the image, or this set to "false" for a lab setup.
 FUS_UPDATE_HAWKBIT_SSL_VERIFY ?= "true"
+
+# --- build switches ----------------------------------------------------------
+# set in local.conf (or a -r file; a -R file comes too late):
+#   FUS_UPDATE_AB = "0"  every machine without A/B: plain core and eval images
+#                        on the vendor partition layout, no update framework.
+#   FUS_UPDATE = "0"     A/B slots stay, the update framework (RAUC, fs-updater,
+#                        bundles) goes; fus-ab-mark-good confirms the slot.
+# FUS_UPDATE follows FUS_UPDATE_AB unless set; FUS_UPDATE = "1" without A/B is
+# fatal (fus-update-layout.inc). only these switches may decide what the two
+# includes change, never the machine: those are distro-wide values that
+# shared-arch packages are built from.
+FUS_UPDATE_AB ?= "1"
+FUS_UPDATE ?= "${FUS_UPDATE_AB}"
+require ${@'' if bb.utils.to_boolean(d.getVar('FUS_UPDATE_AB'), True) else 'conf/distro/include/fus-no-ab.inc'}
+require ${@'' if bb.utils.to_boolean(d.getVar('FUS_UPDATE'), True) else 'conf/distro/include/fus-no-update.inc'}
