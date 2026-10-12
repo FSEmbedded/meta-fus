@@ -84,4 +84,8 @@ print_usage()
 	echo "  bitbake fusys-image-eval     Build F&S evaluation image (Weston, A/B update)"
 	echo "  bitbake fusys-image-core     Build the minimal hardened production base"
 	echo
+	echo "A/B slots and the update framework are on by default. In"
+	echo "conf/local.conf, FUS_UPDATE_AB = \"0\" turns both off, and"
+	echo "FUS_UPDATE = \"0\" keeps the slots without the update framework."
+	echo
 }

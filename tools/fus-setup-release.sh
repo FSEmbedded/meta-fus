@@ -165,9 +165,6 @@ else
 	echo >> conf/local.conf
 	add_config "# Switch to Debian packaging"
 	add_config "PACKAGE_CLASSES = \"package_deb\""
-	# The update images have a read-only rootfs and refuse package-management;
-	# enabling it here would fail every image build.
-	#add_config "EXTRA_IMAGE_FEATURES += \"package-management\""
 
 	if [ ! -e $BUILD_DIR/conf/bblayers.conf.org ]; then
 		cp $BUILD_DIR/conf/bblayers.conf $BUILD_DIR/conf/bblayers.conf.org
@@ -182,10 +179,7 @@ else
 	add_layer "meta-fus-nboot"
 	add_layer "meta-silex-fus"
 
-	add_config "DISTRO_FEATURES:append =  \" rauc\""
 	add_layer "meta-rauc"
-	add_layer "meta-fus-updater"
-	add_layer "meta-fus-updater-azure"
 
 
 
