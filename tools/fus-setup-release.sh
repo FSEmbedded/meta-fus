@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
 	case $1 in
 		-h|--help)
 			print_usage
-			return 1
+			return 2
 			;;
 		-b)
 			BUILD_DIR="$2"
@@ -105,8 +105,15 @@ while [[ $# -gt 0 ]]; do
 done
 }
 
-# A non-zero return asks to stop: leave the sourced script, not the shell
-parse_arguments "$@" || { set +e; return 0 2>/dev/null || exit 0; }
+# Help (status 0) and unknown options (status 1) stop the setup. The script is
+# sourced, so leave errexit off in the caller's shell and fall back to exit if
+# it is run directly.
+# shellcheck disable=SC2317 # exit is reached when the script is run, not sourced
+parse_arguments "$@" || {
+	parse_rc=$(( $? == 2 ? 0 : 1 ))
+	set +e
+	return "$parse_rc" 2>/dev/null || exit "$parse_rc"
+}
 
 if [ -z "$BUILD_DIR" ]; then
 	BUILD_DIR=build-$MACHINE-$DISTRO
