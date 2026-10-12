@@ -217,6 +217,32 @@ out of band first, e.g.: meta-fus-sdk/scripts/fus-update-gen-certs.sh"
     done
 }
 
+# A development build may go without the material a device only needs to
+# accept updates: the image boots, and every update is rejected until the
+# material is there. True when the variant is dev, the value is no PKCS#11
+# URI and no such file exists; the caller then leaves the file out instead of
+# running its gate. Argument-taking:
+#   fus_selfcheck_dev_material_absent <cert-variant> <material>
+fus_selfcheck_dev_material_absent() {
+    [ "$1" = "dev" ] || return 1
+    case "$2" in
+    pkcs11:*) return 1 ;;
+    esac
+    [ ! -e "$2" ]
+}
+
+# Warn when an image with the update client carries no update keyring, or
+# only the link a keyring-less development build leaves. -L comes first: -e
+# follows the absolute link, which here would point into the build host.
+fus_selfcheck_update_keyring() {
+    ca=${IMAGE_ROOTFS}${nonarch_libdir}/rauc/ca.cert.pem
+    if [ -f ${IMAGE_ROOTFS}${nonarch_libdir}/rauc/system.conf ] && { [ -L "$ca" ] || [ ! -e "$ca" ]; }; then
+        bbwarn "No update keyring in this image: it boots, but every update bundle is \
+rejected (failed to load CA file), and in container mode no signed app container \
+is mounted. Generate the signing material, e.g. ./docker-bb.sh certs, and rebuild."
+    fi
+}
+
 # [file-checksums] entries for signing material, which is no SRC_URI input.
 # An existing file is marked ":True", so its content is part of the task hash
 # and a rotated file reruns the task; bitbake skips ":False" entries, so a

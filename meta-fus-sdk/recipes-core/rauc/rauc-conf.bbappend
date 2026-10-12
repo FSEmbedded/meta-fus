@@ -113,8 +113,11 @@ do_install:prepend() {
 # The base recipe installs both unconditionally into ${sysconfdir}/rauc, so
 # they are moved rather than merely also-installed: leaving the originals would
 # ship two copies, and the /etc one would keep winning.
+#
+# A development build without a keyring installs a link to
+# ${sysconfdir}/rauc/ca.cert.pem instead, so a CA placed there on the device
+# makes it accept updates without replacing system.conf.
 do_install:append() {
-    fus_selfcheck_keyring_material "rauc-conf (device keyring)" "${FUS_UPDATE_KEYRING_FILE}"
     fus_selfcheck_production_material "rauc-conf (device keyring)" \
         "${FUS_UPDATE_CERT_VARIANT}" "${FUS_UPDATE_KEYRING_FILE}"
 
@@ -131,7 +134,13 @@ be trusted."
 
     install -d ${D}${nonarch_libdir}/rauc
     install -m 0644 ${D}${sysconfdir}/rauc/system.conf ${D}${nonarch_libdir}/rauc/system.conf
-    install -m 0644 "${FUS_UPDATE_KEYRING_FILE}" ${D}${nonarch_libdir}/rauc/ca.cert.pem
+    if fus_selfcheck_dev_material_absent "${FUS_UPDATE_CERT_VARIANT}" "${FUS_UPDATE_KEYRING_FILE}"; then
+        bbnote "rauc-conf: no keyring at ${FUS_UPDATE_KEYRING_FILE}; linking ${sysconfdir}/rauc/ca.cert.pem instead"
+        ln -s ${sysconfdir}/rauc/ca.cert.pem ${D}${nonarch_libdir}/rauc/ca.cert.pem
+    else
+        fus_selfcheck_keyring_material "rauc-conf (device keyring)" "${FUS_UPDATE_KEYRING_FILE}"
+        install -m 0644 "${FUS_UPDATE_KEYRING_FILE}" ${D}${nonarch_libdir}/rauc/ca.cert.pem
+    fi
     rm -r ${D}${sysconfdir}/rauc
 
     # Firmware version marker (single source: FUS_UPDATE_FW_VERSION). Distinct

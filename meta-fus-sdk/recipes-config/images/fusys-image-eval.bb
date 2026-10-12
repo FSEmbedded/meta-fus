@@ -3,7 +3,8 @@
 
 ### WARNING:
 ###  FOR EVALUATION AND TESTING ONLY
-###  Open root login, and the upstream dummy keyring for update signatures.
+###  Open root login, and a development keyring for update signatures, or
+###  none (the build warns).
 ###  DO NOT USE in production or mission-critical environments — build a
 ###  product image on fusys-image-core and provision real credentials and a
 ###  real keyring instead.

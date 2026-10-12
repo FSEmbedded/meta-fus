@@ -59,8 +59,6 @@ VERITY_CERT ?= "${FUS_APP_CONTAINER_SIGN_CERT}"
 do_install[file-checksums] += "${@fus_file_checksums(d, 'VERITY_CERT')}"
 
 do_install() {
-    fus_selfcheck_signing_material "fus-app-container-runtime (verity cert)" "${VERITY_CERT}"
-
     install -d ${D}${bindir}
     sed \
         -e 's|@@CONTAINER_BASE@@|${FUS_UPDATE_APP_CONTAINER_BASE}|g' \
@@ -85,8 +83,14 @@ do_install() {
     chmod 0644 ${D}${systemd_system_unitdir}/fus-app-container-bootguard.service
     chmod 0644 ${D}${systemd_system_unitdir}/fus-app-container-mount.service
 
-    install -d ${D}${sysconfdir}/fus-app-container
-    install -m 0644 ${VERITY_CERT} ${D}${sysconfdir}/fus-app-container/verity.crt
+    # Without the cert the runtime refuses to mount any app container.
+    if fus_selfcheck_dev_material_absent "${FUS_UPDATE_CERT_VARIANT}" "${VERITY_CERT}"; then
+        bbnote "fus-app-container-runtime: no verity cert at ${VERITY_CERT}; installing none"
+    else
+        fus_selfcheck_signing_material "fus-app-container-runtime (verity cert)" "${VERITY_CERT}"
+        install -d ${D}${sysconfdir}/fus-app-container
+        install -m 0644 ${VERITY_CERT} ${D}${sysconfdir}/fus-app-container/verity.crt
+    fi
 }
 
 FILES:${PN} += " \

@@ -81,7 +81,7 @@ OVERLAYFS_ETC_USE_ORIG_INIT_NAME = "0"
 # the rootfs is a read-only squashfs, so bake the persistent mount point
 # into the image and tell overlayfs-etc not to create dirs at runtime.
 OVERLAYFS_ETC_CREATE_MOUNT_DIRS = "0"
-ROOTFS_POSTPROCESS_COMMAND      += "fus_update_link_preinit_sh; fus_update_create_data_mountpoint; fus_update_create_app_mountpoint;"
+ROOTFS_POSTPROCESS_COMMAND      += "fus_update_link_preinit_sh; fus_update_create_data_mountpoint; fus_update_create_app_mountpoint; fus_selfcheck_update_keyring;"
 fus_update_link_preinit_sh() {
     ln -sf preinit ${IMAGE_ROOTFS}${base_sbindir}/preinit.sh
 }

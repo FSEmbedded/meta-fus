@@ -1,5 +1,5 @@
 #!/bin/sh
-# Hermetic tests for the two build-time signing gates in fus-selfcheck.bbclass.
+# Hermetic tests for the build-time signing gates in fus-selfcheck.bbclass.
 #
 # The functions are BitBake shell. Extracted, given a bbfatal that exits, they
 # run as plain sh -- the same trick the removable-medium suite uses for the unit
@@ -24,6 +24,7 @@ trap 'rm -rf "$T"' EXIT
     sed -n '/^fus_selfcheck_signing_material()/,/^}$/p' "$CLASS"
     sed -n '/^fus_selfcheck_keyring_material()/,/^}$/p' "$CLASS"
     sed -n '/^fus_selfcheck_production_material()/,/^}$/p' "$CLASS"
+    sed -n '/^fus_selfcheck_dev_material_absent()/,/^}$/p' "$CLASS"
     printf '"$@"\n'
 } >"$T/gates.sh"
 
@@ -107,6 +108,24 @@ run fus_selfcheck_production_material ctx Prod "$T/certs/dev/sign.key.pem" \
        *)
            bad "production" "refused for the wrong reason: $(cat "$T/out")" ;;
        esac
+
+# --- material a development build may go without -------------------------
+# True only for dev with no such file; everything else runs the gate.
+run fus_selfcheck_dev_material_absent dev "$T/certs/dev/absent.pem" \
+    && ok "absent: dev without the file builds without it" \
+    || bad "absent" "dev without the file was sent to the gate"
+
+run fus_selfcheck_dev_material_absent dev "$T/certs/dev/sign.key.pem" \
+    && bad "absent" "an existing file was left out" \
+    || ok "absent: an existing file is installed"
+
+run fus_selfcheck_dev_material_absent prod "$T/certs/prod/absent.pem" \
+    && bad "absent" "prod without the file was let through" \
+    || ok "absent: prod without the file runs the gate"
+
+run fus_selfcheck_dev_material_absent dev "pkcs11:token=fus;object=ca" \
+    && bad "absent" "a pkcs11 URI was taken for missing material" \
+    || ok "absent: a pkcs11 URI runs the gate"
 
 if [ "$fails" -eq 0 ]; then
     echo "fus-signing-gates.test: ok"
