@@ -12,3 +12,7 @@ SRCBRANCH = "master"
 # (use_ab, rootfs-slot kernel load); files/fus-ab*.cfg add only the selector
 # state on top.
 SRCREV = "e16b783721e6f6135c34aaa9ba7ac1ecb7d1914e"
+# without A/B in effect (override fus-no-ab): the revision before the A/B
+# boot defaults, so the board boots with the vendor environment (use_ab
+# unset, .rootfs_part=2).
+SRCREV:fus-no-ab = "34e29e057d732c5f97e7576df24d6ff4e93d9fb0"
