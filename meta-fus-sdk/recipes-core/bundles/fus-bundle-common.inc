@@ -65,10 +65,8 @@ do_template_install_hook() {
 addtask template_install_hook after do_unpack before do_configure
 
 # --- OS slot definitions (inert unless listed in RAUC_BUNDLE_SLOTS) --------
-# rootfs: the read-only squashfs rootfs slot image. Defaults to the evaluation
-# image, which is also what makes the bundle as large as it is; a product build
-# points this at its own image instead of editing this include.
-FUS_BUNDLE_ROOTFS_IMAGE ?= "fusys-image-eval"
+# rootfs: the read-only squashfs rootfs slot image. Which image is a build
+# choice, FUS_BUNDLE_ROOTFS_IMAGE (fus-update-features.inc).
 RAUC_SLOT_rootfs = "${FUS_BUNDLE_ROOTFS_IMAGE}"
 RAUC_SLOT_rootfs[fstype] = "squashfs"
 RAUC_SLOT_rootfs[hooks] = "post-install"

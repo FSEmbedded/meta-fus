@@ -80,6 +80,10 @@ FUS_UPDATE_APP_CONTAINER_IMAGE   ?= "${FUS_APP_CONTAINER_NAME}.squashfs"
 FUS_UPDATE_APP_ID                ?= "fus-demo-app"
 # human-readable app name — baked into etc/app-release (PRETTY_NAME).
 FUS_UPDATE_APP_DESCRIPTION       ?= "F&S example application"
+# Image whose rootfs the firmware bundles carry; a product build names its own.
+# Every device with this compatible accepts the bundle and gets this rootfs, so
+# a bundle from an app-free image takes the app delivery off an app-bearing one.
+FUS_BUNDLE_ROOTFS_IMAGE          ?= "fusys-image-eval"
 
 # RAUC signing material — external, persistent directory, never in git.
 # dev material is generated out of band by fus-update-gen-certs.sh; the
