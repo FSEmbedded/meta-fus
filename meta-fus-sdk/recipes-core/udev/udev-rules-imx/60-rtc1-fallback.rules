@@ -1,0 +1,5 @@
+# Use /dev/rtc1 as fallback, when hctosys (default rtc0) is not available
+# This rule does not overwrite 50-udev-default.rules!
+
+SUBSYSTEM=="rtc", KERNEL=="rtc1", SYMLINK+="rtc", OPTIONS+="link_priority=-200"
+
