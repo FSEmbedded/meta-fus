@@ -36,11 +36,12 @@ part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQU
 # Slot B — rootfs (mirror)
 part / --source rootfs --ondisk mmcblk --fstype=squashfs --mkfs-extraopts "${SQUASHFS_EXTRA_IMAGECMD}" --part-name ${FUS_UPDATE_PARTLABEL_ROOT_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_ROOT_MIB}M
 
-# Slot A — application (raw copy of the standalone app slot image; RAUC writes the inactive slot on update)
-part --source rawcopy --sourceparams="file=fus-app-image-${MACHINE}.squashfs" --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
+# Slot A — application: the app slot image in app-bearing images, empty and
+# unformatted otherwise (FUS_UPDATE_WKS_APP_CONTENT); RAUC writes the inactive slot on update
+part ${FUS_UPDATE_WKS_APP_CONTENT} --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_A} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
 
 # Slot B — application (mirror of Slot A at image time)
-part --source rawcopy --sourceparams="file=fus-app-image-${MACHINE}.squashfs" --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
+part ${FUS_UPDATE_WKS_APP_CONTENT} --ondisk mmcblk --part-name ${FUS_UPDATE_PARTLABEL_APP_B} --align 8192 --fixed-size ${FUS_UPDATE_SIZE_APP_MIB}M
 
 # Persistent data — created empty; overlayfs-etc preinit creates its
 # overlay-etc/{upper,work} dirs on first boot. Sized small in the image.

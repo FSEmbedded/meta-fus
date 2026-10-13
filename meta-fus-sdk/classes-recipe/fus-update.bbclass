@@ -48,8 +48,9 @@ EXTRA_IMAGECMD:squashfs         = "${SQUASHFS_EXTRA_IMAGECMD}"
 # the bundle-only build path never runs wic, so check slot fit here.
 do_image_squashfs[postfuncs]   += "fus_selfcheck_rootfs_slot_fit"
 
-# expose the compressor command and the layout identity to the wic
-# kickstart parser.
+# export the compressor command and the layout identity to wic's
+# environment. the kickstart templates do not need it: bitbake expands
+# their ${...} references before wic runs.
 WICVARS:append                  = " SQUASHFS_EXTRA_IMAGECMD \
     FUS_UPDATE_PARTLABEL_BOOT_A FUS_UPDATE_PARTLABEL_BOOT_B \
     FUS_UPDATE_PARTLABEL_ROOT_A FUS_UPDATE_PARTLABEL_ROOT_B \
@@ -58,9 +59,10 @@ WICVARS:append                  = " SQUASHFS_EXTRA_IMAGECMD \
     FUS_UPDATE_SIZE_BOOT_MIB FUS_UPDATE_SIZE_ROOT_MIB \
     FUS_UPDATE_SIZE_APP_MIB FUS_UPDATE_SIZE_DATA_MIB"
 
-# slot mode only: the wic App_A/B slots are populated (rawcopy) from the
-# standalone app slot image, so it must be deployed before do_image_wic.
-do_image_wic[depends]           += "${@bb.utils.contains('FUS_UPDATE_APP_MODE', 'slot', 'fus-app-image:do_image_complete', '', d)}"
+# content of the App_A/B part lines in the slot-mode kickstarts. default:
+# laid out at full size but left unformatted and zero; fus-app.bbclass
+# fills them from the app slot image in app-bearing images.
+FUS_UPDATE_WKS_APP_CONTENT      ?= "--fstype=none"
 
 # ── overlayfs (poky overlayfs-etc.bbclass) ──────────────────────────
 # the preinit mounts the data device before udev runs and the eMMC index

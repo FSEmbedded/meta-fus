@@ -15,3 +15,8 @@ IMAGE_INSTALL:append:app-rootfs = " ${FUS_UPDATE_APP_PACKAGES}"
 # rootfs mode: the payload rides this rootfs (no discrete app image), so its
 # contract is checked here; the other modes check it in their app-image build.
 ROOTFS_POSTPROCESS_COMMAND:append:app-rootfs = " fus_selfcheck_app_payload;"
+
+# Slot mode: fill the App_A/App_B partitions from the app slot image, which
+# must be deployed before do_image_wic. A varflag takes no override suffix.
+FUS_UPDATE_WKS_APP_CONTENT:app-slot = '--source rawcopy --sourceparams="file=fus-app-image-${MACHINE}.squashfs"'
+do_image_wic[depends] += "${@bb.utils.contains('FUS_UPDATE_APP_MODE', 'slot', 'fus-app-image:do_image_complete', '', d)}"
