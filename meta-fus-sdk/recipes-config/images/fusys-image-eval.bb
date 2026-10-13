@@ -82,13 +82,10 @@ CORE_IMAGE_EXTRA_INSTALL:append:imx-nxp-bsp = " \
 # production.
 IMAGE_INSTALL:append = " systemd-analyze"
 
-# the app-delivery mechanism, the example application and the auto-update
-# client.
-IMAGE_INSTALL:append            = " packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} rauc-hawkbit-updater"
-IMAGE_INSTALL:append:app-rootfs = " ${FUS_UPDATE_APP_PACKAGES}"
-# rootfs mode: the payload rides this rootfs, so its contract is
-# checked here; the other modes assert it from their app-image build.
-ROOTFS_POSTPROCESS_COMMAND:append:app-rootfs = " fus_selfcheck_app_payload;"
+# the app-delivery mechanism with the example application, and the
+# auto-update client.
+inherit ${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus-app', '', d)}
+IMAGE_INSTALL:append = " rauc-hawkbit-updater"
 
 # the removable-medium door. gated on the door this image is built with: the
 # package drives the updater CLI, and its recipe skips itself where that door
@@ -98,13 +95,10 @@ ROOTFS_POSTPROCESS_COMMAND:append:app-rootfs = " fus_selfcheck_app_payload;"
 # labelled medium with nobody logged in.
 IMAGE_INSTALL:append = "${@bb.utils.contains('FUS_UPDATE_INSTALL_DOOR', 'fsupdater', ' fus-usb-update', '', d)}"
 
-# Without A/B the rootfs is writable: a package manager works, and the app
-# delivery above has nothing to drive. Without the update framework the update
-# clients have nothing to drive either.
+# Without A/B the rootfs is writable, so a package manager works. Without the
+# update framework the update clients have nothing to drive.
 IMAGE_FEATURES:append:fus-no-ab = " package-management"
-IMAGE_INSTALL:remove:fus-no-ab = "packagegroup-fus-app ${FUS_UPDATE_APP_LAUNCHER_PACKAGES} ${FUS_UPDATE_APP_PACKAGES}"
 IMAGE_INSTALL:remove:fus-no-update = "rauc-hawkbit-updater fus-usb-update"
-ROOTFS_POSTPROCESS_COMMAND:remove:fus-no-ab = "fus_selfcheck_app_payload;"
 
 set_fus_release_version() {
 

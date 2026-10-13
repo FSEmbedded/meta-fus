@@ -2,6 +2,8 @@
 # standard image (RAUC, persistent /data partition, /etc in overlayfs via
 # overlayfs-etc.bbclass). activate in an image recipe: inherit fus-update
 #
+# an app-bearing image inherits fus-app instead, which inherits this class.
+#
 # distro policy lives in conf/distro/include/fus-update-features.inc,
 # machine policy in conf/machine/include/fus-update-emmc.inc, and the
 # partition/layout identity in conf/include/fus-update-layout.inc, so
@@ -161,7 +163,7 @@ load a DTB. Check IMAGE_BOOT_FILES."
 IMAGE_FEATURES:append           = " read-only-rootfs overlayfs-etc"
 
 # every fus-update image gets the A/B runtime floor; the example app and
-# the per-mode mechanism are image-level choices and not pulled here.
+# the per-mode mechanism come with fus-app.bbclass, not here.
 # without the update framework the slot floor stays, and a small unit
 # confirms the booted slot in place of rauc-mark-good.
 FUS_UPDATE_RUNTIME = "packagegroup-fus-update-base"
