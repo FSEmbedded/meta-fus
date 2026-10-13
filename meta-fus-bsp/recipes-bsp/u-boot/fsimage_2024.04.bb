@@ -1,5 +1,9 @@
 SUMMARY = "Boot image tool for the U-Boot and NBoot copies on the boot medium"
 
+DESCRIPTION = "Builds the U-Boot fsimage host utility for F&S boards"
+LICENSE = "GPL-2.0-or-later"
+LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
+
 require u-boot-fus-src-2024.04.inc
 SRC_URI = "git://github.com/FSEmbedded/u-boot-fus;branch=master;protocol=https"
 S = "${WORKDIR}/git"
@@ -29,3 +33,5 @@ do_install() {
     install -d ${D}${sbindir}
     install -m 0700 ${B}/tools/fsimage/fsimage ${D}${sbindir}/fsimage
 }
+
+FILES:${PN} += "${sbindir}/fsimage"

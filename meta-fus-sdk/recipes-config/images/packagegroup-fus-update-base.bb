@@ -14,4 +14,5 @@ RDEPENDS:${PN} = " \
     rauc \
     rauc-conf \
     rauc-mark-good \
+    fsimage \
 "
