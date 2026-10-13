@@ -79,3 +79,7 @@ CYCLONEDX_EXPORT_DIR = "${DEPLOY_DIR_IMAGE}/cyclonedx-export/${IMAGE_BASENAME}"
 # over the support period. On by default; FUS_UPDATE_AB and FUS_UPDATE turn
 # it off. `require` so a wrong path fails the parse.
 require conf/distro/include/fus-update-features.inc
+
+# If image is activated, we need to install the package containing the signed
+# Kernel and devicetrees
+IMAGE_INSTALL:append = "${@bb.utils.contains('DISTRO_FEATURES', 'fus-image-signing', ' linux-fus-signed-images', '', d)}"

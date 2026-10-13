@@ -16,6 +16,10 @@ COMPATIBLE_MACHINE = "(mx6|mx7|mx8|mx93)"
 
 FILESEXTRAPATHS:prepend := "${THISDIR}/files:"
 
+inherit image_signing_fus
+SIGNING_TARGET_IMAGE = "${KERNEL_IMAGETYPES} ${KERNEL_DEVICETREE}"
+SIGNING_TARGET_IMAGE_LOCATION = "${B}/to_sign/"
+FUS_SIGNED_IMAGES_INSTALL = "1"
 
 # Use this to build from local source
 #SRC_URI = "git://${DL_DIR}/linux-fus;branch=${SRCBRANCH};protocol=file"
@@ -76,4 +80,12 @@ kernel_do_deploy:append:mx8m-nxp-bsp() {
 	ln -sf Image-${KERNEL_IMAGE_NAME}.bin Image-${MACHINE}
 	rm -f Image-${MACHINE}.bin
 	cd -
+}
+
+do_sign:prepend() {
+	mkdir -p ${B}/to_sign
+	cp ${B}/arch/${ARCH}/boot/${KERNEL_IMAGETYPES} ${B}/to_sign
+	for dtb in ${KERNEL_DEVICETREE}; do
+		cp ${B}/arch/${ARCH}/boot/dts/${dtb} ${B}/to_sign/
+	done
 }

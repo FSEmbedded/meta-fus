@@ -52,6 +52,10 @@ do_configure[postfuncs] += "${@bb.utils.contains('COMBINED_FEATURES', 'fus-updat
 # The environment location shipped to userspace must match this bootloader.
 do_configure[postfuncs] += "${@bb.utils.contains('COMBINED_FEATURES', 'fus-update-ab', 'fus_selfcheck_fw_env', '', d)}"
 
+inherit image_signing_fus
+SIGNING_TARGET_IMAGE = "${UBOOT_FILE}"
+SIGNING_TARGET_IMAGE_LOCATION = "${B}/${UBOOT_CONFIG}_defconfig/"
+
 do_compile[depends] += " \
 	${@bb.utils.contains_any('UBOOT_MAKE_TARGET', 'uboot.fs uboot-atf.fs', 'imx-atf:do_deploy', '', d)} \
 	${@bb.utils.contains('MACHINE_FEATURES', 'optee', 'optee-os:do_deploy', '', d)} \
