@@ -8,13 +8,9 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 
 UBOOT_VERSION = "2024.04"
 SRCBRANCH = "master"
-# a revision above v2024.04-fus1.10 that carries the native A/B boot defaults
-# (use_ab, rootfs-slot kernel load).
-SRCREV = "d80d493a43a94511c3b1d2fc3792d4a3116a6133"
-# without A/B in effect (override fus-no-ab): the revision before the A/B
-# boot defaults, so the board boots with the vendor environment (use_ab
-# unset, .rootfs_part=2).
-SRCREV:fus-no-ab = "34e29e057d732c5f97e7576df24d6ff4e93d9fb0"
+# a revision above v2024.04-fus1.11 with the native A/B boot defaults;
+# a non-A/B image needs other environment settings.
+SRCREV = "dfc8c19da72e184eb58170e82c051cbf601ebd85"
 
 CVE_STATUS[CVE-2024-42040] = "backported-patch: Fixed through \
 41aafb5eb963c95d19ba4319049b0de8950737ee"

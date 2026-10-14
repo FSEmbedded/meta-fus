@@ -8,11 +8,9 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=5a7450c57ffe5ae63fd732446b988025"
 
 UBOOT_VERSION = "2021.04"
 SRCBRANCH = "uboot-fus-2021.04"
+# the branch head with the native A/B boot defaults; a non-A/B image needs
+# other environment settings.
 SRCREV = "eacbdd5740ecff0ac48e988e0b016ee6ad601cb9"
-# without A/B in effect (override fus-no-ab): the revision before the A/B
-# port, so the board boots with the vendor environment. like the vendor
-# release, it lacks the MMC1 environment-offset fix of the default revision.
-SRCREV:fus-no-ab = "cf304af2cd6b3e36447e2fccf8996f2d7d29e4d8"
 
 CVE_STATUS[CVE-2024-57254] = "patched"
 CVE_STATUS[CVE-2024-57255] = "patched"
