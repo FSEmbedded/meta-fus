@@ -47,7 +47,7 @@ FUS_UPDATE_SIZE_DATA_MIB       ?= "128"
 #   slot   — kernel + DTBs in raw vfat BOOT_A/B slots; RAUC bootname on
 #            boot.0/1, rootfs slots parent onto them.
 #   rootfs — kernel + DTBs in /boot inside the rootfs squashfs (needs
-#            squashfs+zstd in U-Boot, see fus-ab-bootrootfs.cfg); no BOOT
+#            squashfs+zstd in U-Boot); no BOOT
 #            partitions, the rootfs slots carry the bootname, so a rootfs-only
 #            bundle auto-activates. fewest partitions; OS and kernel update
 #            together as one integrity unit.

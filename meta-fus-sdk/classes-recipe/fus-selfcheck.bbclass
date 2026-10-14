@@ -130,38 +130,6 @@ fus_selfcheck_fw_env_one() {
     esac
 }
 
-# Assert the slot-mode CONFIG_PREBOOT override targets the wks file's actual
-# Root_A partition index, not a value that drifted from it. Wire as a
-# u-boot-fus do_configure[postfuncs], only for FUS_UPDATE_BOOT_MODE=slot.
-fus_selfcheck_uboot_ab_env() {
-    configs=$(fus_selfcheck_configs)
-    [ -n "$configs" ] ||
-        bbfatal "fus-selfcheck: .config not found under ${B}; cannot verify the slot-mode CONFIG_PREBOOT override"
-    for config in $configs; do
-        bbnote "fus-selfcheck: checking the slot-mode CONFIG_PREBOOT in $config"
-        fus_selfcheck_uboot_ab_env_one "$config"
-    done
-}
-
-fus_selfcheck_uboot_ab_env_one() {
-    config="$1"
-    wks="${@bb.utils.which(d.getVar('BBPATH'), 'wic/' + ('fus-update-emmc.wks.in' if d.getVar('FUS_UPDATE_APP_MODE') == 'slot' else 'fus-update-emmc-noappslot.wks.in'))}"
-    [ -n "$wks" ] && [ -f "$wks" ] ||
-        bbfatal "fus-selfcheck: slot-mode wks file not found via BBPATH"
-
-    idx=$(awk '/^part /{n++} /--part-name \$\{FUS_UPDATE_PARTLABEL_ROOT_A\}/{print n; exit}' "$wks")
-    [ -n "$idx" ] || bbfatal "fus-selfcheck: no Root_A partition found in $wks"
-
-    preboot=$(sed -n 's/^CONFIG_PREBOOT="\(.*\)"$/\1/p' "$config")
-    case "$preboot" in
-    *".rootfs_part_A $idx"*) : ;;
-    *)
-        bbfatal "fus-selfcheck: FUS_UPDATE_BOOT_MODE=slot but CONFIG_PREBOOT does not \
-set .rootfs_part_A to $idx (the wks file's actual Root_A index). Got: $preboot"
-        ;;
-    esac
-}
-
 # Assert that externally-generated signing material exists (task-time, before
 # openssl would fail cryptically). Argument-taking: call it from a task
 # function, e.g. from a do_bundle:prepend:

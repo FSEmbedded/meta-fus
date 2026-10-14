@@ -9,8 +9,7 @@ LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
 UBOOT_VERSION = "2024.04"
 SRCBRANCH = "master"
 # a revision above v2024.04-fus1.10 that carries the native A/B boot defaults
-# (use_ab, rootfs-slot kernel load); files/fus-ab*.cfg add only the selector
-# state on top.
+# (use_ab, rootfs-slot kernel load).
 SRCREV = "e16b783721e6f6135c34aaa9ba7ac1ecb7d1914e"
 # without A/B in effect (override fus-no-ab): the revision before the A/B
 # boot defaults, so the board boots with the vendor environment (use_ab

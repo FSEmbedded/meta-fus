@@ -5,7 +5,7 @@
 #
 # There are NO BOOT_A/B partitions: the kernel + DTBs live in /boot inside the
 # read-only squashfs rootfs slot, and U-Boot loads them from there (squashfs+zstd
-# enabled via fus-ab-bootrootfs.cfg). The rootfs slots are therefore partitions
+# in its defconfig). The rootfs slots are therefore partitions
 # 1 and 2; .rootfs_part_A/B=1/2 in the U-Boot env redirect matches this.
 #
 #   ┌────────┬────────┬──────┐
