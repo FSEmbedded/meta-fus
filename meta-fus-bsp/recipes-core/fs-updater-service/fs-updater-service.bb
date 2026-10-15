@@ -15,7 +15,7 @@ ERROR_QA:remove = "version-going-backwards"
 WARN_QA:append = " version-going-backwards"
 
 # v2.4.0, in lockstep with the library and the client (FUS_COMPONENT_VERSION).
-SRCREV ?= "6f97c3437c7a809e18714bca68fa1175017a0756"
+SRCREV ?= "b0582a7b13712f4bf60459dbaf63b40c5107bca6"
 FSUPSERVICE_SRC_URI ?= "git://github.com/FSEmbedded/fs-updater-service;protocol=https"
 FSUPSERVICE_GIT_BRANCH ?= "master"
 SRC_URI = "${FSUPSERVICE_SRC_URI};branch=${FSUPSERVICE_GIT_BRANCH}"
@@ -64,5 +64,6 @@ FILES:${PN} += " \
     ${sysconfdir}/polkit-1/rules.d/50-fsupdate.rules \
     ${datadir}/dbus-1/system-services/de.fsembedded.fsupdate1.service \
     ${datadir}/dbus-1/interfaces/de.fsembedded.fsupdate1.xml \
+    ${datadir}/dbus-1/interfaces/de.fsembedded.fsupdate1.Installer.xml \
     ${datadir}/polkit-1/actions/de.fsembedded.fsupdate1.policy \
 "

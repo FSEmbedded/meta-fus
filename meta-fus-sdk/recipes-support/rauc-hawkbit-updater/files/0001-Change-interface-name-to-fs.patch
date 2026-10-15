@@ -1,0 +1,49 @@
+From 92f9b3263b3627383f8aee27d0c1073b88c325a7 Mon Sep 17 00:00:00 2001
+From: developer <developer@developer>
+Date: Wed, 14 Oct 2026 13:07:47 +0200
+Subject: [PATCH] Change interface name to fs
+
+---
+ meson.build            | 2 +-
+ src/rauc-installer.c   | 2 +-
+ src/rauc-installer.xml | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/meson.build b/meson.build
+index 325fd3e..01b1dba 100644
+--- a/meson.build
++++ b/meson.build
+@@ -58,7 +58,7 @@ dbus_ifaces = files('src/rauc-installer.xml')
+ dbus_sources = gnome.gdbus_codegen(
+   dbus,
+   sources : dbus_ifaces,
+-  interface_prefix : 'de.pengutronix.rauc.',
++  interface_prefix : 'de.fsembedded.fsupdate1.',
+   namespace: 'R',
+ )
+ 
+diff --git a/src/rauc-installer.c b/src/rauc-installer.c
+index f9bcb94..6c5c641 100644
+--- a/src/rauc-installer.c
++++ b/src/rauc-installer.c
+@@ -158,7 +158,7 @@ static gpointer install_loop_thread(gpointer data)
+         g_debug("Creating RAUC DBUS proxy");
+         r_installer_proxy = r_installer_proxy_new_for_bus_sync(
+                 bus_type, G_DBUS_PROXY_FLAGS_GET_INVALIDATED_PROPERTIES,
+-                "de.pengutronix.rauc", "/", NULL, &error);
++                "de.fsembedded.fsupdate1", "/", NULL, &error);
+         if (!r_installer_proxy) {
+                 g_warning("Failed to create RAUC DBUS proxy: %s", error->message);
+                 goto notify_complete;
+diff --git a/src/rauc-installer.xml b/src/rauc-installer.xml
+index 801d4e0..b3e49fa 100644
+--- a/src/rauc-installer.xml
++++ b/src/rauc-installer.xml
+@@ -1,6 +1,6 @@
+ <!-- License note: This file is considered data and thus no license is needed for any usage. -->
+ <node>
+-  <interface name="de.pengutronix.rauc.Installer">
++  <interface name="de.fsembedded.fsupdate1.Installer">
+     <!--
+          Install:
+          @source: Path to bundle to be installed
