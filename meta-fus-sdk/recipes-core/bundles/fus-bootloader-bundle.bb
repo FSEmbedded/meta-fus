@@ -14,6 +14,11 @@ RAUC_SLOT_bootloader[file] = "Firmware/uboot-${UBOOT_CONFIG_BASENAME}.fs"
 RAUC_SLOT_bootloader[depends] = "u-boot-fus:do_deploy"
 RAUC_SLOT_bootloader[hooks] = "install"
 
+# the suffix lets fs-updater-lib route this bundle past slot staging; the
+# hook's install-check stage accepts it only for a bootloader-only manifest.
+RAUC_BUNDLE_COMPATIBLE:append = "-bootloader"
+RAUC_BUNDLE_HOOKS[hooks] = "install-check"
+
 # host-side contract test of the hook's bootloader branch; nothing test-related ships.
 SRC_URI += "file://test-install-check-bootloader.sh"
 do_test_install_hook() {

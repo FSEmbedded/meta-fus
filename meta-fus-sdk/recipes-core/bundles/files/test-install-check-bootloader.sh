@@ -1,8 +1,9 @@
 #!/bin/sh
-# Host-side contract test for the bootloader branch of the install-check
-# hook's slot-install stage. Nothing here ships to any image: it runs the hook
-# against stub `fsimage` / `fw_printenv` / `sysctl` binaries and asserts per case
-# the exit code and which steps ran. Usage: test-install-check-bootloader.sh <install-check>
+# Host-side contract test for the install-check hook: the bootloader branch of
+# its slot-install stage and its install-check stage. Nothing here ships to any
+# image: it runs the hook against stub `fsimage` / `fw_printenv` / `sysctl`
+# binaries and asserts per case the exit code and which steps ran.
+# Usage: test-install-check-bootloader.sh <install-check>
 set -u
 
 HOOK=${1:?usage: $0 <path-to-install-check>}
@@ -123,6 +124,40 @@ run_case "image for other board rejected" bootloader 0    ok              1 "arc
 mkimg U-BOOT ''
 run_case "arch failure rejected"          bootloader 0    arch-fail       1 "arch"
 run_case "empty arch rejected"            bootloader 0    arch-empty      1 "arch"
+
+# The install-check stage runs the way RAUC starts it: by path from the
+# bundle root, so the hook finds manifest.raucm next to itself.
+mkdir "$tmp/bundle"
+cp "$HOOK" "$tmp/bundle/install-check"
+check_case() {
+    # check_case <name> <system-compatible> <manifest-compatible> <image-sections> <expect-rc> [raw-section]
+    printf '[update]\ncompatible=%s\n' "$3" > "$tmp/bundle/manifest.raucm"
+    for s in $4; do printf '\n[image.%s]\nfilename=x\n' "$s"; done >> "$tmp/bundle/manifest.raucm"
+    [ -z "${6:-}" ] || printf '\n%b\nfilename=x\n' "$6" >> "$tmp/bundle/manifest.raucm"
+    RAUC_SYSTEM_COMPATIBLE=$2 RAUC_MF_COMPATIBLE=$3 \
+        sh "$tmp/bundle/install-check" install-check >/dev/null 2>"$tmp/stderr"
+    rc=$?
+    # RAUC reports only the last stderr line, so the verdict must fit on one.
+    if [ "$rc" -eq "$5" ] && [ "$(wc -l < "$tmp/stderr")" -le 1 ]; then
+        echo "PASS: $1"
+    else
+        echo "FAIL: $1"; echo "  exit code $rc, expected $5, stderr on one line"; sed 's/^/  | /' "$tmp/stderr"
+        fails=$((fails + 1))
+    fi
+}
+
+S=fus-update-fsimx8mm
+check_case "bootloader-only bundle accepted"   "$S" "$S-bootloader"    bootloader          0
+check_case "bootloader bundle writing more"    "$S" "$S-bootloader"    "bootloader rootfs" 10
+check_case "bootloader suffix without image"   "$S" "$S-bootloader"    ""                  10
+check_case "app bundle accepted"               "$S" "$S-appfs"         appfs               0
+check_case "unsuffixed compatible rejected"    "$S" "$S"               bootloader          10
+check_case "other system's bootloader bundle"  "$S" "other-bootloader" bootloader          10
+check_case "empty system compatible rejected"  ""   "-bootloader"      bootloader          10
+check_case "stock bundle sections accepted"    "$S" "$S-bootloader"    bootloader          0  '[bundle]\nformat=verity\n\n[hooks]\nhooks=install-check;'
+check_case "indented image header"             "$S" "$S-bootloader"    bootloader          10 ' \t[image.rootfs]'
+check_case "CR-terminated image header"        "$S" "$S-bootloader"    bootloader          10 '[image.rootfs]\r'
+check_case "custom handler section"            "$S" "$S-bootloader"    bootloader          10 '[handler]'
 
 if [ "$fails" -ne 0 ]; then
     echo "install-check bootloader contract test: $fails case(s) FAILED"

@@ -1,9 +1,10 @@
 # fus-bundle-common.inc
 #
 # Shared policy for every F&S RAUC bundle recipe (fus-update-bundle,
-# fus-fw-bundle, fus-app-bundle): version source, bundle format, signing
-# wiring + guard, the shared bundle hook script (read-back verification +
-# container-mode staging + compatible override), and the OS slot definitions.
+# fus-fw-bundle, fus-app-bundle, fus-bootloader-bundle): version source,
+# bundle format, signing wiring + guard, the shared bundle hook script
+# (read-back verification + container-mode staging + compatible override),
+# and the OS slot definitions.
 # A bundle recipe composes its RAUC_BUNDLE_SLOTS from the slot tokens;
 # RAUC_SLOT_* definitions not listed there are inert (the same idiom as
 # fus-app-slot.inc), so carrying the OS slots here is harmless for the
@@ -46,8 +47,8 @@ RAUC_BUNDLE_FORMAT = "verity"
 # The shared bundle hook script: for post-install-hooked slots it re-reads the
 # slot device after each write and compares its hash to the just-installed
 # image, failing the install on a mismatch (requires raw slots, see
-# system.conf); in container mode it also stages the app image and replaces
-# the bundle-level compatible check (see fus-app-slot.inc / fus-app-bundle.bb).
+# system.conf); in container mode it also stages the app image; it replaces the
+# bundle-level compatible check for the container app bundle and the bootloader bundle.
 # Every slot-carrying bundle ships the hook executable.
 SRC_URI = "file://install-check"
 RAUC_BUNDLE_HOOKS[file] = "install-check"

@@ -1,8 +1,8 @@
 #!/bin/sh
 # RAUC bundle hook script — three stages: slot-post-install (read-back
 # verification of the raw slots RAUC writes), slot-install (bootloader write,
-# container-mode appfs staging) and install-check (container app-bundle
-# compatible-string override).
+# container-mode appfs staging) and install-check (compatible-string override
+# for the container app bundle and the bootloader bundle).
 #
 # slot-post-install re-reads the slot device and compares its SHA-256
 # against the just-installed image; a mismatch fails the installation so
@@ -192,16 +192,38 @@ slot-install)
     echo "slot-install[$RAUC_SLOT_NAME]: staged $img (+ 3 sidecars) to $dest_dir/.incoming.squashfs" >&2
     ;;
 install-check)
-    # container app-bundle only (fus-app-bundle.bb): its manifest carries
-    # an -appfs-suffixed compatible so fs-updater-lib can classify it,
-    # which would fail RAUC's exact-equality default check. accept exactly
-    # that one suffixed form; reject everything else with exit 10 (RAUC's
-    # install-check rejection convention). dormant for other bundles.
+    # replaces RAUC's exact-equality compatible check for the bundles that
+    # enable this stage: the container app bundle (fus-app-bundle.bb, -appfs)
+    # and the bootloader bundle (fus-bootloader-bundle.bb, -bootloader). the
+    # suffix lets fs-updater-lib classify the bundle. accept exactly those two
+    # forms; reject everything else with exit 10 (RAUC's install-check
+    # rejection convention). dormant for other bundles.
+    if [ -z "${RAUC_SYSTEM_COMPATIBLE:-}" ]; then
+        echo "install-check: system compatible is empty, rejected" >&2
+        exit 10
+    fi
     if [ "${RAUC_MF_COMPATIBLE:-}" = "${RAUC_SYSTEM_COMPATIBLE:-}-appfs" ]; then
         echo "install-check: compatible '${RAUC_MF_COMPATIBLE:-}' accepted (app bundle)" >&2
         exit 0
     fi
-    echo "install-check: compatible '${RAUC_MF_COMPATIBLE:-}' rejected (expected '${RAUC_SYSTEM_COMPATIBLE:-}-appfs')" >&2
+    # fs-updater-lib installs a -bootloader bundle without slot staging, so
+    # it must write the bootloader slot and nothing else. RAUC starts this
+    # stage by path from the mounted bundle root, next to the manifest.
+    if [ "${RAUC_MF_COMPATIBLE:-}" = "${RAUC_SYSTEM_COMPATIBLE}-bootloader" ]; then
+        # every group header the manifest parser would see (it skips leading
+        # and trailing whitespace); besides the stock ones only this may remain.
+        sections=$(sed -n 's/^[[:space:]]*\(\[.*\]\)[[:space:]]*$/\1/p' "${0%/*}/manifest.raucm" 2>/dev/null |
+            grep -v -x -e '\[update\]' -e '\[bundle\]' -e '\[hooks\]')
+        if [ "$sections" = "[image.bootloader]" ]; then
+            echo "install-check: compatible '${RAUC_MF_COMPATIBLE}' accepted (bootloader bundle)" >&2
+            exit 0
+        fi
+        # RAUC reports only the last line of a rejecting hook's stderr.
+        sections=$(printf '%s' "$sections" | tr '\n' ' ')
+        echo "install-check: bootloader bundle rejected, manifest sections '$sections' are not exactly [image.bootloader]" >&2
+        exit 10
+    fi
+    echo "install-check: compatible '${RAUC_MF_COMPATIBLE:-}' rejected (expected '${RAUC_SYSTEM_COMPATIBLE}-appfs' or '${RAUC_SYSTEM_COMPATIBLE}-bootloader')" >&2
     exit 10
     ;;
 *)
