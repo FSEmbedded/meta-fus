@@ -1,0 +1,267 @@
+{
+    "version": 1,
+    "weight": 100,
+    "buttonTitle": "Quick Build",
+    "panelTitle": "QuickBuild",
+    "autoExec": [
+        {
+            "type": "runTasks",
+            "concurrency": {
+                "strategy": "command"
+            },
+            "tasks": [
+                {
+                    "mode": "parsed",
+                    "args": "python3 fus-build.py --supportedDistros",
+                    "outputs": [
+                        {
+                            "target": "supportedDistroSelect",
+                            "widget": "datalist-options",
+                            "mode": "set"
+                        }
+                    ]
+                },
+                {
+                    "mode": "parsed",
+                    "args": "python3 fus-build.py --supportedImages",
+                    "outputs": [
+                        {
+                            "target": "supportedImageSelect",
+                            "widget": "datalist-options",
+                            "mode": "set"
+                        }
+                    ]
+                }
+                ,
+                {
+                    "mode": "parsed",
+                    "args": "python3 fus-build.py --supportedMachines",
+                    "outputs": [
+                        {
+                            "target": "supportedMachineSelect",
+                            "widget": "datalist-options",
+                            "mode": "set"
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "type": "runTasks",
+            "tasks": {
+                "mode": "parsed",
+                "args": "python3 fus-build.py --availableBuilds",
+                "outputs":
+                    {
+                    "target": "buildSelect",
+                    "widget": "select-options",
+                    "mode": "set",
+                    "parser": {
+                        "pattern": "^(?<value>.*)$",
+                        "labelGroup": "value",
+                        "valueGroup": "value"
+                    }
+                }
+            }
+        }
+    ],
+    "components": [
+        {
+            "type": "h1",
+            "text": "Quick Build"
+        },
+        {
+            "type":"p",
+            "text": "The Quick Build tool allows you to quickly set up and manage Yocto builds"
+        },
+        {
+            "type": "h2",
+            "text": "Prepare a new build"
+        },
+        {
+            "type": "h4",
+            "text": "Distro"
+        },
+        {
+            "type":"p",
+            "text": "Select a F&S distro or enter a custom one.\nThe custom distro must be defined in a meta-layer:"
+        },
+        {
+            "type": "datalist",
+            "id": "supportedDistroSelect"
+        },
+        {
+            "type": "h4",
+            "text": "Machine"
+        },
+        {
+            "type": "p",
+            "text": "Select a F&S machine or enter a custom one.\nThe custom machine must be defined in a meta-layer:"
+        },
+        {
+            "type": "datalist",
+            "id": "supportedMachineSelect"
+        },
+        {
+            "type": "h4",
+            "text": "Build Name"
+        },
+        {
+            "type": "p",
+            "text": "Select a name for the new build.\nIf none is provided, \"build-{machine}-{distro}\" will be used."
+        },
+        {
+            "type": "textbox",
+            "id": "inputBuildname"
+        },
+        {
+            "type": "button",
+            "text": "Prepare Yocto-Build",
+            "requires": ["supportedDistroSelect", "supportedMachineSelect"],
+            "action": {
+                "type": "runTasks",
+                "tasks": [
+                    {
+                        "args": "python3 fus-build.py --setup-build distro={{supportedDistroSelect}} machine={{supportedMachineSelect}} build={{inputBuildname}}"
+                    },
+                    {
+                        "mode": "parsed",
+                        "args":  "python3 fus-build.py --availableBuilds",
+                        "outputs": [
+                            {
+                                "target": "buildSelect",
+                                "widget": "select-options",
+                                "mode": "set",
+                                "parser": {
+                                    "pattern": "^(?<value>.*)$",
+                                    "labelGroup": "value",
+                                    "valueGroup": "value"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "type": "h2",
+            "text": "Build"
+        },
+        {
+            "type": "p",
+            "text": "Select an available build:"
+        },
+        {
+            "type": "selectbox",
+            "id": "buildSelect"
+        },
+        {
+            "type": "p",
+            "text": "Select a F&S image or enter a custom one.\nThe custom image must be defined in a meta-layer:"
+        },
+        {
+            "type": "datalist",
+            "id": "supportedImageSelect"
+        },
+        {
+            "type": "p",
+            "text": "Start the Yocto-Build with the given machine and image."
+        },
+        {
+            "type": "button",
+            "text": "Start Yocto-Build",
+            "requires": ["supportedImageSelect", "buildSelect"],
+            "action": {
+                "type": "runTasks",
+                "tasks": [
+                    {
+                        "args":"python3 fus-build.py --build image={{supportedImageSelect}} build={{buildSelect}} machine={{supportedMachineSelect}}"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "h2",
+            "text": "Edit build"
+        },
+        {
+            "type": "p",
+            "text": "Open a build terminal in the selected available build:"
+        },
+        {
+            "type": "button",
+            "text": "Open build terminal",
+            "requires": ["buildSelect"],
+            "action": {
+                "type": "runTasks",
+                "tasks": [
+                    {
+                        "args": "python3 fus-build.py --openShell build={{buildSelect}}"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "p",
+            "text": "Open the configuration file of the selected available build:"
+        },
+        {
+            "type": "button",
+            "text": "Open local.conf",
+            "requires": ["buildSelect"],
+            "action": {
+                "type": "runTasks",
+                "concurrency": {
+                    "strategy": "command"
+                },
+                "tasks": [
+                    {
+                        "mode": "silent",
+                        "args": "python3 fus-build.py --openLocalconf build={{buildSelect}}"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "p",
+            "text": "Open the deploy directory of the selected available build and machine:"
+        },
+        {
+            "type": "button",
+            "text": "Open deploy directory",
+            "requires": ["buildSelect", "supportedMachineSelect"],
+            "action": {
+                "type": "runTasks",
+                "concurrency": {
+                    "strategy": "command"
+                },
+                "tasks": [
+                    {
+                        "mode": "silent",
+                        "args": "python3 fus-build.py --openDeploy build={{buildSelect}} machine={{supportedMachineSelect}}"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "p",
+            "text": "Open the yocto source directory to manage and create meta-layers:"
+        },
+        {
+            "type": "button",
+            "text": "Open source directory",
+            "action": {
+                "type": "runTasks",
+                "concurrency": {
+                    "strategy": "command"
+                },
+                "tasks": [
+                    {
+                        "mode": "silent",
+                        "args": "python3 fus-build.py --openSourceDir"
+                    }
+                ]
+            }
+        }
+    ]
+}
