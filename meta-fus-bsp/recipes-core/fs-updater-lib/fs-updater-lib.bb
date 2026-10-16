@@ -15,10 +15,10 @@ WARN_QA:append = " version-going-backwards"
 inherit cmake pkgconfig features_check
 REQUIRED_DISTRO_FEATURES = "fus-update"
 
-# v2.4.0. library, client and service move together (FUS_COMPONENT_VERSION);
-# the sibling CLI recipe's exit-code selfcheck fails the build if the pinned
-# pair does not implement the expected contract.
-SRCREV ?= "ab60a8e5248b3ca08f56737882ebe08ed493a857"
+# v2.4.0-1-g66f1f11. library, client and service move together
+# (FUS_COMPONENT_VERSION); the sibling CLI recipe's exit-code selfcheck fails
+# the build if the pinned pair does not implement the expected contract.
+SRCREV ?= "66f1f1190517cb9539e4c8c4da775dab7af78102"
 # Shared-object version of the pinned library; the install check asserts it.
 # Moves together with SRCREV.
 FUS_LIB_SOVERSION ?= "1"
