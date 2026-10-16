@@ -2,15 +2,10 @@
 # Released under the MIT license (see COPYING.MIT for the terms)
 
 require u-boot-fus.inc
-
-LICENSE = "GPL-2.0-or-later"
-LIC_FILES_CHKSUM = "file://Licenses/README;md5=2ca5f2c35c8cc335f0a19756634782f1"
+require u-boot-fus-src-2024.04.inc
 
 UBOOT_VERSION = "2024.04"
 SRCBRANCH = "master"
-# a revision above v2024.04-fus1.11 with the native A/B boot defaults;
-# a non-A/B image needs other environment settings.
-SRCREV = "dfc8c19da72e184eb58170e82c051cbf601ebd85"
 
 CVE_STATUS[CVE-2024-42040] = "backported-patch: Fixed through \
 41aafb5eb963c95d19ba4319049b0de8950737ee"
