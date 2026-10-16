@@ -1,7 +1,8 @@
 #!/bin/sh
 # RAUC bundle hook script — three stages: slot-post-install (read-back
-# verification, all raw slots), slot-install (container-mode appfs staging)
-# and install-check (container app-bundle compatible-string override).
+# verification of the raw slots RAUC writes), slot-install (bootloader write,
+# container-mode appfs staging) and install-check (container app-bundle
+# compatible-string override).
 #
 # slot-post-install re-reads the slot device and compares its SHA-256
 # against the just-installed image; a mismatch fails the installation so
@@ -68,6 +69,53 @@ locate_bundle_image() { # locate_bundle_image <glob-fallback:0|1>
     [ -n "$img" ] && [ -L "$img" ] && img=""
 }
 
+# Bootloader slot: RAUC never writes it (read-only sysfs device). fsimage writes
+# both copies, the booted one last; save exits 0 even when a copy failed, so the
+# success line in the pinned loader tree's wording is required too.
+install_bootloader() { # install_bootloader <image>
+    tag="slot-install[$RAUC_SLOT_NAME]"
+    fail() { echo "$tag: $*" >&2; exit 1; }
+
+    # Only from idle (0, the loader's default): an update in flight has staged
+    # the environment for a slot switch that a failed install here would then
+    # revert. An unreadable, empty or unknown state is refused, as the updater does.
+    urs=$(fw_printenv -n update_reboot_state)
+    [ "$urs" = 0 ] || fail "update_reboot_state='$urs' is not idle (0)"
+
+    # save hands every other image type to the NBoot writer, so the type
+    # (header bytes 16..27) is checked here first. Fields are cut at NUL like
+    # fsimage's strncmp; a line feed is mapped away so it cannot cut them early.
+    itype=$(dd if="$1" bs=1 skip=16 count=12 2>/dev/null | tr '\n\000' '?\n' | head -n1)
+    descr=$(dd if="$1" bs=1 skip=32 count=32 2>/dev/null | tr '\n\000' '?\n' | head -n1)
+    arch=$(fsimage arch 2>/dev/null) && [ -n "$arch" ] || fail "fsimage arch failed"
+    [ "$itype" = "U-BOOT" ] || fail "image type '$itype' is not U-BOOT"
+    [ "$descr" = "$arch" ] || fail "image is for '$descr', board is '$arch'"
+
+    tmp=$(mktemp -d) || fail "mktemp failed"
+    trap 'rm -rf "$tmp"' EXIT
+
+    echo "$tag: boot_copy=$(cat /sys/bdinfo/boot_copy 2>/dev/null) before save of $1" >&2
+    fsimage save "$1" </dev/null >"$tmp/save.log" 2>&1
+    rc=$?
+    cat "$tmp/save.log" >&2
+    [ "$rc" -eq 0 ] && grep -qx 'Saving U-Boot complete' "$tmp/save.log" || \
+        fail "fsimage save failed (rc $rc)"
+
+    # fsimage does not bypass the page cache; without the drop the read-back
+    # would only see what save just wrote into it.
+    sync
+    sysctl -w vm.drop_caches=3 >/dev/null || fail "cannot drop the page cache before read-back"
+    fsimage load uboot "$tmp/u.fs" </dev/null >"$tmp/load.log" 2>&1
+    rc=$?
+    cat "$tmp/load.log" >&2
+    [ "$rc" -eq 0 ] && grep -qx ' *Both copies are identical' "$tmp/load.log" || \
+        fail "read-back of both copies failed (rc $rc)"
+    # load rewrites the 64-byte header, so compare the payload after it.
+    [ "$(tail -c +65 "$1" | sha256sum)" = "$(tail -c +65 "$tmp/u.fs" | sha256sum)" ] || \
+        fail "READ-BACK MISMATCH: flash payload differs from the bundle image"
+    echo "$tag: OK, boot_copy=$(cat /sys/bdinfo/boot_copy 2>/dev/null)" >&2
+}
+
 case "$1" in
 slot-post-install)
     locate_bundle_image 1
@@ -101,7 +149,8 @@ slot-post-install)
     echo "verify[$RAUC_SLOT_NAME]: OK" >&2
     ;;
 slot-install)
-    # container-mode appfs slot only: RAUC does not write the device (see
+    # bootloader slot: install_bootloader above.
+    # container-mode appfs slot: RAUC does not write the device (see
     # rauc-conf.bbappend, allow-mounted=true) -- this hook stages the app
     # image + its 3 verity sidecars at the atomic .incoming rename point
     # that fs-updater-lib later renames into app_<slot>.squashfs on commit.
@@ -111,6 +160,10 @@ slot-install)
     if [ -z "$img" ]; then
         echo "slot-install[$RAUC_SLOT_NAME]: cannot locate bundle image (RAUC_IMAGE_NAME='${RAUC_IMAGE_NAME:-}')" >&2
         exit 1
+    fi
+    if [ "${RAUC_SLOT_CLASS:-}" = bootloader ]; then
+        install_bootloader "$img"
+        exit 0
     fi
     for s in verity roothash roothash.p7s; do
         if [ ! -f "$img.$s" ]; then

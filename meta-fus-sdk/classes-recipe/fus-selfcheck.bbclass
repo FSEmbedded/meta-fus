@@ -361,6 +361,20 @@ the writable /etc overlay can freeze it and it would beat ${nonarch_libdir}/rauc
             bbfatal "fus-selfcheck: no app-dimension assertion wired for FUS_UPDATE_APP_MODE='${FUS_UPDATE_APP_MODE}'"
             ;;
     esac
+
+    # Bootloader slot only with the feature: a writable device would let RAUC
+    # write it raw, and parent= or bootname= would pull it into the A/B switch.
+    blk=$(sed -n '/^\[slot\.bootloader\./,/^\[/p' "$conf")
+    if ${@bb.utils.contains('MACHINE_FEATURES', 'fus-update-bootloader', 'true', 'false', d)}; then
+        printf '%s\n' "$blk" | grep -qx 'device=/sys/bdinfo/boot_dev' && \
+            printf '%s\n' "$blk" | grep -qx 'type=raw' || \
+            bbfatal "fus-selfcheck(bootloader): slot missing, not raw or off /sys/bdinfo/boot_dev"
+        printf '%s\n' "$blk" | grep -Eq '^(parent|bootname)=' && \
+            bbfatal "fus-selfcheck(bootloader): bootloader slot must have no parent= or bootname="
+    else
+        [ -z "$blk" ] || \
+            bbfatal "fus-selfcheck(bootloader): slot present without fus-update-bootloader"
+    fi
     :
 }
 

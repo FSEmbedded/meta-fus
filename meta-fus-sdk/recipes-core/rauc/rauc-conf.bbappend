@@ -21,6 +21,9 @@ PACKAGE_ARCH = "${MACHINE_ARCH}"
 
 SRC_URI:append = " file://system.conf.in"
 
+# the bootloader slot's install hook runs fsimage.
+RDEPENDS:${PN}:append = "${@bb.utils.contains('MACHINE_FEATURES', 'fus-update-bootloader', ' fsimage', '', d)}"
+
 do_install:prepend() {
     sed \
         -e 's|@@COMPATIBLE@@|${RAUC_BUNDLE_COMPATIBLE}|g' \
@@ -95,6 +98,14 @@ do_install:prepend() {
             bbfatal "rauc-conf: no system.conf app section wired for FUS_UPDATE_APP_MODE='${FUS_UPDATE_APP_MODE}'"
             ;;
     esac
+
+    # Bootloader slot outside the A/B graph, written by the bundle's install
+    # hook with fsimage. A read-only sysfs device makes RAUC's own raw writer
+    # fail instead of writing the image to the start of the boot medium.
+    if ${@bb.utils.contains('MACHINE_FEATURES', 'fus-update-bootloader', 'true', 'false', d)}; then
+        printf '\n[slot.bootloader.0]\ndevice=/sys/bdinfo/boot_dev\ntype=raw\n' \
+            >> ${WORKDIR}/system.conf
+    fi
 }
 
 # Ship the real CA as the device keyring and move both it and the generated

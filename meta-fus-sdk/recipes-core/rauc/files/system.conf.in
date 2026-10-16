@@ -14,8 +14,9 @@
 #
 # All slots are type=raw so the on-disk bytes equal the bundle image — the
 # precondition for the post-install read-back verification (install-check hook).
-# The bootloader lives in eMMC HW partitions boot0/boot1 and is updated out of
-# band — RAUC does not own a bootloader slot here.
+# The bootloader (eMMC boot0/boot1) is updated out of band; with the machine
+# feature fus-update-bootloader a slot on a read-only device is added, and the
+# bundle's install hook writes and reads back both copies with fsimage.
 
 [system]
 compatible=@@COMPATIBLE@@
