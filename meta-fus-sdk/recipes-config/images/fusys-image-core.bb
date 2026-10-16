@@ -23,3 +23,5 @@ IMAGE_LINGUAS = ""
 # emmc-${MACHINE}.sysimg flash alias (it can belong to only one image).
 # images built on this inherit the setting and re-enable it deliberately.
 FUS_EMMC_SYSIMG_ALIAS = "0"
+
+EXTRA_IMAGE_FEATURES:remove = "debug-tweaks"
