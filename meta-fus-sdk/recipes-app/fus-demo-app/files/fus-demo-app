@@ -15,8 +15,14 @@ systemd-notify --ready --status="healthy"
 # (app, firmware or both). /data/fus-app-no-commit holds it for rollback tests.
 if [ -e /data/fus-app-no-commit ]; then
     echo "fus-demo-app: commit held (/data/fus-app-no-commit)"
+elif reply=$(busctl call de.fsembedded.fsupdate1 /de/fsembedded/fsupdate1 \
+    de.fsembedded.fsupdate1 Commit 2>&1); then
+    case "${reply}" in
+        "b true") echo "fus-demo-app: commit successful, the pending update is confirmed" ;;
+        "b false") echo "fus-demo-app: commit not needed, no update pending" ;;
+        *) echo "fus-demo-app: commit reply not understood: ${reply}" >&2 ;;
+    esac
 else
-    echo "fus-demo-app: commit -> $(busctl call de.fsembedded.fsupdate1 \
-        /de/fsembedded/fsupdate1 de.fsembedded.fsupdate1 Commit 2>&1)"
+    echo "fus-demo-app: commit failed: ${reply}" >&2
 fi
 exec sleep infinity
