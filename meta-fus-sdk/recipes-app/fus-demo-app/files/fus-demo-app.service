@@ -4,6 +4,9 @@ Description=Example application (runs the payload from @@APP_MOUNT@@)
 # order before fus-app.target, so depend on the target.
 Requires=fus-app.target
 After=fus-app.target
+# the health probe asks whether this unit is active; order before it so
+# the probe does not run while the app is still starting.
+Before=fus-health-check.service
 # skip cleanly (not "failed") when no app is present yet.
 ConditionPathExists=@@APP_BINDIR@@/fus-demo-app
 

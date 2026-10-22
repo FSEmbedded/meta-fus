@@ -5,4 +5,5 @@ Description=Application filesystem ready at the app mount point
 # boot-time update bookkeeping (fus-update-confirm.service) order Before=
 # this target, so reaching it means the app filesystem is ready and
 # pending update state is reconciled. an application orders
-# After=/Requires= this target and stays mode-agnostic.
+# After=/Requires= this target and stays mode-agnostic; one whose health
+# probe checks that it is active also orders Before=fus-health-check.service.
