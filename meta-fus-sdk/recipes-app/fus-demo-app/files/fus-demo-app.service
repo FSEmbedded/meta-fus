@@ -34,9 +34,9 @@ SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
 # the payload neither networks nor does anything privileged, so confine
-# further.
+# further; PrivateUsers= is left out because systemd fails the unit on a
+# kernel without user namespaces.
 PrivateNetwork=yes
-PrivateUsers=yes
 IPAddressDeny=any
 RestrictAddressFamilies=AF_UNIX
 SystemCallArchitectures=native
